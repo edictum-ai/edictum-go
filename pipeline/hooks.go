@@ -9,6 +9,7 @@ import (
 // HookResult represents the outcome of a hook evaluation.
 type HookResult string
 
+// HookResult values.
 const (
 	HookResultAllow HookResult = "allow"
 	HookResultDeny  HookResult = "deny"

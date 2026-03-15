@@ -1,5 +1,12 @@
+version: "2"
+
 run:
   timeout: 5m
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 linters:
   enable:
@@ -10,8 +17,6 @@ linters:
     - ineffassign
     - unused
     - misspell
-    - gofmt
-    - goimports
     - revive
     - unconvert
     - gocritic

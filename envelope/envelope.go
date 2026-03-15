@@ -11,6 +11,7 @@ import (
 // SideEffect classifies the impact of a tool call.
 type SideEffect string
 
+// SideEffect classification values.
 const (
 	SideEffectPure         SideEffect = "pure"
 	SideEffectRead         SideEffect = "read"

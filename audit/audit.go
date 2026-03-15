@@ -12,6 +12,7 @@ import (
 // Action represents the type of governance event.
 type Action string
 
+// Audit action types.
 const (
 	ActionCallDenied           Action = "CALL_DENIED"
 	ActionCallWouldDeny        Action = "CALL_WOULD_DENY"

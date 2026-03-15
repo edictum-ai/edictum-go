@@ -9,6 +9,7 @@ import (
 // Status represents the current state of an approval request.
 type Status string
 
+// Approval status values.
 const (
 	StatusPending  Status = "pending"
 	StatusApproved Status = "approved"
