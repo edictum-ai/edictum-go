@@ -1,0 +1,47 @@
+run:
+  timeout: 5m
+  go: "1.22"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosec
+    - ineffassign
+    - unused
+    - misspell
+    - gofmt
+    - goimports
+    - revive
+    - unconvert
+    - gocritic
+    - prealloc
+    - nilerr
+    - errorlint
+    - exhaustive
+    - copyloopvar
+
+linters-settings:
+  gosec:
+    severity: high
+    confidence: medium
+  revive:
+    rules:
+      - name: exported
+        arguments:
+          - checkPrivateReceivers
+      - name: unexported-return
+      - name: error-return
+      - name: error-naming
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+  exhaustive:
+    default-signifies-exhaustive: true
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 5
