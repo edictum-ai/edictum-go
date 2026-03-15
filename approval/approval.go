@@ -35,8 +35,17 @@ func (r *Request) ApprovalID() string { return r.approvalID }
 // ToolName returns the tool name.
 func (r *Request) ToolName() string { return r.toolName }
 
-// ToolArgs returns the tool arguments.
-func (r *Request) ToolArgs() map[string]any { return r.toolArgs }
+// ToolArgs returns a defensive copy of the tool arguments.
+func (r *Request) ToolArgs() map[string]any {
+	if r.toolArgs == nil {
+		return nil
+	}
+	cp := make(map[string]any, len(r.toolArgs))
+	for k, v := range r.toolArgs {
+		cp[k] = v
+	}
+	return cp
+}
 
 // Message returns the approval message.
 func (r *Request) Message() string { return r.message }
@@ -44,8 +53,17 @@ func (r *Request) Message() string { return r.message }
 // Principal returns the principal associated with the request.
 func (r *Request) Principal() any { return r.principal }
 
-// Metadata returns the request metadata.
-func (r *Request) Metadata() map[string]any { return r.metadata }
+// Metadata returns a defensive copy of the request metadata.
+func (r *Request) Metadata() map[string]any {
+	if r.metadata == nil {
+		return nil
+	}
+	cp := make(map[string]any, len(r.metadata))
+	for k, v := range r.metadata {
+		cp[k] = v
+	}
+	return cp
+}
 
 // CreatedAt returns the time the request was created.
 func (r *Request) CreatedAt() time.Time { return r.createdAt }

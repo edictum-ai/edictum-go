@@ -130,7 +130,11 @@ func (s *Session) BatchGetCounters(ctx context.Context, includeTool string) (map
 
 	result := make(map[string]int, len(keys))
 	for i, key := range keys {
-		result[labels[i]] = parseIntOr(raw[key], 0)
+		v, err := parseCounter(raw[key])
+		if err != nil {
+			return nil, fmt.Errorf("corrupt counter %q: %w", labels[i], err)
+		}
+		result[labels[i]] = v
 	}
 	return result, nil
 }
@@ -140,23 +144,25 @@ func (s *Session) getCounter(ctx context.Context, key string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return parseIntOr(val, 0), nil
+	return parseCounter(val)
 }
 
 func (s *Session) key(counter string) string {
 	return fmt.Sprintf("s:%s:%s", s.sessionID, counter)
 }
 
-func parseIntOr(s string, fallback int) int {
+// parseCounter parses a counter value string. Empty strings return 0
+// (counter not yet initialized). Non-numeric values return an error
+// to fail closed per security policy.
+func parseCounter(s string) (int, error) {
 	if s == "" {
-		return fallback
+		return 0, nil
 	}
 	var v int
-	_, err := fmt.Sscanf(s, "%d", &v)
-	if err != nil {
-		return fallback
+	if _, err := fmt.Sscanf(s, "%d", &v); err != nil {
+		return 0, fmt.Errorf("corrupt counter value %q: %w", s, err)
 	}
-	return v
+	return v, nil
 }
 
 func validateKeyComponent(s string) error {

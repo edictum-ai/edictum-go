@@ -109,12 +109,18 @@ func NewCollectingSink(capacity int) *CollectingSink {
 	}
 }
 
-// Emit adds an event to the buffer. The event is copied to prevent
+// Emit adds an event to the buffer. The event is deep-copied to prevent
 // post-emit mutation from affecting audit integrity.
 func (c *CollectingSink) Emit(_ context.Context, event *Event) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	cp := *event
+	if event.ToolArgs != nil {
+		cp.ToolArgs = make(map[string]any, len(event.ToolArgs))
+		for k, v := range event.ToolArgs {
+			cp.ToolArgs[k] = v
+		}
+	}
 	if len(c.events) >= c.cap {
 		// Ring buffer: drop oldest
 		c.events = append(c.events[1:], cp)
