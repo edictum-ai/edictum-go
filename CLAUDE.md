@@ -25,7 +25,7 @@ edictum-go/
 ├── audit/                 # AuditSink, CompositeSink, FileSink, CollectingSink
 ├── redaction/             # RedactionPolicy
 ├── approval/              # ApprovalBackend, LocalApprovalBackend
-├── yaml/                  # YAML engine (optional dep)
+├── yaml/                  # YAML contract bundle loader (optional dep)
 ├── sandbox/               # Path/command/domain sandbox
 ├── guard/                 # Top-level Edictum guard (constructor, reload, from_yaml)
 ├── adapter/

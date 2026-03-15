@@ -3,6 +3,7 @@ package contract
 
 import (
 	"context"
+	"regexp"
 
 	"github.com/edictum-ai/edictum-go/envelope"
 )
@@ -29,9 +30,10 @@ func Pass() Verdict {
 }
 
 // Fail creates a failing verdict with a message (truncated to 500 chars).
+// Truncation preserves readability: "xxx..." (497 chars + "...").
 func Fail(message string, metadata ...map[string]any) Verdict {
 	if len(message) > 500 {
-		message = message[:500]
+		message = message[:497] + "..."
 	}
 	var meta map[string]any
 	if len(metadata) > 0 {
@@ -42,19 +44,34 @@ func Fail(message string, metadata ...map[string]any) Verdict {
 
 // Precondition defines a check that runs before tool execution.
 type Precondition struct {
-	Tool  string
-	Check func(ctx context.Context, env envelope.ToolEnvelope) (Verdict, error)
-	When  func(ctx context.Context, env envelope.ToolEnvelope) bool
+	Name          string // Human-readable name for audit records.
+	Tool          string // Tool name or "*" for all tools.
+	Check         func(ctx context.Context, env envelope.ToolEnvelope) (Verdict, error)
+	When          func(ctx context.Context, env envelope.ToolEnvelope) bool
+	Mode          string // "observe" for observe-mode; "" for enforce.
+	Source        string // Decision source for audit (default: "precondition").
+	Effect        string // "deny" (default) or "approve".
+	Timeout       int    // Approval timeout in seconds (default: 300).
+	TimeoutEffect string // "deny" (default) or "allow".
 }
 
 // Postcondition defines a check that runs after tool execution.
 type Postcondition struct {
-	Tool  string
-	Check func(ctx context.Context, env envelope.ToolEnvelope, response any) (Verdict, error)
-	When  func(ctx context.Context, env envelope.ToolEnvelope) bool
+	Name           string // Human-readable name for audit records.
+	Tool           string // Tool name or "*" for all tools.
+	Check          func(ctx context.Context, env envelope.ToolEnvelope, response any) (Verdict, error)
+	When           func(ctx context.Context, env envelope.ToolEnvelope) bool
+	Mode           string            // "observe" for observe-mode; "" for enforce.
+	Source         string            // Decision source for audit (default: "postcondition").
+	Effect         string            // "warn" (default), "redact", or "deny".
+	RedactPatterns []*regexp.Regexp  // Compiled regex patterns for redact effect.
 }
 
 // SessionContract defines a check that evaluates session-level state.
+// The Check function receives a *session.Session as the session parameter.
 type SessionContract struct {
-	Check func(ctx context.Context, session any) (Verdict, error)
+	Name   string // Human-readable name for audit records.
+	Check  func(ctx context.Context, session any) (Verdict, error)
+	Mode   string // "observe" for observe-mode; "" for enforce.
+	Source string // Decision source for audit (default: "session_contract").
 }

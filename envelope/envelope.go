@@ -102,7 +102,7 @@ func NewPrincipal(opts ...PrincipalOption) Principal {
 	return p
 }
 
-// ToolEnvelope is an immutable snapshot of a tool invocation.
+// ToolEnvelope is an immutable snapshot of a tool call.
 // Fields are unexported — use getter methods.
 type ToolEnvelope struct {
 	toolName    string

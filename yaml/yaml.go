@@ -1,2 +1,2 @@
-// Package yaml provides the YAML contract engine for loading contract bundles.
+// Package yaml provides YAML contract bundle loading and compilation.
 package yaml
