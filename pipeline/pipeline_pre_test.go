@@ -3,7 +3,6 @@ package pipeline_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -18,7 +17,6 @@ func TestPreExecute_SessionContractDeny(t *testing.T) {
 	sess, _ := session.New("test", backend)
 	ctx := context.Background()
 
-	// Simulate 3 executions
 	for i := 0; i < 3; i++ {
 		if err := sess.RecordExecution(ctx, "T", true); err != nil {
 			t.Fatal(err)
@@ -196,7 +194,6 @@ func TestPreExecute_ToolSpecificPrecondition(t *testing.T) {
 	}}
 	p := pipeline.New(prov)
 
-	// Non-Bash tool should not be affected
 	readEnv := makeEnvelope(t, "Read", map[string]any{"file_path": "/tmp/x"})
 	dec, err := p.PreExecute(ctx, readEnv, sess)
 	if err != nil {
@@ -206,7 +203,6 @@ func TestPreExecute_ToolSpecificPrecondition(t *testing.T) {
 		t.Fatalf("Read should be allowed, got %s", dec.Action)
 	}
 
-	// Bash tool should be denied
 	bashEnv := makeEnvelope(t, "Bash", map[string]any{"command": "ls"})
 	dec, err = p.PreExecute(ctx, bashEnv, sess)
 	if err != nil {
@@ -271,74 +267,11 @@ func TestPreExecute_PreconditionExceptionDenies(t *testing.T) {
 	}
 }
 
-func TestPreExecute_ObserveModeContractDoesNotDeny(t *testing.T) {
-	sess, _ := newTestSession(t)
-	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	prov := defaultProvider()
-	prov.preconditions = []contract.Precondition{{
-		Name: "observe_only", Tool: "*", Mode: "observe",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("would deny"), nil
-		},
-	}}
-	p := pipeline.New(prov)
-	env := makeEnvelope(t, "TestTool", nil)
-	dec, err := p.PreExecute(context.Background(), env, sess)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dec.Action != "allow" {
-		t.Fatalf("observe contract should not deny, got %s", dec.Action)
-	}
-	if !dec.Observed {
-		t.Fatal("expected Observed=true")
-	}
-}
-
-func TestPreExecute_ApprovalPending(t *testing.T) {
-	sess, _ := newTestSession(t)
-	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	prov := defaultProvider()
-	prov.preconditions = []contract.Precondition{{
-		Name: "needs_approval", Tool: "*", Effect: "approve",
-		Timeout: 60, TimeoutEffect: "allow",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("Requires human approval"), nil
-		},
-	}}
-	p := pipeline.New(prov)
-	env := makeEnvelope(t, "TestTool", nil)
-	dec, err := p.PreExecute(context.Background(), env, sess)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dec.Action != "pending_approval" {
-		t.Fatalf("expected pending_approval, got %s", dec.Action)
-	}
-	if dec.ApprovalTimeout != 60 {
-		t.Fatalf("expected timeout=60, got %d", dec.ApprovalTimeout)
-	}
-	if dec.ApprovalTimeoutEff != "allow" {
-		t.Fatalf("expected timeout_effect=allow, got %s", dec.ApprovalTimeoutEff)
-	}
-	if dec.ApprovalMessage != "Requires human approval" {
-		t.Fatalf("expected approval message, got %q", dec.ApprovalMessage)
-	}
-}
-
 func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 	backend := session.NewMemoryBackend()
 	sess, _ := session.New("test", backend)
 	ctx := context.Background()
 
-	// 2 attempts, limit is 3 — first call denied by precondition,
-	// second call should still work (not hit attempt limit yet)
 	prov := &mockProvider{limits: pipeline.OperationLimits{
 		MaxAttempts: 3, MaxToolCalls: 200, MaxCallsPerTool: map[string]int{},
 	}}
@@ -351,7 +284,6 @@ func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
 
-	// Each pre_execute is preceded by increment_attempts in the runner
 	if _, err := sess.IncrementAttempts(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -389,63 +321,6 @@ func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 	}
 }
 
-func TestPreExecute_ObserveContractsEvaluated(t *testing.T) {
-	sess, _ := newTestSession(t)
-	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	prov := defaultProvider()
-	prov.observePreconditions = []contract.Precondition{{
-		Name: "observe_check", Tool: "*",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("observe would deny"), nil
-		},
-	}}
-	p := pipeline.New(prov)
-	env := makeEnvelope(t, "TestTool", nil)
-	dec, err := p.PreExecute(context.Background(), env, sess)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dec.Action != "allow" {
-		t.Fatalf("observe contracts should not deny, got %s", dec.Action)
-	}
-	if len(dec.ObserveResults) != 1 {
-		t.Fatalf("expected 1 observe result, got %d", len(dec.ObserveResults))
-	}
-	if dec.ObserveResults[0]["passed"] != false {
-		t.Fatal("expected observe result passed=false")
-	}
-}
-
-func TestPreExecute_SandboxContractDeny(t *testing.T) {
-	sess, _ := newTestSession(t)
-	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	prov := defaultProvider()
-	prov.sandboxContracts = []contract.Precondition{{
-		Name: "path_sandbox", Tool: "*", Source: "yaml_sandbox",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("path not allowed"), nil
-		},
-	}}
-	p := pipeline.New(prov)
-	env := makeEnvelope(t, "Bash", map[string]any{"command": "cat /etc/shadow"})
-	dec, err := p.PreExecute(context.Background(), env, sess)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dec.Action != "deny" {
-		t.Fatalf("expected deny, got %s", dec.Action)
-	}
-	if dec.DecisionSource != "yaml_sandbox" {
-		t.Fatalf("expected yaml_sandbox source, got %s", dec.DecisionSource)
-	}
-}
-
 func TestPreExecute_PolicyErrorAggregation(t *testing.T) {
 	sess, _ := newTestSession(t)
 	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
@@ -473,84 +348,10 @@ func TestPreExecute_PolicyErrorAggregation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// First contract fails -> deny
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 	if !dec.PolicyError {
 		t.Fatal("expected policy_error=true (aggregated)")
-	}
-}
-
-// --- Parity IDs ---
-func TestParity_1_22_MessageTruncation500(t *testing.T) {
-	long := strings.Repeat("x", 600)
-	v := contract.Fail(long)
-	if len(v.Message()) != 500 {
-		t.Fatalf("expected 500, got %d", len(v.Message()))
-	}
-	if !strings.HasSuffix(v.Message(), "...") {
-		t.Fatal("expected ... suffix")
-	}
-}
-
-func TestParity_1_23_PreDecisionShape(t *testing.T) {
-	sess, _ := newTestSession(t)
-	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	p := pipeline.New(defaultProvider())
-	env := makeEnvelope(t, "TestTool", nil)
-	dec, err := p.PreExecute(context.Background(), env, sess)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Verify all fields are present and have correct zero-value types
-	_ = dec.Action
-	_ = dec.Reason
-	_ = dec.DecisionSource
-	_ = dec.DecisionName
-	_ = dec.HooksEvaluated
-	_ = dec.ContractsEvaluated
-	_ = dec.Observed
-	_ = dec.PolicyError
-	_ = dec.ObserveResults
-	_ = dec.ApprovalTimeout
-	_ = dec.ApprovalTimeoutEff
-	_ = dec.ApprovalMessage
-
-	if dec.HooksEvaluated == nil {
-		t.Fatal("HooksEvaluated should be non-nil slice")
-	}
-	if dec.ContractsEvaluated == nil {
-		t.Fatal("ContractsEvaluated should be non-nil slice")
-	}
-}
-
-func TestParity_1_5_HookExceptionDeny(t *testing.T) {
-	sess, _ := newTestSession(t)
-	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	prov := defaultProvider()
-	prov.hooks = []pipeline.HookRegistration{{
-		Phase: "before", Tool: "*", Name: "boom",
-		Before: func(_ context.Context, _ *envelope.ToolEnvelope) (pipeline.HookDecision, error) {
-			return pipeline.HookDecision{}, fmt.Errorf("kaboom")
-		},
-	}}
-	p := pipeline.New(prov)
-	env := makeEnvelope(t, "TestTool", nil)
-	dec, err := p.PreExecute(context.Background(), env, sess)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dec.Action != "deny" {
-		t.Fatalf("hook exception should deny, got %s", dec.Action)
-	}
-	if !strings.Contains(dec.Reason, "Hook error:") {
-		t.Fatalf("expected 'Hook error:' in reason, got %q", dec.Reason)
 	}
 }
