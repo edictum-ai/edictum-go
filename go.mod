@@ -1,3 +1,3 @@
 module github.com/edictum-ai/edictum-go
 
-go 1.23.0
+go 1.25.0
