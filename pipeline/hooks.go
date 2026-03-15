@@ -35,19 +35,19 @@ func DenyHook(reason string) HookDecision {
 }
 
 // BeforeHookFunc is the signature for before-execution hooks.
-type BeforeHookFunc func(ctx context.Context, env envelope.ToolEnvelope) (HookDecision, error)
+type BeforeHookFunc func(ctx context.Context, env *envelope.ToolEnvelope) (HookDecision, error)
 
 // AfterHookFunc is the signature for after-execution hooks.
-type AfterHookFunc func(ctx context.Context, env envelope.ToolEnvelope, result any) error
+type AfterHookFunc func(ctx context.Context, env *envelope.ToolEnvelope, result any) error
 
 // HookRegistration binds a hook callback to a phase and tool pattern.
 type HookRegistration struct {
-	Phase    string         // "before" or "after"
-	Tool     string         // Tool name, glob pattern, or "*" for all.
-	Before   BeforeHookFunc // Set for phase="before".
-	After    AfterHookFunc  // Set for phase="after".
-	When     func(ctx context.Context, env envelope.ToolEnvelope) bool
-	Name     string         // Human-readable name for audit.
+	Phase  string         // "before" or "after"
+	Tool   string         // Tool name, glob pattern, or "*" for all.
+	Before BeforeHookFunc // Set for phase="before".
+	After  AfterHookFunc  // Set for phase="after".
+	When   func(ctx context.Context, env *envelope.ToolEnvelope) bool
+	Name   string // Human-readable name for audit.
 }
 
 // HookName returns the hook's name, falling back to "anonymous".

@@ -2,17 +2,17 @@ package pipeline
 
 // PreDecision is the result of pre-execution governance checks.
 type PreDecision struct {
-	Action             string           // "allow", "deny", or "pending_approval"
+	Action             string
 	Reason             string
 	DecisionSource     string
 	DecisionName       string
-	HooksEvaluated     []map[string]any // Each hook: name, result, reason.
-	ContractsEvaluated []map[string]any // Each contract: name, type, passed, message.
-	Observed           bool             // True if any per-contract observe deny occurred.
+	HooksEvaluated     []map[string]any
+	ContractsEvaluated []map[string]any
+	Observed           bool
 	PolicyError        bool
-	ObserveResults     []map[string]any // Observe-mode contract results.
-	ApprovalTimeout    int              // Seconds. Default: 300.
-	ApprovalTimeoutEff string           // "deny" (default) or "allow".
+	ObserveResults     []map[string]any
+	ApprovalTimeout    int
+	ApprovalTimeoutEff string
 	ApprovalMessage    string
 }
 

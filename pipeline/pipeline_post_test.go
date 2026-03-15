@@ -11,11 +11,11 @@ import (
 	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
-func makeEnvelopeWithRegistry(t *testing.T, tool string, args map[string]any, se envelope.SideEffect) envelope.ToolEnvelope {
+func makeEnvelopeWithRegistry(t *testing.T, tool string, args map[string]any, se envelope.SideEffect) *envelope.ToolEnvelope {
 	t.Helper()
 	reg := envelope.NewToolRegistry()
 	reg.Register(tool, se, false)
-	env, err := envelope.CreateEnvelope(context.Background(), envelope.CreateEnvelopeOptions{
+	env, err := envelope.CreateEnvelope(context.Background(), &envelope.CreateEnvelopeOptions{
 		ToolName: tool, Args: args, Registry: reg,
 	})
 	if err != nil {
@@ -46,7 +46,7 @@ func TestPostExecute_PostconditionFailurePureTool(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "check_result", Tool: "TestTool",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope, result any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope, result any) (contract.Verdict, error) {
 			if result != "expected" {
 				return contract.Fail("Unexpected result"), nil
 			}
@@ -55,7 +55,10 @@ func TestPostExecute_PostconditionFailurePureTool(t *testing.T) {
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelopeWithRegistry(t, "TestTool", nil, envelope.SideEffectPure)
-	dec, _ := p.PostExecute(context.Background(), env, "wrong", true)
+	dec, err := p.PostExecute(context.Background(), env, "wrong", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.PostconditionsPassed {
 		t.Fatal("expected postconditions_passed=false")
 	}
@@ -71,14 +74,17 @@ func TestPostExecute_PostconditionFailureWriteTool(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "check_write", Tool: "WriteTool",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("Write verification failed"), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	// WriteTool defaults to IRREVERSIBLE (unregistered)
 	env := makeEnvelope(t, "WriteTool", nil)
-	dec, _ := p.PostExecute(context.Background(), env, "result", true)
+	dec, err := p.PostExecute(context.Background(), env, "result", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.PostconditionsPassed {
 		t.Fatal("expected postconditions_passed=false")
 	}
@@ -92,14 +98,17 @@ func TestPostExecute_AfterHooksCalled(t *testing.T) {
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "after", Tool: "*", Name: "tracker",
-		After: func(_ context.Context, _ envelope.ToolEnvelope, result any) error {
+		After: func(_ context.Context, _ *envelope.ToolEnvelope, result any) error {
 			called = append(called, result)
 			return nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	p.PostExecute(context.Background(), env, "the_result", true)
+	_, err := p.PostExecute(context.Background(), env, "the_result", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(called) != 1 || called[0] != "the_result" {
 		t.Fatalf("expected after hook called with 'the_result', got %v", called)
 	}
@@ -108,26 +117,32 @@ func TestPostExecute_AfterHooksCalled(t *testing.T) {
 func TestPostExecute_ToolFailureReported(t *testing.T) {
 	p := pipeline.New(defaultProvider())
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PostExecute(context.Background(), env, "Error: failed", false)
+	dec, err := p.PostExecute(context.Background(), env, "Error: failed", false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.ToolSuccess {
 		t.Fatal("expected tool_success=false")
 	}
 }
 
-// --- Postcondition effects (parity 1.12–1.16) ---
+// --- Postcondition effects (parity 1.12-1.16) ---
 
 func TestPostExecute_RedactEffectPureTool(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "redact_ssn", Tool: "TestTool", Effect: "redact",
 		RedactPatterns: []*regexp.Regexp{regexp.MustCompile(`\d{3}-\d{2}-\d{4}`)},
-		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("SSN found"), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelopeWithRegistry(t, "TestTool", nil, envelope.SideEffectPure)
-	dec, _ := p.PostExecute(context.Background(), env, "SSN: 123-45-6789", true)
+	dec, err := p.PostExecute(context.Background(), env, "SSN: 123-45-6789", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	redacted, ok := dec.RedactedResponse.(string)
 	if !ok {
 		t.Fatalf("expected string response, got %T", dec.RedactedResponse)
@@ -145,13 +160,16 @@ func TestPostExecute_RedactEffectWriteFallsBackToWarn(t *testing.T) {
 	prov.postconditions = []contract.Postcondition{{
 		Name: "redact_attempt", Tool: "WriteTool", Effect: "redact",
 		RedactPatterns: []*regexp.Regexp{regexp.MustCompile(`secret`)},
-		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("found secret"), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelopeWithRegistry(t, "WriteTool", nil, envelope.SideEffectWrite)
-	dec, _ := p.PostExecute(context.Background(), env, "secret data", true)
+	dec, err := p.PostExecute(context.Background(), env, "secret data", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// WRITE tool: redact falls back to warn
 	if dec.RedactedResponse != nil {
 		t.Fatalf("WRITE tool should not be redacted, got %v", dec.RedactedResponse)
@@ -165,13 +183,16 @@ func TestPostExecute_DenyEffectPureTool(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "suppress_output", Tool: "TestTool", Effect: "deny",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("output not allowed"), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelopeWithRegistry(t, "TestTool", nil, envelope.SideEffectRead)
-	dec, _ := p.PostExecute(context.Background(), env, "sensitive data", true)
+	dec, err := p.PostExecute(context.Background(), env, "sensitive data", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !dec.OutputSuppressed {
 		t.Fatal("expected output_suppressed=true")
 	}
@@ -188,13 +209,16 @@ func TestPostExecute_DenyEffectWriteFallsBackToWarn(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "deny_attempt", Tool: "WriteTool", Effect: "deny",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("not allowed"), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelopeWithRegistry(t, "WriteTool", nil, envelope.SideEffectIrreversible)
-	dec, _ := p.PostExecute(context.Background(), env, "result", true)
+	dec, err := p.PostExecute(context.Background(), env, "result", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.OutputSuppressed {
 		t.Fatal("IRREVERSIBLE tool should not suppress output")
 	}
@@ -207,20 +231,19 @@ func TestPostExecute_ObserveModePostcondition(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "observe_post", Tool: "TestTool", Mode: "observe", Effect: "redact",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("would redact"), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelopeWithRegistry(t, "TestTool", nil, envelope.SideEffectPure)
-	dec, _ := p.PostExecute(context.Background(), env, "data", true)
+	dec, err := p.PostExecute(context.Background(), env, "data", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Observe mode: no redaction
 	if dec.RedactedResponse != nil {
 		t.Fatal("observe mode should not redact")
-	}
-	if !dec.PostconditionsPassed {
-		// PostconditionsPassed is false because contract didn't pass
-		// But observe mode should still log it
 	}
 	if len(dec.Warnings) != 1 {
 		t.Fatalf("expected 1 observe warning, got %d", len(dec.Warnings))
@@ -234,7 +257,7 @@ func TestPostExecute_ObservePostconditionsEvaluated(t *testing.T) {
 	prov := defaultProvider()
 	prov.observePostconditions = []contract.Postcondition{{
 		Name: "observe_scan", Tool: "TestTool", Effect: "redact",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope, resp any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope, resp any) (contract.Verdict, error) {
 			if strings.Contains(resp.(string), "secret") {
 				return contract.Fail("secret detected in output"), nil
 			}
@@ -289,13 +312,16 @@ func TestPostExecute_ObservePostconditionPassDoesNotWarn(t *testing.T) {
 	prov := defaultProvider()
 	prov.observePostconditions = []contract.Postcondition{{
 		Name: "observe_pass", Tool: "TestTool",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Pass(), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelopeWithRegistry(t, "TestTool", nil, envelope.SideEffectPure)
-	dec, _ := p.PostExecute(context.Background(), env, "clean data", true)
+	dec, err := p.PostExecute(context.Background(), env, "clean data", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if len(dec.ContractsEvaluated) != 1 {
 		t.Fatalf("expected 1 contract, got %d", len(dec.ContractsEvaluated))
@@ -314,7 +340,10 @@ func TestPostExecute_ObservePostconditionPassDoesNotWarn(t *testing.T) {
 func TestParity_1_24_PostDecisionShape(t *testing.T) {
 	p := pipeline.New(defaultProvider())
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PostExecute(context.Background(), env, "ok", true)
+	dec, err := p.PostExecute(context.Background(), env, "ok", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_ = dec.ToolSuccess
 	_ = dec.PostconditionsPassed

@@ -26,7 +26,7 @@ func New(provider ContractProvider) *GovernancePipeline {
 // PreExecute runs all pre-execution governance checks.
 func (p *GovernancePipeline) PreExecute(
 	ctx context.Context,
-	env envelope.ToolEnvelope,
+	env *envelope.ToolEnvelope,
 	sess *session.Session,
 ) (PreDecision, error) {
 	hooks := make([]map[string]any, 0)
@@ -182,4 +182,3 @@ func (p *GovernancePipeline) PreExecute(
 		ObserveResults:     observeResults,
 	}, nil
 }
-

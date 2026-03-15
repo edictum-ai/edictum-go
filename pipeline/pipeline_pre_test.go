@@ -20,9 +20,13 @@ func TestPreExecute_SessionContractDeny(t *testing.T) {
 
 	// Simulate 3 executions
 	for i := 0; i < 3; i++ {
-		sess.RecordExecution(ctx, "T", true)
+		if err := sess.RecordExecution(ctx, "T", true); err != nil {
+			t.Fatal(err)
+		}
 	}
-	sess.IncrementAttempts(ctx)
+	if _, err := sess.IncrementAttempts(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.sessionContracts = []contract.SessionContract{{
@@ -38,7 +42,10 @@ func TestPreExecute_SessionContractDeny(t *testing.T) {
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(ctx, env, sess)
+	dec, err := p.PreExecute(ctx, env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
@@ -52,16 +59,25 @@ func TestPreExecute_ExecutionLimitDeny(t *testing.T) {
 	sess, _ := session.New("test", backend)
 	ctx := context.Background()
 
-	sess.RecordExecution(ctx, "T", true)
-	sess.RecordExecution(ctx, "T", true)
-	sess.IncrementAttempts(ctx)
+	if err := sess.RecordExecution(ctx, "T", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := sess.RecordExecution(ctx, "T", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sess.IncrementAttempts(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := &mockProvider{limits: pipeline.OperationLimits{
 		MaxAttempts: 500, MaxToolCalls: 2, MaxCallsPerTool: map[string]int{},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(ctx, env, sess)
+	dec, err := p.PreExecute(ctx, env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
@@ -78,8 +94,12 @@ func TestPreExecute_PerToolLimitDeny(t *testing.T) {
 	sess, _ := session.New("test", backend)
 	ctx := context.Background()
 
-	sess.RecordExecution(ctx, "Bash", true)
-	sess.IncrementAttempts(ctx)
+	if err := sess.RecordExecution(ctx, "Bash", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sess.IncrementAttempts(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := &mockProvider{limits: pipeline.OperationLimits{
 		MaxAttempts: 500, MaxToolCalls: 200,
@@ -87,7 +107,10 @@ func TestPreExecute_PerToolLimitDeny(t *testing.T) {
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "Bash", map[string]any{"command": "ls"})
-	dec, _ := p.PreExecute(ctx, env, sess)
+	dec, err := p.PreExecute(ctx, env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
@@ -98,27 +121,29 @@ func TestPreExecute_PerToolLimitDeny(t *testing.T) {
 
 func TestPreExecute_EvaluationOrder(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	var order []string
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "tracking_hook",
-		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ *envelope.ToolEnvelope) (pipeline.HookDecision, error) {
 			order = append(order, "hook")
 			return pipeline.AllowHook(), nil
 		},
 	}}
 	prov.preconditions = []contract.Precondition{{
 		Name: "tracking_pre", Tool: "*",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 			order = append(order, "precondition")
 			return contract.Pass(), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	p.PreExecute(context.Background(), env, sess)
+	_, _ = p.PreExecute(context.Background(), env, sess)
 
 	if len(order) != 2 || order[0] != "hook" || order[1] != "precondition" {
 		t.Fatalf("expected [hook, precondition], got %v", order)
@@ -127,18 +152,23 @@ func TestPreExecute_EvaluationOrder(t *testing.T) {
 
 func TestPreExecute_ContractsEvaluatedPopulated(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "check_a", Tool: "*",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Pass(), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(context.Background(), env, sess)
+	dec, err := p.PreExecute(context.Background(), env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(dec.ContractsEvaluated) != 1 {
 		t.Fatalf("expected 1 contract, got %d", len(dec.ContractsEvaluated))
 	}
@@ -153,12 +183,14 @@ func TestPreExecute_ContractsEvaluatedPopulated(t *testing.T) {
 func TestPreExecute_ToolSpecificPrecondition(t *testing.T) {
 	sess, _ := newTestSession(t)
 	ctx := context.Background()
-	sess.IncrementAttempts(ctx)
+	if _, err := sess.IncrementAttempts(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "bash_only", Tool: "Bash",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("bash denied"), nil
 		},
 	}}
@@ -166,14 +198,20 @@ func TestPreExecute_ToolSpecificPrecondition(t *testing.T) {
 
 	// Non-Bash tool should not be affected
 	readEnv := makeEnvelope(t, "Read", map[string]any{"file_path": "/tmp/x"})
-	dec, _ := p.PreExecute(ctx, readEnv, sess)
+	dec, err := p.PreExecute(ctx, readEnv, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "allow" {
 		t.Fatalf("Read should be allowed, got %s", dec.Action)
 	}
 
 	// Bash tool should be denied
 	bashEnv := makeEnvelope(t, "Bash", map[string]any{"command": "ls"})
-	dec, _ = p.PreExecute(ctx, bashEnv, sess)
+	dec, err = p.PreExecute(ctx, bashEnv, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("Bash should be denied, got %s", dec.Action)
 	}
@@ -181,18 +219,23 @@ func TestPreExecute_ToolSpecificPrecondition(t *testing.T) {
 
 func TestPreExecute_HookExceptionDenies(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "exploding_hook",
-		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ *envelope.ToolEnvelope) (pipeline.HookDecision, error) {
 			return pipeline.HookDecision{}, errors.New("hook exploded")
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(context.Background(), env, sess)
+	dec, err := p.PreExecute(context.Background(), env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny on hook error, got %s", dec.Action)
 	}
@@ -203,18 +246,23 @@ func TestPreExecute_HookExceptionDenies(t *testing.T) {
 
 func TestPreExecute_PreconditionExceptionDenies(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "exploding", Tool: "*",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Verdict{}, errors.New("check exploded")
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(context.Background(), env, sess)
+	dec, err := p.PreExecute(context.Background(), env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
@@ -225,18 +273,23 @@ func TestPreExecute_PreconditionExceptionDenies(t *testing.T) {
 
 func TestPreExecute_ObserveModeContractDoesNotDeny(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "observe_only", Tool: "*", Mode: "observe",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("would deny"), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(context.Background(), env, sess)
+	dec, err := p.PreExecute(context.Background(), env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "allow" {
 		t.Fatalf("observe contract should not deny, got %s", dec.Action)
 	}
@@ -247,19 +300,24 @@ func TestPreExecute_ObserveModeContractDoesNotDeny(t *testing.T) {
 
 func TestPreExecute_ApprovalPending(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "needs_approval", Tool: "*", Effect: "approve",
 		Timeout: 60, TimeoutEffect: "allow",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("Requires human approval"), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(context.Background(), env, sess)
+	dec, err := p.PreExecute(context.Background(), env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "pending_approval" {
 		t.Fatalf("expected pending_approval, got %s", dec.Action)
 	}
@@ -286,7 +344,7 @@ func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 	}}
 	prov.preconditions = []contract.Precondition{{
 		Name: "always_deny", Tool: "*",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("denied"), nil
 		},
 	}}
@@ -294,20 +352,35 @@ func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 	env := makeEnvelope(t, "TestTool", nil)
 
 	// Each pre_execute is preceded by increment_attempts in the runner
-	sess.IncrementAttempts(ctx) // attempt 1
-	dec, _ := p.PreExecute(ctx, env, sess)
+	if _, err := sess.IncrementAttempts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	dec, err := p.PreExecute(ctx, env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 
-	sess.IncrementAttempts(ctx) // attempt 2
-	dec, _ = p.PreExecute(ctx, env, sess)
+	if _, err := sess.IncrementAttempts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	dec, err = p.PreExecute(ctx, env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 
-	sess.IncrementAttempts(ctx) // attempt 3 — now at limit
-	dec, _ = p.PreExecute(ctx, env, sess)
+	if _, err := sess.IncrementAttempts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	dec, err = p.PreExecute(ctx, env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
@@ -318,18 +391,23 @@ func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 
 func TestPreExecute_ObserveContractsEvaluated(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.observePreconditions = []contract.Precondition{{
 		Name: "observe_check", Tool: "*",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("observe would deny"), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(context.Background(), env, sess)
+	dec, err := p.PreExecute(context.Background(), env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "allow" {
 		t.Fatalf("observe contracts should not deny, got %s", dec.Action)
 	}
@@ -343,18 +421,23 @@ func TestPreExecute_ObserveContractsEvaluated(t *testing.T) {
 
 func TestPreExecute_SandboxContractDeny(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.sandboxContracts = []contract.Precondition{{
 		Name: "path_sandbox", Tool: "*", Source: "yaml_sandbox",
-		Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("path not allowed"), nil
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "Bash", map[string]any{"command": "cat /etc/shadow"})
-	dec, _ := p.PreExecute(context.Background(), env, sess)
+	dec, err := p.PreExecute(context.Background(), env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
@@ -365,27 +448,32 @@ func TestPreExecute_SandboxContractDeny(t *testing.T) {
 
 func TestPreExecute_PolicyErrorAggregation(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{
 		{
 			Name: "error_contract", Tool: "*",
-			Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+			Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 				return contract.Fail("err", map[string]any{"policy_error": true}), nil
 			},
 		},
 		{
 			Name: "pass_contract", Tool: "*",
-			Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+			Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
 				return contract.Pass(), nil
 			},
 		},
 	}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(context.Background(), env, sess)
-	// First contract fails → deny
+	dec, err := p.PreExecute(context.Background(), env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// First contract fails -> deny
 	if dec.Action != "deny" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
@@ -408,10 +496,15 @@ func TestParity_1_22_MessageTruncation500(t *testing.T) {
 
 func TestParity_1_23_PreDecisionShape(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	p := pipeline.New(defaultProvider())
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(context.Background(), env, sess)
+	dec, err := p.PreExecute(context.Background(), env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Verify all fields are present and have correct zero-value types
 	_ = dec.Action
@@ -437,18 +530,23 @@ func TestParity_1_23_PreDecisionShape(t *testing.T) {
 
 func TestParity_1_5_HookExceptionDeny(t *testing.T) {
 	sess, _ := newTestSession(t)
-	sess.IncrementAttempts(context.Background())
+	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "boom",
-		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ *envelope.ToolEnvelope) (pipeline.HookDecision, error) {
 			return pipeline.HookDecision{}, fmt.Errorf("kaboom")
 		},
 	}}
 	p := pipeline.New(prov)
 	env := makeEnvelope(t, "TestTool", nil)
-	dec, _ := p.PreExecute(context.Background(), env, sess)
+	dec, err := p.PreExecute(context.Background(), env, sess)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dec.Action != "deny" {
 		t.Fatalf("hook exception should deny, got %s", dec.Action)
 	}

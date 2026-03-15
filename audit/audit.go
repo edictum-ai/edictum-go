@@ -68,7 +68,7 @@ func NewEvent() Event {
 
 // Sink defines the interface for emitting audit events.
 type Sink interface {
-	Emit(ctx context.Context, event Event) error
+	Emit(ctx context.Context, event *Event) error
 }
 
 // CompositeSink fans out events to multiple sinks.
@@ -82,7 +82,7 @@ func NewCompositeSink(sinks ...Sink) *CompositeSink {
 }
 
 // Emit sends the event to all sinks, collecting errors.
-func (c *CompositeSink) Emit(ctx context.Context, event Event) error {
+func (c *CompositeSink) Emit(ctx context.Context, event *Event) error {
 	var errs []error
 	for _, s := range c.sinks {
 		if err := s.Emit(ctx, event); err != nil {
@@ -109,18 +109,20 @@ func NewCollectingSink(capacity int) *CollectingSink {
 	}
 }
 
-// Emit adds an event to the buffer.
-func (c *CollectingSink) Emit(_ context.Context, event Event) error {
+// Emit adds an event to the buffer. The event is copied to prevent
+// post-emit mutation from affecting audit integrity.
+func (c *CollectingSink) Emit(_ context.Context, event *Event) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	cp := *event
 	if len(c.events) >= c.cap {
 		// Ring buffer: drop oldest
-		c.events = append(c.events[1:], event)
+		c.events = append(c.events[1:], cp)
 		if c.mark >= 0 {
 			c.mark--
 		}
 	} else {
-		c.events = append(c.events, event)
+		c.events = append(c.events, cp)
 	}
 	return nil
 }
@@ -164,7 +166,7 @@ func (c *CollectingSink) SinceMark() ([]Event, error) {
 type StdoutSink struct{}
 
 // Emit writes the event to stdout.
-func (s *StdoutSink) Emit(_ context.Context, event Event) error {
+func (s *StdoutSink) Emit(_ context.Context, event *Event) error {
 	fmt.Printf("[%s] %s tool=%s action=%s\n",
 		event.Timestamp.Format(time.RFC3339),
 		event.SchemaVersion,

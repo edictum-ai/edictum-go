@@ -12,7 +12,7 @@ import (
 // PostExecute runs all post-execution governance checks.
 func (p *GovernancePipeline) PostExecute(
 	ctx context.Context,
-	env envelope.ToolEnvelope,
+	env *envelope.ToolEnvelope,
 	toolResponse any,
 	toolSuccess bool,
 ) (PostDecision, error) {

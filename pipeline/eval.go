@@ -13,7 +13,7 @@ import (
 // Returns (decision, true) if a deny/approval was triggered; (zero, false) otherwise.
 func (p *GovernancePipeline) evalPreconditions(
 	ctx context.Context,
-	env envelope.ToolEnvelope,
+	env *envelope.ToolEnvelope,
 	pres []contract.Precondition,
 	defaultSource string,
 	hooks []map[string]any,

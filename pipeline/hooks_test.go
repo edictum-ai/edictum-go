@@ -27,11 +27,11 @@ func TestHookDecisionDeny(t *testing.T) {
 
 func TestHookDecisionDenyTruncation(t *testing.T) {
 	tests := []struct {
-		name      string
-		inputLen  int
-		wantLen   int
+		name       string
+		inputLen   int
+		wantLen    int
 		wantSuffix string
-		exact     bool // if true, reason should equal input exactly
+		exact      bool
 	}{
 		{
 			name:     "exact_500_no_truncation",

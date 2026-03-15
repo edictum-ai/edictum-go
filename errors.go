@@ -2,12 +2,12 @@ package edictum
 
 import "fmt"
 
-// EdictumError is the base error type for all edictum errors.
-type EdictumError struct {
+// Error is the base error type for all edictum errors.
+type Error struct {
 	Message string
 }
 
-func (e *EdictumError) Error() string {
+func (e *Error) Error() string {
 	return e.Message
 }
 

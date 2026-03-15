@@ -14,13 +14,17 @@ import (
 // affecting the real decision. Results are returned for audit emission.
 func (p *GovernancePipeline) evaluateObserveContracts(
 	ctx context.Context,
-	env envelope.ToolEnvelope,
+	env *envelope.ToolEnvelope,
 	sess *session.Session,
 ) []map[string]any {
-	var results []map[string]any
+	// Pre-allocate results slice based on total observe contract count.
+	shadowPres := p.provider.GetObservePreconditions(env)
+	shadowSandbox := p.provider.GetObserveSandboxContracts(env)
+	shadowSession := p.provider.GetObserveSessionContracts()
+	results := make([]map[string]any, 0, len(shadowPres)+len(shadowSandbox)+len(shadowSession))
 
 	// Observe preconditions
-	for _, c := range p.provider.GetObservePreconditions(env) {
+	for _, c := range shadowPres {
 		verdict, err := c.Check(ctx, env)
 		if err != nil {
 			log.Printf("Observe-mode precondition %s raised: %v", contractName(c.Name), err)
@@ -43,7 +47,7 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 	}
 
 	// Observe sandbox contracts
-	for _, c := range p.provider.GetObserveSandboxContracts(env) {
+	for _, c := range shadowSandbox {
 		verdict, err := c.Check(ctx, env)
 		if err != nil {
 			log.Printf("Observe-mode sandbox %s raised: %v", contractName(c.Name), err)
@@ -66,7 +70,7 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 	}
 
 	// Observe session contracts
-	for _, sc := range p.provider.GetObserveSessionContracts() {
+	for _, sc := range shadowSession {
 		verdict, err := sc.Check(ctx, sess)
 		if err != nil {
 			log.Printf("Observe-mode session contract %s raised: %v", contractName(sc.Name), err)
