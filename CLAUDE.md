@@ -25,7 +25,7 @@ edictum-go/
 ├── audit/                 # AuditSink, CompositeSink, FileSink, CollectingSink
 ├── redaction/             # RedactionPolicy
 ├── approval/              # ApprovalBackend, LocalApprovalBackend
-├── yaml/                  # YAML engine (optional dep)
+├── yaml/                  # YAML contract bundle loader (optional dep)
 ├── sandbox/               # Path/command/domain sandbox
 ├── guard/                 # Top-level Edictum guard (constructor, reload, from_yaml)
 ├── adapter/
@@ -44,7 +44,7 @@ edictum-go/
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
-| Language | Go 1.22+ | Latest stable, generics, errors.Join, slices/maps |
+| Language | Go 1.25+ | Oldest supported release, generics, errors.Join, slices/maps |
 | Build | `go build` | Standard toolchain, no third-party build tool |
 | Test | `go test` + testify | Standard testing, testify for assertions |
 | Lint | golangci-lint | gosec, staticcheck, govet, errcheck |

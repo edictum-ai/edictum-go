@@ -11,6 +11,7 @@ import (
 // SideEffect classifies the impact of a tool call.
 type SideEffect string
 
+// SideEffect classification values.
 const (
 	SideEffectPure         SideEffect = "pure"
 	SideEffectRead         SideEffect = "read"
@@ -102,7 +103,7 @@ func NewPrincipal(opts ...PrincipalOption) Principal {
 	return p
 }
 
-// ToolEnvelope is an immutable snapshot of a tool invocation.
+// ToolEnvelope is an immutable snapshot of a tool call.
 // Fields are unexported — use getter methods.
 type ToolEnvelope struct {
 	toolName    string

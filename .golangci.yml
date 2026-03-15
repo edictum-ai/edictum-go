@@ -1,6 +1,12 @@
+version: "2"
+
 run:
   timeout: 5m
-  go: "1.22"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 linters:
   enable:
@@ -11,8 +17,6 @@ linters:
     - ineffassign
     - unused
     - misspell
-    - gofmt
-    - goimports
     - revive
     - unconvert
     - gocritic
@@ -39,6 +43,11 @@ linters-settings:
       - diagnostic
       - style
       - performance
+    disabled-checks:
+      # ToolEnvelope (216B) and Principal (88B) use value receivers by design:
+      # immutable types with unexported fields. Copying is the immutability
+      # mechanism — callers cannot mutate the original through a copy.
+      - hugeParam
   exhaustive:
     default-signifies-exhaustive: true
 

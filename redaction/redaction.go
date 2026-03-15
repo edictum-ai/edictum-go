@@ -49,6 +49,12 @@ func WithDetectSecrets(detect bool) Option {
 	return func(p *Policy) { p.detectSecrets = detect }
 }
 
+// BashPatterns returns the configured bash redaction patterns.
+func (p *Policy) BashPatterns() []string { return p.bashPatterns }
+
+// SecretPatterns returns the configured secret detection patterns.
+func (p *Policy) SecretPatterns() []string { return p.secretPatterns }
+
 // NewPolicy creates a new RedactionPolicy with the given options.
 func NewPolicy(opts ...Option) *Policy {
 	p := &Policy{
