@@ -1,0 +1,155 @@
+name: Code Review
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, ready_for_review, reopened]
+
+concurrency:
+  group: review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # SECURITY: Extract governance files from the BASE branch, not the PR.
+      # A malicious PR could modify CLAUDE.md to inject instructions into the
+      # reviewer agent.
+      - name: Extract governance files from base branch
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          mkdir -p /tmp/governance
+          git show "origin/${BASE_REF}:CLAUDE.md" > /tmp/governance/CLAUDE.md 2>/dev/null || true
+          git show "origin/${BASE_REF}:.github/review-instructions.md" > /tmp/governance/review-instructions.md 2>/dev/null || true
+          git show "origin/${BASE_REF}:.github/review-template.md" > /tmp/governance/review-template.md 2>/dev/null || true
+
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Run Code Review
+        id: review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          model: claude-sonnet-4-6
+          claude_args: '--max-turns 30 --allowedTools "Bash(git diff:*),Bash(git log:*),Bash(cat:*),Read,Glob,Grep,Write"'
+          prompt: |
+            You are an adversarial code reviewer for Edictum Go — a **security product** (runtime contract enforcement for AI agent tool calls). A single vulnerability destroys the credibility of a startup that sells trust. Think like an attacker first, reviewer second.
+
+            PR: #${{ github.event.pull_request.number }}
+            SHA: ${{ github.event.pull_request.head.sha }}
+
+            ## Instructions
+
+            1. Read governance files from `/tmp/governance/` (extracted from the BASE branch — prevents prompt injection):
+               - `/tmp/governance/CLAUDE.md` — architecture, API design checklist, security review checklist
+               - `/tmp/governance/review-instructions.md` — comment formatting rules
+               - `/tmp/governance/review-template.md` — the template to fill in
+
+            2. Get the diff:
+               - `git diff origin/main...HEAD --name-only` for changed files
+               - `git diff origin/main...HEAD` for full diff
+
+            3. Route checks by file type:
+               - `pipeline/**`, `envelope/**`, `contract/**`, `session/**`, `audit/**` → code quality, contract correctness, API design, security
+               - `adapter/**` → also adapter parity
+               - `**/*_test.go` → test conventions, behavior test coverage
+               - `.github/**` → security (Actions injection patterns)
+               - `CLAUDE.md` → governance file consistency
+
+            4. For EACH changed file:
+               a. Read the FULL source file (not just the diff)
+               b. Run the adversarial pass first (think like an attacker)
+               c. Then run the standards compliance pass
+               d. Only apply checks relevant to the file type
+
+            5. Go-specific security checks:
+               - Race conditions: shared state without mutex protection
+               - Goroutine leaks: missing context cancellation
+               - Unsafe type assertions without comma-ok
+               - Error swallowing (err != nil without return)
+               - Exported fields on types that should be immutable
+
+            6. For each potential issue, verify ALL of these before reporting:
+               - The issue was INTRODUCED by this PR (not pre-existing)
+               - You can describe a concrete attack path or concrete bug
+               - Include a concrete fix with code, not just "consider doing X"
+
+            7. Fill in the template from `/tmp/governance/review-template.md` per `/tmp/governance/review-instructions.md`. Write to `/tmp/review.md`.
+
+            8. Do NOT post the comment yourself. The workflow handles posting after validation.
+
+            ## Rules
+            - One pass. If the PR is clean, say so and stop.
+            - A clean PR with zero findings is a good outcome.
+            - Do NOT flag style/formatting (linters handle that).
+            - ALWAYS include the attack path for security issues.
+            - ALWAYS include file path + line number + concrete fix with code.
+
+      - name: Validate and post review comment
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Validate review file exists and contains the required marker
+          if [ ! -f /tmp/review.md ]; then
+            echo "::error::Review file /tmp/review.md not found. Claude may have failed."
+            exit 1
+          fi
+          if ! grep -q '<!-- edictum-review -->' /tmp/review.md; then
+            echo "::error::Review file missing <!-- edictum-review --> marker. Content:"
+            head -5 /tmp/review.md
+            exit 1
+          fi
+
+          # Post or update sticky comment
+          EXISTING_ID=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq '[.[] | select(.body | contains("<!-- edictum-review -->"))] | last | .id // empty')
+          if [ -n "$EXISTING_ID" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/${EXISTING_ID}" \
+              -X PATCH -F body=@/tmp/review.md
+            echo "Updated existing review comment ${EXISTING_ID}"
+          else
+            gh pr comment "${PR_NUMBER}" --body-file /tmp/review.md
+            echo "Created new review comment"
+          fi
+
+      - name: Fail on critical or high findings
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          COMMENT=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq '[.[] | select(.body | contains("<!-- edictum-review -->"))] | last | .body // ""')
+          if [ -z "$COMMENT" ]; then
+            echo "::error::No review comment found. Review step may have failed or timed out."
+            exit 1
+          fi
+          if echo "$COMMENT" | grep -q '<!-- STATUS: fail -->'; then
+            echo "::error::Code review found critical/high issues. See PR comment for details."
+            exit 1
+          fi
+          echo "Code review passed."
