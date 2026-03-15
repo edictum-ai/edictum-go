@@ -84,6 +84,9 @@ func (s *Session) ExecutionCount(ctx context.Context) (int, error) {
 
 // ToolExecutionCount returns the execution count for a specific tool.
 func (s *Session) ToolExecutionCount(ctx context.Context, tool string) (int, error) {
+	if err := validateKeyComponent(tool); err != nil {
+		return 0, fmt.Errorf("invalid tool name: %w", err)
+	}
 	return s.getCounter(ctx, s.key("tool:"+tool))
 }
 

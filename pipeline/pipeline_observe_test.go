@@ -18,7 +18,7 @@ func TestPreExecute_ObserveModeContractDoesNotDeny(t *testing.T) {
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "observe_only", Tool: "*", Mode: "observe",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("would deny"), nil
 		},
 	}}
@@ -46,7 +46,7 @@ func TestPreExecute_ApprovalPending(t *testing.T) {
 	prov.preconditions = []contract.Precondition{{
 		Name: "needs_approval", Tool: "*", Effect: "approve",
 		Timeout: 60, TimeoutEffect: "allow",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("Requires human approval"), nil
 		},
 	}}
@@ -79,7 +79,7 @@ func TestPreExecute_ObserveContractsEvaluated(t *testing.T) {
 	prov := defaultProvider()
 	prov.observePreconditions = []contract.Precondition{{
 		Name: "observe_check", Tool: "*",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("observe would deny"), nil
 		},
 	}}
@@ -109,7 +109,7 @@ func TestPreExecute_SandboxContractDeny(t *testing.T) {
 	prov := defaultProvider()
 	prov.sandboxContracts = []contract.Precondition{{
 		Name: "path_sandbox", Tool: "*", Source: "yaml_sandbox",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("path not allowed"), nil
 		},
 	}}

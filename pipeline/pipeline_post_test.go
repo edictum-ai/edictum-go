@@ -11,11 +11,11 @@ import (
 	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
-func makeEnvelopeWithRegistry(t *testing.T, tool string, args map[string]any, se envelope.SideEffect) *envelope.ToolEnvelope {
+func makeEnvelopeWithRegistry(t *testing.T, tool string, args map[string]any, se envelope.SideEffect) envelope.ToolEnvelope {
 	t.Helper()
 	reg := envelope.NewToolRegistry()
 	reg.Register(tool, se, false)
-	env, err := envelope.CreateEnvelope(context.Background(), &envelope.CreateEnvelopeOptions{
+	env, err := envelope.CreateEnvelope(context.Background(), envelope.CreateEnvelopeOptions{
 		ToolName: tool, Args: args, Registry: reg,
 	})
 	if err != nil {
@@ -46,7 +46,7 @@ func TestPostExecute_PostconditionFailurePureTool(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "check_result", Tool: "TestTool",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope, result any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope, result any) (contract.Verdict, error) {
 			if result != "expected" {
 				return contract.Fail("Unexpected result"), nil
 			}
@@ -74,7 +74,7 @@ func TestPostExecute_PostconditionFailureWriteTool(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "check_write", Tool: "WriteTool",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("Write verification failed"), nil
 		},
 	}}
@@ -98,7 +98,7 @@ func TestPostExecute_AfterHooksCalled(t *testing.T) {
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "after", Tool: "*", Name: "tracker",
-		After: func(_ context.Context, _ *envelope.ToolEnvelope, result any) error {
+		After: func(_ context.Context, _ envelope.ToolEnvelope, result any) error {
 			called = append(called, result)
 			return nil
 		},
@@ -133,7 +133,7 @@ func TestPostExecute_RedactEffectPureTool(t *testing.T) {
 	prov.postconditions = []contract.Postcondition{{
 		Name: "redact_ssn", Tool: "TestTool", Effect: "redact",
 		RedactPatterns: []*regexp.Regexp{regexp.MustCompile(`\d{3}-\d{2}-\d{4}`)},
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("SSN found"), nil
 		},
 	}}
@@ -160,7 +160,7 @@ func TestPostExecute_RedactEffectWriteFallsBackToWarn(t *testing.T) {
 	prov.postconditions = []contract.Postcondition{{
 		Name: "redact_attempt", Tool: "WriteTool", Effect: "redact",
 		RedactPatterns: []*regexp.Regexp{regexp.MustCompile(`secret`)},
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("found secret"), nil
 		},
 	}}
@@ -183,7 +183,7 @@ func TestPostExecute_DenyEffectPureTool(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "suppress_output", Tool: "TestTool", Effect: "deny",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("output not allowed"), nil
 		},
 	}}
@@ -209,7 +209,7 @@ func TestPostExecute_DenyEffectWriteFallsBackToWarn(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "deny_attempt", Tool: "WriteTool", Effect: "deny",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("not allowed"), nil
 		},
 	}}
@@ -231,7 +231,7 @@ func TestPostExecute_ObserveModePostcondition(t *testing.T) {
 	prov := defaultProvider()
 	prov.postconditions = []contract.Postcondition{{
 		Name: "observe_post", Tool: "TestTool", Mode: "observe", Effect: "redact",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Fail("would redact"), nil
 		},
 	}}
@@ -257,7 +257,7 @@ func TestPostExecute_ObservePostconditionsEvaluated(t *testing.T) {
 	prov := defaultProvider()
 	prov.observePostconditions = []contract.Postcondition{{
 		Name: "observe_scan", Tool: "TestTool", Effect: "redact",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope, resp any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope, resp any) (contract.Verdict, error) {
 			if strings.Contains(resp.(string), "secret") {
 				return contract.Fail("secret detected in output"), nil
 			}
@@ -312,7 +312,7 @@ func TestPostExecute_ObservePostconditionPassDoesNotWarn(t *testing.T) {
 	prov := defaultProvider()
 	prov.observePostconditions = []contract.Postcondition{{
 		Name: "observe_pass", Tool: "TestTool",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
 			return contract.Pass(), nil
 		},
 	}}

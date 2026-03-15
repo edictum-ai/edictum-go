@@ -29,22 +29,22 @@ type Principal struct {
 }
 
 // UserID returns the principal's user ID.
-func (p *Principal) UserID() string { return p.userID }
+func (p Principal) UserID() string { return p.userID }
 
 // ServiceID returns the principal's service ID.
-func (p *Principal) ServiceID() string { return p.serviceID }
+func (p Principal) ServiceID() string { return p.serviceID }
 
 // OrgID returns the principal's organization ID.
-func (p *Principal) OrgID() string { return p.orgID }
+func (p Principal) OrgID() string { return p.orgID }
 
 // Role returns the principal's role.
-func (p *Principal) Role() string { return p.role }
+func (p Principal) Role() string { return p.role }
 
 // TicketRef returns the principal's ticket reference.
-func (p *Principal) TicketRef() string { return p.ticketRef }
+func (p Principal) TicketRef() string { return p.ticketRef }
 
 // Claims returns a copy of the principal's claims.
-func (p *Principal) Claims() map[string]any {
+func (p Principal) Claims() map[string]any {
 	if p.claims == nil {
 		return nil
 	}
@@ -124,10 +124,10 @@ type ToolEnvelope struct {
 }
 
 // ToolName returns the tool name.
-func (e *ToolEnvelope) ToolName() string { return e.toolName }
+func (e ToolEnvelope) ToolName() string { return e.toolName }
 
 // Args returns a copy of the tool arguments.
-func (e *ToolEnvelope) Args() map[string]any {
+func (e ToolEnvelope) Args() map[string]any {
 	if e.args == nil {
 		return nil
 	}
@@ -139,46 +139,46 @@ func (e *ToolEnvelope) Args() map[string]any {
 }
 
 // CallID returns the call ID.
-func (e *ToolEnvelope) CallID() string { return e.callID }
+func (e ToolEnvelope) CallID() string { return e.callID }
 
 // RunID returns the run ID.
-func (e *ToolEnvelope) RunID() string { return e.runID }
+func (e ToolEnvelope) RunID() string { return e.runID }
 
 // CallIndex returns the call index.
-func (e *ToolEnvelope) CallIndex() int { return e.callIndex }
+func (e ToolEnvelope) CallIndex() int { return e.callIndex }
 
 // ParentCallID returns the parent call ID.
-func (e *ToolEnvelope) ParentCallID() string { return e.parentCall }
+func (e ToolEnvelope) ParentCallID() string { return e.parentCall }
 
 // SideEffect returns the classified side effect.
-func (e *ToolEnvelope) SideEffect() SideEffect { return e.sideEffect }
+func (e ToolEnvelope) SideEffect() SideEffect { return e.sideEffect }
 
 // Idempotent returns whether the tool call is idempotent.
-func (e *ToolEnvelope) Idempotent() bool { return e.idempotent }
+func (e ToolEnvelope) Idempotent() bool { return e.idempotent }
 
 // Environment returns the environment name.
-func (e *ToolEnvelope) Environment() string { return e.environment }
+func (e ToolEnvelope) Environment() string { return e.environment }
 
 // Timestamp returns the timestamp.
-func (e *ToolEnvelope) Timestamp() string { return e.timestamp }
+func (e ToolEnvelope) Timestamp() string { return e.timestamp }
 
 // Caller returns the caller identifier.
-func (e *ToolEnvelope) Caller() string { return e.caller }
+func (e ToolEnvelope) Caller() string { return e.caller }
 
 // ToolUseID returns the tool use ID.
-func (e *ToolEnvelope) ToolUseID() string { return e.toolUseID }
+func (e ToolEnvelope) ToolUseID() string { return e.toolUseID }
 
 // Principal returns the principal (nil if not set).
-func (e *ToolEnvelope) Principal() *Principal { return e.principal }
+func (e ToolEnvelope) Principal() *Principal { return e.principal }
 
 // BashCommand returns the extracted bash command.
-func (e *ToolEnvelope) BashCommand() string { return e.bashCommand }
+func (e ToolEnvelope) BashCommand() string { return e.bashCommand }
 
 // FilePath returns the extracted file path.
-func (e *ToolEnvelope) FilePath() string { return e.filePath }
+func (e ToolEnvelope) FilePath() string { return e.filePath }
 
 // Metadata returns a copy of the metadata.
-func (e *ToolEnvelope) Metadata() map[string]any {
+func (e ToolEnvelope) Metadata() map[string]any {
 	if e.metadata == nil {
 		return nil
 	}
@@ -223,9 +223,9 @@ type CreateEnvelopeOptions struct {
 }
 
 // CreateEnvelope creates a new frozen ToolEnvelope.
-func CreateEnvelope(_ context.Context, opts *CreateEnvelopeOptions) (*ToolEnvelope, error) {
+func CreateEnvelope(_ context.Context, opts CreateEnvelopeOptions) (ToolEnvelope, error) {
 	if err := ValidateToolName(opts.ToolName); err != nil {
-		return nil, err
+		return ToolEnvelope{}, err
 	}
 
 	// Deep copy args
@@ -258,7 +258,7 @@ func CreateEnvelope(_ context.Context, opts *CreateEnvelopeOptions) (*ToolEnvelo
 		}
 	}
 
-	return &ToolEnvelope{
+	return ToolEnvelope{
 		toolName:    opts.ToolName,
 		args:        args,
 		callID:      opts.CallID,

@@ -26,7 +26,7 @@ func New(provider ContractProvider) *GovernancePipeline {
 // PreExecute runs all pre-execution governance checks.
 func (p *GovernancePipeline) PreExecute(
 	ctx context.Context,
-	env *envelope.ToolEnvelope,
+	env envelope.ToolEnvelope,
 	sess *session.Session,
 ) (PreDecision, error) {
 	hooks := make([]map[string]any, 0)
@@ -61,10 +61,12 @@ func (p *GovernancePipeline) PreExecute(
 		if hook.When != nil && !hook.When(ctx, env) {
 			continue
 		}
+		hookRaisedException := false
 		decision, hookErr := hook.Before(ctx, env)
 		if hookErr != nil {
 			log.Printf("Hook %s raised: %v", hook.HookName(), hookErr)
 			decision = DenyHook(fmt.Sprintf("Hook error: %s", hookErr))
+			hookRaisedException = true
 		}
 		hookRecord := map[string]any{
 			"name":   hook.HookName(),
@@ -73,11 +75,6 @@ func (p *GovernancePipeline) PreExecute(
 		}
 		hooks = append(hooks, hookRecord)
 		if decision.Result == HookResultDeny {
-			pe := false
-			if decision.Reason != "" && len(decision.Reason) > 11 &&
-				decision.Reason[:11] == "Hook error:" {
-				pe = true
-			}
 			return PreDecision{
 				Action:             "deny",
 				Reason:             decision.Reason,
@@ -85,7 +82,7 @@ func (p *GovernancePipeline) PreExecute(
 				DecisionName:       hook.HookName(),
 				HooksEvaluated:     hooks,
 				ContractsEvaluated: contracts,
-				PolicyError:        pe,
+				PolicyError:        hookRaisedException,
 			}, nil
 		}
 	}

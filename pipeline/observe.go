@@ -14,7 +14,7 @@ import (
 // affecting the real decision. Results are returned for audit emission.
 func (p *GovernancePipeline) evaluateObserveContracts(
 	ctx context.Context,
-	env *envelope.ToolEnvelope,
+	env envelope.ToolEnvelope,
 	sess *session.Session,
 ) []map[string]any {
 	// Pre-allocate results slice based on total observe contract count.

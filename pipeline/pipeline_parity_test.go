@@ -64,7 +64,7 @@ func TestParity_1_5_HookExceptionDeny(t *testing.T) {
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "boom",
-		Before: func(_ context.Context, _ *envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
 			return pipeline.HookDecision{}, fmt.Errorf("kaboom")
 		},
 	}}

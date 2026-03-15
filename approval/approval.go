@@ -24,19 +24,19 @@ type Request struct {
 	message       string
 	timeout       time.Duration
 	timeoutEffect string
-	principal     any
+	principal     any // any: avoids import cycle with envelope.Principal; concrete type varies by integration
 	metadata      map[string]any
 	createdAt     time.Time
 }
 
 // ApprovalID returns the unique approval request ID.
-func (r *Request) ApprovalID() string { return r.approvalID }
+func (r Request) ApprovalID() string { return r.approvalID }
 
 // ToolName returns the tool name.
-func (r *Request) ToolName() string { return r.toolName }
+func (r Request) ToolName() string { return r.toolName }
 
 // ToolArgs returns a defensive copy of the tool arguments.
-func (r *Request) ToolArgs() map[string]any {
+func (r Request) ToolArgs() map[string]any {
 	if r.toolArgs == nil {
 		return nil
 	}
@@ -48,13 +48,15 @@ func (r *Request) ToolArgs() map[string]any {
 }
 
 // Message returns the approval message.
-func (r *Request) Message() string { return r.message }
+func (r Request) Message() string { return r.message }
 
 // Principal returns the principal associated with the request.
-func (r *Request) Principal() any { return r.principal }
+// Returns any to avoid an import cycle with the envelope package;
+// concrete type is *envelope.Principal when set by the pipeline.
+func (r Request) Principal() any { return r.principal }
 
 // Metadata returns a defensive copy of the request metadata.
-func (r *Request) Metadata() map[string]any {
+func (r Request) Metadata() map[string]any {
 	if r.metadata == nil {
 		return nil
 	}
@@ -66,13 +68,13 @@ func (r *Request) Metadata() map[string]any {
 }
 
 // CreatedAt returns the time the request was created.
-func (r *Request) CreatedAt() time.Time { return r.createdAt }
+func (r Request) CreatedAt() time.Time { return r.createdAt }
 
 // Timeout returns the approval timeout duration.
-func (r *Request) Timeout() time.Duration { return r.timeout }
+func (r Request) Timeout() time.Duration { return r.timeout }
 
 // TimeoutEffect returns the effect when timeout occurs ("deny" or "allow").
-func (r *Request) TimeoutEffect() string { return r.timeoutEffect }
+func (r Request) TimeoutEffect() string { return r.timeoutEffect }
 
 // Decision represents the outcome of an approval request.
 type Decision struct {

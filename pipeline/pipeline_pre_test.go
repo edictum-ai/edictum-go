@@ -127,14 +127,14 @@ func TestPreExecute_EvaluationOrder(t *testing.T) {
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "tracking_hook",
-		Before: func(_ context.Context, _ *envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
 			order = append(order, "hook")
 			return pipeline.AllowHook(), nil
 		},
 	}}
 	prov.preconditions = []contract.Precondition{{
 		Name: "tracking_pre", Tool: "*",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 			order = append(order, "precondition")
 			return contract.Pass(), nil
 		},
@@ -157,7 +157,7 @@ func TestPreExecute_ContractsEvaluatedPopulated(t *testing.T) {
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "check_a", Tool: "*",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Pass(), nil
 		},
 	}}
@@ -188,7 +188,7 @@ func TestPreExecute_ToolSpecificPrecondition(t *testing.T) {
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "bash_only", Tool: "Bash",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("bash denied"), nil
 		},
 	}}
@@ -222,7 +222,7 @@ func TestPreExecute_HookExceptionDenies(t *testing.T) {
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "exploding_hook",
-		Before: func(_ context.Context, _ *envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
 			return pipeline.HookDecision{}, errors.New("hook exploded")
 		},
 	}}
@@ -249,7 +249,7 @@ func TestPreExecute_PreconditionExceptionDenies(t *testing.T) {
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "exploding", Tool: "*",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Verdict{}, errors.New("check exploded")
 		},
 	}}
@@ -277,7 +277,7 @@ func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 	}}
 	prov.preconditions = []contract.Precondition{{
 		Name: "always_deny", Tool: "*",
-		Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 			return contract.Fail("denied"), nil
 		},
 	}}
@@ -331,13 +331,13 @@ func TestPreExecute_PolicyErrorAggregation(t *testing.T) {
 	prov.preconditions = []contract.Precondition{
 		{
 			Name: "error_contract", Tool: "*",
-			Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+			Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 				return contract.Fail("err", map[string]any{"policy_error": true}), nil
 			},
 		},
 		{
 			Name: "pass_contract", Tool: "*",
-			Check: func(_ context.Context, _ *envelope.ToolEnvelope) (contract.Verdict, error) {
+			Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
 				return contract.Pass(), nil
 			},
 		},

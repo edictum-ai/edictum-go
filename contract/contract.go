@@ -46,8 +46,8 @@ func Fail(message string, metadata ...map[string]any) Verdict {
 type Precondition struct {
 	Name          string // Human-readable name for audit records.
 	Tool          string // Tool name or "*" for all tools.
-	Check         func(ctx context.Context, env *envelope.ToolEnvelope) (Verdict, error)
-	When          func(ctx context.Context, env *envelope.ToolEnvelope) bool
+	Check         func(ctx context.Context, env envelope.ToolEnvelope) (Verdict, error)
+	When          func(ctx context.Context, env envelope.ToolEnvelope) bool
 	Mode          string // "observe" for observe-mode; "" for enforce.
 	Source        string // Decision source for audit (default: "precondition").
 	Effect        string // "deny" (default) or "approve".
@@ -59,8 +59,8 @@ type Precondition struct {
 type Postcondition struct {
 	Name           string // Human-readable name for audit records.
 	Tool           string // Tool name or "*" for all tools.
-	Check          func(ctx context.Context, env *envelope.ToolEnvelope, response any) (Verdict, error)
-	When           func(ctx context.Context, env *envelope.ToolEnvelope) bool
+	Check          func(ctx context.Context, env envelope.ToolEnvelope, response any) (Verdict, error)
+	When           func(ctx context.Context, env envelope.ToolEnvelope) bool
 	Mode           string           // "observe" for observe-mode; "" for enforce.
 	Source         string           // Decision source for audit (default: "postcondition").
 	Effect         string           // "warn" (default), "redact", or "deny".

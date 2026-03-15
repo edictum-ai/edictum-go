@@ -26,7 +26,7 @@ type mockProvider struct {
 }
 
 func (m *mockProvider) GetLimits() pipeline.OperationLimits { return m.limits }
-func (m *mockProvider) GetHooks(phase string, _ *envelope.ToolEnvelope) []pipeline.HookRegistration {
+func (m *mockProvider) GetHooks(phase string, _ envelope.ToolEnvelope) []pipeline.HookRegistration {
 	var out []pipeline.HookRegistration
 	for _, h := range m.hooks {
 		if h.Phase == phase {
@@ -35,10 +35,10 @@ func (m *mockProvider) GetHooks(phase string, _ *envelope.ToolEnvelope) []pipeli
 	}
 	return out
 }
-func (m *mockProvider) GetPreconditions(env *envelope.ToolEnvelope) []contract.Precondition {
+func (m *mockProvider) GetPreconditions(env envelope.ToolEnvelope) []contract.Precondition {
 	return filterPreconditions(m.preconditions, env)
 }
-func (m *mockProvider) GetPostconditions(env *envelope.ToolEnvelope) []contract.Postcondition {
+func (m *mockProvider) GetPostconditions(env envelope.ToolEnvelope) []contract.Postcondition {
 	var out []contract.Postcondition
 	for _, c := range m.postconditions {
 		if c.Tool == "*" || c.Tool == env.ToolName() {
@@ -47,7 +47,7 @@ func (m *mockProvider) GetPostconditions(env *envelope.ToolEnvelope) []contract.
 	}
 	return out
 }
-func (m *mockProvider) GetObservePostconditions(env *envelope.ToolEnvelope) []contract.Postcondition {
+func (m *mockProvider) GetObservePostconditions(env envelope.ToolEnvelope) []contract.Postcondition {
 	var out []contract.Postcondition
 	for _, c := range m.observePostconditions {
 		if c.Tool == "*" || c.Tool == env.ToolName() {
@@ -56,23 +56,23 @@ func (m *mockProvider) GetObservePostconditions(env *envelope.ToolEnvelope) []co
 	}
 	return out
 }
-func (m *mockProvider) GetSandboxContracts(env *envelope.ToolEnvelope) []contract.Precondition {
+func (m *mockProvider) GetSandboxContracts(env envelope.ToolEnvelope) []contract.Precondition {
 	return filterPreconditions(m.sandboxContracts, env)
 }
 func (m *mockProvider) GetSessionContracts() []contract.SessionContract {
 	return m.sessionContracts
 }
-func (m *mockProvider) GetObservePreconditions(env *envelope.ToolEnvelope) []contract.Precondition {
+func (m *mockProvider) GetObservePreconditions(env envelope.ToolEnvelope) []contract.Precondition {
 	return filterPreconditions(m.observePreconditions, env)
 }
-func (m *mockProvider) GetObserveSandboxContracts(env *envelope.ToolEnvelope) []contract.Precondition {
+func (m *mockProvider) GetObserveSandboxContracts(env envelope.ToolEnvelope) []contract.Precondition {
 	return filterPreconditions(m.observeSandbox, env)
 }
 func (m *mockProvider) GetObserveSessionContracts() []contract.SessionContract {
 	return m.observeSession
 }
 
-func filterPreconditions(pres []contract.Precondition, env *envelope.ToolEnvelope) []contract.Precondition {
+func filterPreconditions(pres []contract.Precondition, env envelope.ToolEnvelope) []contract.Precondition {
 	var out []contract.Precondition
 	for _, c := range pres {
 		if c.Tool == "*" || c.Tool == env.ToolName() {
@@ -92,9 +92,9 @@ func newTestSession(t *testing.T) (*session.Session, *session.MemoryBackend) {
 	return sess, backend
 }
 
-func makeEnvelope(t *testing.T, tool string, args map[string]any) *envelope.ToolEnvelope {
+func makeEnvelope(t *testing.T, tool string, args map[string]any) envelope.ToolEnvelope {
 	t.Helper()
-	env, err := envelope.CreateEnvelope(context.Background(), &envelope.CreateEnvelopeOptions{
+	env, err := envelope.CreateEnvelope(context.Background(), envelope.CreateEnvelopeOptions{
 		ToolName: tool,
 		Args:     args,
 	})
@@ -168,7 +168,7 @@ func TestPreExecute_HookDeny(t *testing.T) {
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "deny_all",
-		Before: func(_ context.Context, _ *envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
 			return pipeline.DenyHook("denied by hook"), nil
 		},
 	}}
@@ -203,7 +203,7 @@ func TestPreExecute_HookAllowContinues(t *testing.T) {
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "allow_all",
-		Before: func(_ context.Context, _ *envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
 			return pipeline.AllowHook(), nil
 		},
 	}}
@@ -229,7 +229,7 @@ func TestPreExecute_PreconditionDeny(t *testing.T) {
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "must_have_name", Tool: "*",
-		Check: func(_ context.Context, env *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
 			if env.Args() == nil || env.Args()["name"] == nil {
 				return contract.Fail("Missing required arg: name"), nil
 			}
@@ -261,7 +261,7 @@ func TestPreExecute_PreconditionPass(t *testing.T) {
 	prov := defaultProvider()
 	prov.preconditions = []contract.Precondition{{
 		Name: "must_have_name", Tool: "*",
-		Check: func(_ context.Context, env *envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
 			if env.Args() == nil || env.Args()["name"] == nil {
 				return contract.Fail("Missing required arg: name"), nil
 			}

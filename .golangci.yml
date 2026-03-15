@@ -39,6 +39,11 @@ linters-settings:
       - diagnostic
       - style
       - performance
+    disabled-checks:
+      # ToolEnvelope (216B) and Principal (88B) use value receivers by design:
+      # immutable types with unexported fields. Copying is the immutability
+      # mechanism — callers cannot mutate the original through a copy.
+      - hugeParam
   exhaustive:
     default-signifies-exhaustive: true
 

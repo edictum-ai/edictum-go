@@ -12,7 +12,7 @@ import (
 // PostExecute runs all post-execution governance checks.
 func (p *GovernancePipeline) PostExecute(
 	ctx context.Context,
-	env *envelope.ToolEnvelope,
+	env envelope.ToolEnvelope,
 	toolResponse any,
 	toolSuccess bool,
 ) (PostDecision, error) {
@@ -23,6 +23,10 @@ func (p *GovernancePipeline) PostExecute(
 
 	// 1. Postconditions
 	for _, c := range p.provider.GetPostconditions(env) {
+		// When predicate: skip this contract if When returns false
+		if c.When != nil && !c.When(ctx, env) {
+			continue
+		}
 		verdict, err := c.Check(ctx, env, toolResponse)
 		if err != nil {
 			log.Printf("Postcondition %s raised: %v", contractName(c.Name), err)

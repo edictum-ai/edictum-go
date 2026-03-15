@@ -13,7 +13,7 @@ import (
 // Returns (decision, true) if a deny/approval was triggered; (zero, false) otherwise.
 func (p *GovernancePipeline) evalPreconditions(
 	ctx context.Context,
-	env *envelope.ToolEnvelope,
+	env envelope.ToolEnvelope,
 	pres []contract.Precondition,
 	defaultSource string,
 	hooks []map[string]any,
@@ -21,6 +21,10 @@ func (p *GovernancePipeline) evalPreconditions(
 	hasObservedDeny *bool,
 ) (PreDecision, bool) {
 	for _, c := range pres {
+		// When predicate: skip this contract if When returns false
+		if c.When != nil && !c.When(ctx, env) {
+			continue
+		}
 		verdict, err := c.Check(ctx, env)
 		if err != nil {
 			log.Printf("Contract %s raised: %v", contractName(c.Name), err)
