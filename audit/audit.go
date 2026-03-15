@@ -82,10 +82,19 @@ func NewCompositeSink(sinks ...Sink) *CompositeSink {
 }
 
 // Emit sends the event to all sinks, collecting errors.
+// Each sink receives an independent copy to prevent a mutating sink
+// from corrupting the event seen by later sinks in the chain.
 func (c *CompositeSink) Emit(ctx context.Context, event *Event) error {
 	var errs []error
 	for _, s := range c.sinks {
-		if err := s.Emit(ctx, event); err != nil {
+		cp := *event
+		if event.ToolArgs != nil {
+			cp.ToolArgs = make(map[string]any, len(event.ToolArgs))
+			for k, v := range event.ToolArgs {
+				cp.ToolArgs[k] = v
+			}
+		}
+		if err := s.Emit(ctx, &cp); err != nil {
 			errs = append(errs, err)
 		}
 	}

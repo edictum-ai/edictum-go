@@ -109,6 +109,9 @@ func (s *Session) BatchGetCounters(ctx context.Context, includeTool string) (map
 	labels := []string{"attempts", "execs"}
 
 	if includeTool != "" {
+		if err := validateKeyComponent(includeTool); err != nil {
+			return nil, fmt.Errorf("invalid tool name: %w", err)
+		}
 		keys = append(keys, s.key("tool:"+includeTool))
 		labels = append(labels, "tool:"+includeTool)
 	}
