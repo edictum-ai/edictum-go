@@ -251,6 +251,36 @@ func TestEvaluateSandboxContracts(t *testing.T) {
 	}
 }
 
+// TestEvaluate_GuardPrincipalFallback proves that Evaluate() falls back
+// to the guard-level principal when no WithEvalPrincipal option is set.
+func TestEvaluate_GuardPrincipalFallback(t *testing.T) {
+	var captured *envelope.Principal
+	principal := envelope.NewPrincipal(envelope.WithUserID("guard-user"))
+
+	g := New(
+		WithPrincipal(&principal),
+		WithContracts(
+			contract.Precondition{Name: "capture-principal", Tool: "*",
+				Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+					captured = env.Principal()
+					return contract.Pass(), nil
+				}},
+		),
+	)
+
+	ctx := context.Background()
+	result := g.Evaluate(ctx, "Bash", map[string]any{"command": "ls"})
+	if result.Verdict != "allow" {
+		t.Fatalf("verdict: got %q, want 'allow'", result.Verdict)
+	}
+	if captured == nil {
+		t.Fatal("principal should not be nil -- guard-level principal was not propagated")
+	}
+	if captured.UserID() != "guard-user" {
+		t.Errorf("principal.UserID: got %q, want 'guard-user'", captured.UserID())
+	}
+}
+
 func TestEvaluateWithWhenPredicate(t *testing.T) {
 	g := New(
 		WithContracts(
