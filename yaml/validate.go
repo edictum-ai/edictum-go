@@ -43,6 +43,12 @@ func validateSchema(data map[string]any) error {
 				return fmt.Errorf("yaml: contract %q of type %q missing required field 'tool'", cm["id"], ctype)
 			}
 		}
+		// Reject _shadow in user-supplied YAML. This is an internal key
+		// added by the composer for observe_alongside — if a user sets it
+		// directly, they can silently downgrade any contract to observe mode.
+		if _, has := cm["_shadow"]; has {
+			return fmt.Errorf("yaml: contract %q uses reserved internal key '_shadow'", cm["id"])
+		}
 	}
 	return nil
 }

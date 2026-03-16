@@ -54,19 +54,19 @@ func precompileRegexes(expr map[string]any) map[string]any {
 			}
 		}
 		if pats, ok := newOp["matches_any"].([]any); ok {
-			compiled := make([]any, len(pats))
+			reList := make([]any, len(pats))
 			for i, p := range pats {
 				if s, ok := p.(string); ok {
 					if re, err := regexp.Compile(s); err == nil {
-						compiled[i] = re
+						reList[i] = re
 					} else {
-						compiled[i] = p
+						reList[i] = p
 					}
 				} else {
-					compiled[i] = p
+					reList[i] = p
 				}
 			}
-			newOp["matches_any"] = compiled
+			newOp["matches_any"] = reList
 		}
 		compiled[selector] = newOp
 	}
