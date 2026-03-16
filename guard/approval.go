@@ -3,6 +3,7 @@ package guard
 import (
 	"context"
 	"fmt"
+	"time"
 
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/approval"
@@ -36,7 +37,15 @@ func (g *Guard) handleApproval(
 		msg = pre.Reason
 	}
 
-	req, err := g.approvalBackend.RequestApproval(ctx, env2.ToolName(), env2.Args(), msg)
+	// Propagate per-contract timeout settings to the approval backend.
+	var reqOpts []approval.RequestOption
+	if pre.ApprovalTimeout > 0 {
+		reqOpts = append(reqOpts, approval.WithTimeout(time.Duration(pre.ApprovalTimeout)*time.Second))
+	}
+	if pre.ApprovalTimeoutEff != "" {
+		reqOpts = append(reqOpts, approval.WithTimeoutEffect(pre.ApprovalTimeoutEff))
+	}
+	req, err := g.approvalBackend.RequestApproval(ctx, env2.ToolName(), env2.Args(), msg, reqOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("request approval: %w", err)
 	}

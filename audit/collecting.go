@@ -66,13 +66,13 @@ func (c *CollectingSink) Emit(_ context.Context, event *Event) error {
 	return nil
 }
 
-// Events returns a defensive copy of all collected events.
+// Events returns a deep defensive copy of all collected events.
+// Nested maps (ToolArgs) are deep-copied so callers cannot corrupt
+// the internal audit buffer.
 func (c *CollectingSink) Events() []Event {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	cp := make([]Event, len(c.events))
-	copy(cp, c.events)
-	return cp
+	return deepCopyEvents(c.events)
 }
 
 // Mark returns an absolute position marker at the current end of
@@ -105,9 +105,7 @@ func (c *CollectingSink) SinceMark(m int) ([]Event, error) {
 	}
 
 	bufferOffset := m - evictedCount
-	result := make([]Event, len(c.events)-bufferOffset)
-	copy(result, c.events[bufferOffset:])
-	return result, nil
+	return deepCopyEvents(c.events[bufferOffset:]), nil
 }
 
 // Last returns the most recent event. Returns an error if the buffer
@@ -118,7 +116,7 @@ func (c *CollectingSink) Last() (Event, error) {
 	if len(c.events) == 0 {
 		return Event{}, fmt.Errorf("no events in buffer")
 	}
-	return c.events[len(c.events)-1], nil
+	return deepCopyEvent(c.events[len(c.events)-1]), nil
 }
 
 // Filter returns all events matching the given action.
@@ -128,7 +126,7 @@ func (c *CollectingSink) Filter(action Action) []Event {
 	var result []Event
 	for _, e := range c.events {
 		if e.Action == action {
-			result = append(result, e)
+			result = append(result, deepCopyEvent(e))
 		}
 	}
 	return result
@@ -141,6 +139,23 @@ func (c *CollectingSink) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.events = c.events[:0]
+}
+
+// deepCopyEvents returns a deep copy of an event slice.
+func deepCopyEvents(events []Event) []Event {
+	cp := make([]Event, len(events))
+	for i, e := range events {
+		cp[i] = deepCopyEvent(e)
+	}
+	return cp
+}
+
+// deepCopyEvent returns a deep copy of a single event.
+func deepCopyEvent(e Event) Event {
+	if e.ToolArgs != nil {
+		e.ToolArgs = deepCopyMap(e.ToolArgs)
+	}
+	return e
 }
 
 // deepCopyMap recursively copies a map[string]any.
