@@ -13,8 +13,11 @@ const MaxRegexInput = 10_000
 func applyOperator(op string, fieldValue any, opValue any, selector string, ec *evalCtx) EvalResult {
 	// exists is special: works on missing fields.
 	if op == "exists" {
+		expected, ok := opValue.(bool)
+		if !ok {
+			return policyError("exists: operand must be bool")
+		}
 		isPresent := fieldValue != missing && fieldValue != nil
-		expected, _ := opValue.(bool)
 		if isPresent == expected {
 			return pass()
 		}

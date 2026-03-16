@@ -468,3 +468,29 @@ func TestLoadBundle_FileNotFound(t *testing.T) {
 		t.Fatal("expected error for missing file")
 	}
 }
+
+func TestSecurity_ShadowInjection(t *testing.T) {
+	// A user-supplied YAML bundle must not be able to set _shadow: true
+	// on a contract. This internal key is reserved for observe_alongside
+	// composition — if accepted, it silently downgrades enforce→observe.
+	bundle := `
+apiVersion: edictum/v1
+kind: ContractBundle
+defaults:
+  mode: enforce
+contracts:
+  - id: injected
+    type: pre
+    tool: "*"
+    _shadow: true
+    when:
+      args.command:
+        contains: "rm"
+    then:
+      message: "Blocked"
+`
+	_, _, err := LoadBundleString(bundle)
+	if err == nil {
+		t.Fatal("expected error: _shadow key should be rejected in user YAML")
+	}
+}
