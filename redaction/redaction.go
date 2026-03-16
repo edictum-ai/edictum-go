@@ -1,36 +1,25 @@
 // Package redaction provides sensitive data masking for audit events.
 package redaction
 
+import (
+	"encoding/json"
+	"regexp"
+	"strings"
+)
+
 // Policy configures how sensitive data is redacted from audit events.
 type Policy struct {
-	sensitiveKeys    map[string]bool
-	bashPatterns     []string
-	secretPatterns   []string
-	detectSecrets    bool
-	maxPayloadSize   int
-	maxRegexInput    int
-	maxPatternLength int
+	sensitiveKeys  map[string]bool
+	bashPatterns   []compiledPattern
+	secretPatterns []*regexp.Regexp
+	detectSecrets  bool
 }
 
-// DefaultSensitiveKeys are keys that are always redacted.
-var DefaultSensitiveKeys = []string{
-	"password", "secret", "token", "api_key", "apikey",
-	"credentials", "private_key", "privatekey", "access_token",
-	"accesstoken", "refresh_token", "refreshtoken", "auth",
-	"authorization", "cookie", "session", "ssn", "credit_card",
-	"creditcard", "cvv",
+// compiledPattern is a pre-compiled regex with its replacement string.
+type compiledPattern struct {
+	re          *regexp.Regexp
+	replacement string
 }
-
-const (
-	// MaxPayloadSize is the maximum audit payload size (32KB).
-	MaxPayloadSize = 32 * 1024
-	// MaxStringLength is the maximum string length in audit events.
-	MaxStringLength = 1000
-	// MaxRegexInput is the maximum input length for regex matching.
-	MaxRegexInput = 10000
-	// MaxPatternLength is the maximum regex pattern length.
-	MaxPatternLength = 10000
-)
 
 // Option configures a Policy.
 type Option func(*Policy)
@@ -39,36 +28,173 @@ type Option func(*Policy)
 func WithSensitiveKeys(keys []string) Option {
 	return func(p *Policy) {
 		for _, k := range keys {
-			p.sensitiveKeys[k] = true
+			p.sensitiveKeys[strings.ToLower(k)] = true
 		}
 	}
 }
 
-// WithDetectSecrets enables automatic secret value detection.
+// WithDetectSecrets enables or disables automatic secret value detection.
 func WithDetectSecrets(detect bool) Option {
 	return func(p *Policy) { p.detectSecrets = detect }
 }
 
-// BashPatterns returns the configured bash redaction patterns.
-func (p *Policy) BashPatterns() []string { return p.bashPatterns }
-
-// SecretPatterns returns the configured secret detection patterns.
-func (p *Policy) SecretPatterns() []string { return p.secretPatterns }
-
-// NewPolicy creates a new RedactionPolicy with the given options.
+// NewPolicy creates a new Policy with the given options.
 func NewPolicy(opts ...Option) *Policy {
 	p := &Policy{
-		sensitiveKeys:    make(map[string]bool),
-		detectSecrets:    true,
-		maxPayloadSize:   MaxPayloadSize,
-		maxRegexInput:    MaxRegexInput,
-		maxPatternLength: MaxPatternLength,
+		sensitiveKeys: make(map[string]bool, len(defaultSensitiveKeys)),
+		detectSecrets: true,
 	}
-	for _, k := range DefaultSensitiveKeys {
+	for _, k := range defaultSensitiveKeys {
 		p.sensitiveKeys[k] = true
 	}
+
+	// Compile bash redaction patterns.
+	p.bashPatterns = make([]compiledPattern, 0, len(bashRedactionPatterns))
+	for _, bp := range bashRedactionPatterns {
+		p.bashPatterns = append(p.bashPatterns, compiledPattern{
+			re:          regexp.MustCompile(bp.pattern),
+			replacement: bp.replacement,
+		})
+	}
+
+	// Compile secret value patterns.
+	p.secretPatterns = make([]*regexp.Regexp, 0, len(secretValuePatterns))
+	for _, sp := range secretValuePatterns {
+		p.secretPatterns = append(p.secretPatterns, regexp.MustCompile(sp))
+	}
+
 	for _, opt := range opts {
 		opt(p)
 	}
 	return p
+}
+
+// IsSensitiveKey reports whether key should be treated as sensitive.
+//
+// Uses word-boundary matching per issue #127: the key is lowercased,
+// split on "_" and "-", and each segment is checked for exact match
+// against sensitive terms. This means "monkey" does NOT match "key",
+// "bucket" does NOT match (no segment matches any term).
+func (p *Policy) IsSensitiveKey(key string) bool {
+	k := strings.ToLower(key)
+	if p.sensitiveKeys[k] {
+		return true
+	}
+	// Word-boundary matching: split on separators, check segments.
+	segments := splitKeySegments(k)
+	for _, seg := range segments {
+		for _, term := range partialTerms {
+			if seg == term {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// splitKeySegments splits a key into word segments on "_" and "-".
+func splitKeySegments(key string) []string {
+	return strings.FieldsFunc(key, func(r rune) bool {
+		return r == '_' || r == '-'
+	})
+}
+
+// DetectSecretValue reports whether value matches a known secret pattern.
+func (p *Policy) DetectSecretValue(value string) bool {
+	if len(value) > maxRegexInput {
+		return false
+	}
+	for _, re := range p.secretPatterns {
+		if re.MatchString(value) {
+			return true
+		}
+	}
+	return false
+}
+
+// RedactArgs recursively redacts sensitive keys in args.
+// Maps, slices, and string values are processed. Other types pass through.
+// Returns nil for nil input.
+func (p *Policy) RedactArgs(args map[string]any) map[string]any {
+	if args == nil {
+		return nil
+	}
+	result, _ := p.redactValue(args).(map[string]any)
+	return result
+}
+
+// redactValue recursively redacts a single value.
+func (p *Policy) redactValue(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(val))
+		for k, v2 := range val {
+			if p.IsSensitiveKey(k) {
+				out[k] = redacted
+			} else {
+				out[k] = p.redactValue(v2)
+			}
+		}
+		return out
+	case []any:
+		out := make([]any, len(val))
+		for i, item := range val {
+			out[i] = p.redactValue(item)
+		}
+		return out
+	case string:
+		if p.detectSecrets && p.DetectSecretValue(val) {
+			return redacted
+		}
+		if len(val) > maxStringLength {
+			return val[:maxStringLength-3] + "..."
+		}
+		return val
+	default:
+		return v
+	}
+}
+
+// RedactBashCommand applies bash redaction patterns to a command string.
+func (p *Policy) RedactBashCommand(command string) string {
+	if len(command) > maxRegexInput {
+		command = command[:maxRegexInput]
+	}
+	result := command
+	for _, bp := range p.bashPatterns {
+		result = bp.re.ReplaceAllString(result, bp.replacement)
+	}
+	return result
+}
+
+// RedactResult truncates and redacts a result string.
+// maxLength caps the returned string length. If maxLength <= 0,
+// it defaults to 500.
+func (p *Policy) RedactResult(result string, maxLength int) string {
+	if maxLength <= 0 {
+		maxLength = 500
+	}
+	r := result
+	for _, bp := range p.bashPatterns {
+		r = bp.re.ReplaceAllString(r, bp.replacement)
+	}
+	if len(r) > maxLength {
+		r = r[:maxLength-3] + "..."
+	}
+	return r
+}
+
+// CapPayload caps total serialized size to 32KB.
+// If the payload exceeds the limit, tool_args and result_summary are
+// dropped and replaced with a truncation marker.
+func (p *Policy) CapPayload(data map[string]any) map[string]any {
+	serialized, err := json.Marshal(data)
+	if err != nil || len(serialized) <= maxPayloadSize {
+		return data
+	}
+	data["_truncated"] = true
+	delete(data, "result_summary")
+	delete(data, "tool_args")
+	data["tool_args"] = map[string]any{"_redacted": "payload exceeded 32KB"}
+	return data
 }

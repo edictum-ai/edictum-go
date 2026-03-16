@@ -5,20 +5,25 @@ import "strings"
 // BashClassifier classifies bash commands by side effect.
 
 // readAllowlist contains commands classified as READ.
-var readAllowlist = map[string]bool{
-	"ls": true, "cat": true, "head": true, "tail": true, "less": true,
-	"more": true, "wc": true, "file": true, "stat": true, "find": true,
-	"grep": true, "rg": true, "ag": true, "ack": true, "which": true,
-	"whereis": true, "type": true, "echo": true, "printf": true,
-	"pwd": true, "whoami": true, "id": true, "uname": true, "date": true,
-	"env": true, "printenv": true, "git status": true, "git log": true,
-	"git diff": true, "git show": true, "git branch": true,
+// Multi-word entries (e.g. "git status") match via prefix: the command
+// must equal the entry or start with entry + " ".
+// Security note: env/printenv are NOT allowed — they leak secrets.
+var readAllowlist = []string{
+	"ls", "cat", "head", "tail", "less",
+	"more", "wc", "file", "stat", "find",
+	"grep", "rg", "ag", "ack", "which",
+	"whereis", "type", "echo", "printf",
+	"pwd", "whoami", "id", "uname", "date",
+	"du", "df", "tree",
+	"git status", "git log", "git diff", "git show",
+	"git branch", "git remote", "git tag",
 }
 
 // shellOperators are shell metacharacters that indicate IRREVERSIBLE side effects.
+// Order matters: "$" is checked early so it catches $(), ${}, and bare $VAR.
 var shellOperators = []string{
-	"|", ";", "&&", "||", "$(", "`", "${", "<(", "<<", ">", ">>",
-	"\n", "\r", "$((",
+	"\n", "\r", "<(", "<<", "$", "${", ">", ">>", "|", ";", "&&", "||",
+	"$(", "`", "#{",
 }
 
 // ClassifyBash classifies a bash command string by its side effect.
@@ -35,17 +40,12 @@ func ClassifyBash(command string) SideEffect {
 		}
 	}
 
-	// Extract the first word/command
-	firstWord := strings.Fields(command)[0]
-
-	// Check multi-word commands (e.g., "git status")
-	if readAllowlist[command] {
-		return SideEffectRead
-	}
-
-	// Check single-word command
-	if readAllowlist[firstWord] {
-		return SideEffectRead
+	// Check against allowlist with prefix matching.
+	// "git status" matches "git status" and "git status --short".
+	for _, allowed := range readAllowlist {
+		if command == allowed || strings.HasPrefix(command, allowed+" ") {
+			return SideEffectRead
+		}
 	}
 
 	return SideEffectIrreversible
