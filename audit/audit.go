@@ -5,26 +5,41 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 )
 
 // Action represents the type of governance event.
 type Action string
 
-// Audit action types.
+// Audit action types. 10 canonical actions matching Python parity.
 const (
-	ActionCallDenied           Action = "CALL_DENIED"
-	ActionCallWouldDeny        Action = "CALL_WOULD_DENY"
-	ActionCallAllowed          Action = "CALL_ALLOWED"
-	ActionCallExecuted         Action = "CALL_EXECUTED"
-	ActionCallFailed           Action = "CALL_FAILED"
-	ActionPostconditionWarning Action = "POSTCONDITION_WARNING"
-	ActionCallApprovalPending  Action = "CALL_APPROVAL_PENDING"
-	ActionCallApprovalGranted  Action = "CALL_APPROVAL_GRANTED"
-	ActionCallApprovalDenied   Action = "CALL_APPROVAL_DENIED"
-	ActionCallApprovalTimeout  Action = "CALL_APPROVAL_TIMEOUT"
+	ActionCallDenied            Action = "CALL_DENIED"
+	ActionCallWouldDeny         Action = "CALL_WOULD_DENY"
+	ActionCallAllowed           Action = "CALL_ALLOWED"
+	ActionCallExecuted          Action = "CALL_EXECUTED"
+	ActionCallFailed            Action = "CALL_FAILED"
+	ActionPostconditionWarning  Action = "POSTCONDITION_WARNING"
+	ActionCallApprovalRequested Action = "CALL_APPROVAL_REQUESTED"
+	ActionCallApprovalGranted   Action = "CALL_APPROVAL_GRANTED"
+	ActionCallApprovalDenied    Action = "CALL_APPROVAL_DENIED"
+	ActionCallApprovalTimeout   Action = "CALL_APPROVAL_TIMEOUT"
 )
+
+// AllActions returns all 10 canonical audit actions.
+func AllActions() []Action {
+	return []Action{
+		ActionCallDenied,
+		ActionCallWouldDeny,
+		ActionCallAllowed,
+		ActionCallExecuted,
+		ActionCallFailed,
+		ActionPostconditionWarning,
+		ActionCallApprovalRequested,
+		ActionCallApprovalGranted,
+		ActionCallApprovalDenied,
+		ActionCallApprovalTimeout,
+	}
+}
 
 // Event represents a structured audit event.
 type Event struct {
@@ -73,13 +88,28 @@ type Sink interface {
 }
 
 // CompositeSink fans out events to multiple sinks.
+// Every sink is attempted even if earlier sinks fail. Errors are
+// aggregated with errors.Join.
 type CompositeSink struct {
 	sinks []Sink
 }
 
 // NewCompositeSink creates a sink that emits to all provided sinks.
+// Panics if no sinks are provided.
 func NewCompositeSink(sinks ...Sink) *CompositeSink {
-	return &CompositeSink{sinks: sinks}
+	if len(sinks) == 0 {
+		panic("CompositeSink requires at least one sink")
+	}
+	cp := make([]Sink, len(sinks))
+	copy(cp, sinks)
+	return &CompositeSink{sinks: cp}
+}
+
+// Sinks returns a copy of the wrapped sinks.
+func (c *CompositeSink) Sinks() []Sink {
+	cp := make([]Sink, len(c.sinks))
+	copy(cp, c.sinks)
+	return cp
 }
 
 // Emit sends the event to all sinks, collecting errors.
@@ -90,92 +120,13 @@ func (c *CompositeSink) Emit(ctx context.Context, event *Event) error {
 	for _, s := range c.sinks {
 		cp := *event
 		if event.ToolArgs != nil {
-			cp.ToolArgs = make(map[string]any, len(event.ToolArgs))
-			for k, v := range event.ToolArgs {
-				cp.ToolArgs[k] = v
-			}
+			cp.ToolArgs = deepCopyMap(event.ToolArgs)
 		}
 		if err := s.Emit(ctx, &cp); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
-}
-
-// CollectingSink stores events in memory with a ring buffer.
-type CollectingSink struct {
-	mu     sync.Mutex
-	events []Event
-	cap    int
-	mark   int
-}
-
-// NewCollectingSink creates a sink that collects events in memory.
-func NewCollectingSink(capacity int) *CollectingSink {
-	return &CollectingSink{
-		events: make([]Event, 0, capacity),
-		cap:    capacity,
-		mark:   -1,
-	}
-}
-
-// Emit adds an event to the buffer. The event is deep-copied to prevent
-// post-emit mutation from affecting audit integrity.
-func (c *CollectingSink) Emit(_ context.Context, event *Event) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	cp := *event
-	if event.ToolArgs != nil {
-		cp.ToolArgs = make(map[string]any, len(event.ToolArgs))
-		for k, v := range event.ToolArgs {
-			cp.ToolArgs[k] = v
-		}
-	}
-	if len(c.events) >= c.cap {
-		// Ring buffer: drop oldest
-		c.events = append(c.events[1:], cp)
-		if c.mark >= 0 {
-			c.mark--
-		}
-	} else {
-		c.events = append(c.events, cp)
-	}
-	return nil
-}
-
-// Events returns a copy of all collected events.
-func (c *CollectingSink) Events() []Event {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	cp := make([]Event, len(c.events))
-	copy(cp, c.events)
-	return cp
-}
-
-// Mark sets a mark at the current position.
-func (c *CollectingSink) Mark() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.mark = len(c.events)
-}
-
-// MarkEvictedError is returned when a mark has been evicted from the ring buffer.
-type MarkEvictedError struct{}
-
-func (e *MarkEvictedError) Error() string {
-	return "mark has been evicted from the ring buffer"
-}
-
-// SinceMark returns events since the last mark.
-func (c *CollectingSink) SinceMark() ([]Event, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.mark < 0 {
-		return nil, &MarkEvictedError{}
-	}
-	cp := make([]Event, len(c.events)-c.mark)
-	copy(cp, c.events[c.mark:])
-	return cp, nil
 }
 
 // StdoutSink writes events to stdout.
