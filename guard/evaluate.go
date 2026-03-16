@@ -72,11 +72,19 @@ func (g *Guard) Evaluate(
 		opt(cfg)
 	}
 
+	// Fall back to guard-level principal, matching Run() behavior.
+	principal := cfg.principal
+	if principal == nil {
+		g.mu.RLock()
+		principal = g.resolvePrincipal(toolName, args)
+		g.mu.RUnlock()
+	}
+
 	env2, err := envelope.CreateEnvelope(ctx, envelope.CreateEnvelopeOptions{
 		ToolName:    toolName,
 		Args:        args,
 		Environment: cfg.environment,
-		Principal:   cfg.principal,
+		Principal:   principal,
 		Registry:    g.toolRegistry,
 	})
 	if err != nil {
