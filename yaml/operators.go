@@ -108,7 +108,10 @@ func opContains(fv, ov any, sel string) EvalResult {
 	if !ok {
 		return typeMismatch("contains", sel, fv)
 	}
-	sub, _ := ov.(string)
+	sub, ok := ov.(string)
+	if !ok {
+		return policyError("contains: operand must be string")
+	}
 	if strings.Contains(s, sub) {
 		return pass()
 	}
@@ -125,7 +128,10 @@ func opContainsAny(fv, ov any, sel string) EvalResult {
 		return policyError("contains_any: expected list operand")
 	}
 	for _, item := range list {
-		sub, _ := item.(string)
+		sub, ok := item.(string)
+		if !ok {
+			return policyError("contains_any: list item must be string")
+		}
 		if strings.Contains(s, sub) {
 			return pass()
 		}
@@ -138,7 +144,10 @@ func opStartsWith(fv, ov any, sel string) EvalResult {
 	if !ok {
 		return typeMismatch("starts_with", sel, fv)
 	}
-	prefix, _ := ov.(string)
+	prefix, ok := ov.(string)
+	if !ok {
+		return policyError("starts_with: operand must be string")
+	}
 	if strings.HasPrefix(s, prefix) {
 		return pass()
 	}
@@ -150,7 +159,10 @@ func opEndsWith(fv, ov any, sel string) EvalResult {
 	if !ok {
 		return typeMismatch("ends_with", sel, fv)
 	}
-	suffix, _ := ov.(string)
+	suffix, ok := ov.(string)
+	if !ok {
+		return policyError("ends_with: operand must be string")
+	}
 	if strings.HasSuffix(s, suffix) {
 		return pass()
 	}

@@ -20,18 +20,14 @@ type BundleHash struct {
 func (h BundleHash) String() string { return h.Hex }
 
 // LoadBundle loads and validates a YAML contract bundle from a file path.
+// Size is checked after reading to avoid TOCTOU races between stat and read.
 func LoadBundle(path string) (map[string]any, BundleHash, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, BundleHash{}, fmt.Errorf("yaml: %w", err)
-	}
-	if info.Size() > MaxBundleSize {
-		return nil, BundleHash{}, fmt.Errorf("yaml: bundle file too large (%d bytes, max %d)", info.Size(), MaxBundleSize)
-	}
-
 	raw, err := os.ReadFile(path) //nolint:gosec // Path is caller-provided; this is the intended API.
 	if err != nil {
 		return nil, BundleHash{}, fmt.Errorf("yaml: %w", err)
+	}
+	if len(raw) > MaxBundleSize {
+		return nil, BundleHash{}, fmt.Errorf("yaml: bundle file too large (%d bytes, max %d)", len(raw), MaxBundleSize)
 	}
 
 	return parseAndValidate(raw)

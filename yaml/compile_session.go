@@ -30,7 +30,9 @@ func compileSession(
 		Check: func(ctx context.Context, s any) (contract.Verdict, error) {
 			sess, ok := s.(*session.Session)
 			if !ok {
-				return contract.Pass(), nil
+				// Fail-closed: unknown session type cannot be evaluated safely.
+				return contract.Fail("Session contract error: unexpected session type",
+					map[string]any{"policy_error": true}), nil
 			}
 			execCount, err := sess.ExecutionCount(ctx)
 			if err != nil {
