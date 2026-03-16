@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	edictum "github.com/edictum-ai/edictum-go"
+	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
 	"github.com/edictum-ai/edictum-go/contract"
 	"github.com/edictum-ai/edictum-go/envelope"
@@ -220,6 +221,119 @@ func TestRunPostconditionRedact(t *testing.T) {
 	if s != "[REDACTED]" {
 		t.Errorf("result: got %q, want '[REDACTED]'", s)
 	}
+}
+
+// TestRun_ObserveMode_ApprovalFallsThrough proves that in observe mode,
+// a precondition with Effect="approve" does NOT block on approval.
+// Instead it emits CALL_WOULD_DENY and executes the tool.
+func TestRun_ObserveMode_ApprovalFallsThrough(t *testing.T) {
+	toolExecuted := false
+	g := New(
+		WithMode("observe"),
+		WithContracts(
+			contract.Precondition{
+				Name:   "needs-approval",
+				Tool:   "*",
+				Effect: "approve",
+				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+					return contract.Fail("requires human approval"), nil
+				},
+			},
+		),
+		// Deliberately NO approval backend -- in enforce mode this would
+		// error. In observe mode it must not reach the backend at all.
+	)
+
+	ctx := context.Background()
+	result, err := g.Run(ctx, "Bash", map[string]any{"command": "ls"},
+		func(_ map[string]any) (any, error) {
+			toolExecuted = true
+			return "executed", nil
+		})
+	if err != nil {
+		t.Fatalf("observe mode should not error: %v", err)
+	}
+	if !toolExecuted {
+		t.Fatal("tool should have been executed in observe mode")
+	}
+	if result != "executed" {
+		t.Errorf("result: got %v, want 'executed'", result)
+	}
+
+	// Verify CALL_WOULD_DENY was emitted
+	events := g.LocalSink().Events()
+	hasWouldDeny := false
+	for _, e := range events {
+		if e.Action == audit.ActionCallWouldDeny {
+			hasWouldDeny = true
+			break
+		}
+	}
+	if !hasWouldDeny {
+		t.Error("expected CALL_WOULD_DENY audit event for approval in observe mode")
+	}
+}
+
+// TestRun_ApprovalTimeoutPropagated proves that per-contract
+// ApprovalTimeout and ApprovalTimeoutEff are passed to the approval backend.
+func TestRun_ApprovalTimeoutPropagated(t *testing.T) {
+	var capturedReq approval.Request
+	mock := &mockApprovalBackend{
+		onRequest: func(_ context.Context, _ string, _ map[string]any, _ string, opts ...approval.RequestOption) (approval.Request, error) {
+			req := approval.Request{}
+			for _, opt := range opts {
+				opt(&req)
+			}
+			capturedReq = req
+			return req, nil
+		},
+		onPoll: func(_ context.Context, _ string) (approval.Decision, error) {
+			return approval.Decision{Approved: true, Status: approval.StatusApproved}, nil
+		},
+	}
+
+	g := New(
+		WithContracts(
+			contract.Precondition{
+				Name:          "approval-timeout",
+				Tool:          "*",
+				Effect:        "approve",
+				Timeout:       60,
+				TimeoutEffect: "allow",
+				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+					return contract.Fail("needs approval"), nil
+				},
+			},
+		),
+		WithApprovalBackend(mock),
+	)
+
+	ctx := context.Background()
+	_, err := g.Run(ctx, "Bash", map[string]any{"command": "ls"}, nopCallable)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	if capturedReq.Timeout() != 60*1e9 { // 60 seconds in nanoseconds
+		t.Errorf("timeout: got %v, want 60s", capturedReq.Timeout())
+	}
+	if capturedReq.TimeoutEffect() != "allow" {
+		t.Errorf("timeout_effect: got %q, want 'allow'", capturedReq.TimeoutEffect())
+	}
+}
+
+// mockApprovalBackend is a test double that records RequestApproval calls.
+type mockApprovalBackend struct {
+	onRequest func(ctx context.Context, toolName string, toolArgs map[string]any, message string, opts ...approval.RequestOption) (approval.Request, error)
+	onPoll    func(ctx context.Context, approvalID string) (approval.Decision, error)
+}
+
+func (m *mockApprovalBackend) RequestApproval(ctx context.Context, toolName string, toolArgs map[string]any, message string, opts ...approval.RequestOption) (approval.Request, error) {
+	return m.onRequest(ctx, toolName, toolArgs, message, opts...)
+}
+
+func (m *mockApprovalBackend) PollApprovalStatus(ctx context.Context, approvalID string) (approval.Decision, error) {
+	return m.onPoll(ctx, approvalID)
 }
 
 func TestRunAttemptsIncrement(t *testing.T) {
