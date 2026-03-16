@@ -1,7 +1,6 @@
 package yaml
 
 import (
-	"os"
 	"testing"
 
 	"github.com/edictum-ai/edictum-go/envelope"
@@ -202,8 +201,7 @@ func TestUnknownOperatorPolicyError(t *testing.T) {
 // --- Additional: env var float coercion ---
 
 func TestEnvVarFloatCoercion(t *testing.T) {
-	os.Setenv("EDICTUM_TEST_FLOAT", "3.14")
-	t.Cleanup(func() { os.Unsetenv("EDICTUM_TEST_FLOAT") })
+	t.Setenv("EDICTUM_TEST_FLOAT", "3.14")
 	env := makeEnv(t, envelope.CreateEnvelopeOptions{})
 	r := EvaluateExpression(leaf("env.EDICTUM_TEST_FLOAT", "equals", 3.14), env, "")
 	if !r.Matched {
