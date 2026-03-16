@@ -229,6 +229,10 @@ func TestCheckSymlinkResolution(t *testing.T) {
 		if err := os.MkdirAll(outside, 0o750); err != nil {
 			t.Fatal(err)
 		}
+		// Create the target file so EvalSymlinks can resolve the full chain.
+		if err := os.WriteFile(filepath.Join(outside, "data.txt"), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
 		bLink := filepath.Join(workspace, "b")
 		if err := os.Symlink(outside, bLink); err != nil {
 			t.Skipf("symlink creation failed: %v", err)
