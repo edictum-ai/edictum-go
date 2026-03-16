@@ -120,10 +120,7 @@ func (c *CompositeSink) Emit(ctx context.Context, event *Event) error {
 	for _, s := range c.sinks {
 		cp := *event
 		if event.ToolArgs != nil {
-			cp.ToolArgs = make(map[string]any, len(event.ToolArgs))
-			for k, v := range event.ToolArgs {
-				cp.ToolArgs[k] = v
-			}
+			cp.ToolArgs = deepCopyMap(event.ToolArgs)
 		}
 		if err := s.Emit(ctx, &cp); err != nil {
 			errs = append(errs, err)

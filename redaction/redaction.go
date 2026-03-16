@@ -185,16 +185,21 @@ func (p *Policy) RedactResult(result string, maxLength int) string {
 }
 
 // CapPayload caps total serialized size to 32KB.
-// If the payload exceeds the limit, tool_args and result_summary are
-// dropped and replaced with a truncation marker.
+// If the payload exceeds the limit, a new map is returned with
+// tool_args and result_summary replaced by truncation markers.
+// The original map is never mutated.
 func (p *Policy) CapPayload(data map[string]any) map[string]any {
 	serialized, err := json.Marshal(data)
 	if err != nil || len(serialized) <= maxPayloadSize {
 		return data
 	}
-	data["_truncated"] = true
-	delete(data, "result_summary")
-	delete(data, "tool_args")
-	data["tool_args"] = map[string]any{"_redacted": "payload exceeded 32KB"}
-	return data
+	// Copy to avoid mutating the caller's map.
+	out := make(map[string]any, len(data))
+	for k, v := range data {
+		out[k] = v
+	}
+	out["_truncated"] = true
+	delete(out, "result_summary")
+	out["tool_args"] = map[string]any{"_redacted": "payload exceeded 32KB"}
+	return out
 }

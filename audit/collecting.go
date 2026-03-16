@@ -54,10 +54,7 @@ func (c *CollectingSink) Emit(_ context.Context, event *Event) error {
 
 	cp := *event
 	if event.ToolArgs != nil {
-		cp.ToolArgs = make(map[string]any, len(event.ToolArgs))
-		for k, v := range event.ToolArgs {
-			cp.ToolArgs[k] = v
-		}
+		cp.ToolArgs = deepCopyMap(event.ToolArgs)
 	}
 
 	c.events = append(c.events, cp)
@@ -144,4 +141,22 @@ func (c *CollectingSink) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.events = c.events[:0]
+}
+
+// deepCopyMap recursively copies a map[string]any.
+func deepCopyMap(src map[string]any) map[string]any {
+	dst := make(map[string]any, len(src))
+	for k, v := range src {
+		switch val := v.(type) {
+		case map[string]any:
+			dst[k] = deepCopyMap(val)
+		case []any:
+			cp := make([]any, len(val))
+			copy(cp, val)
+			dst[k] = cp
+		default:
+			dst[k] = v
+		}
+	}
+	return dst
 }

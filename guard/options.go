@@ -19,7 +19,11 @@ func WithEnvironment(env string) Option {
 }
 
 // WithMode sets the enforcement mode: "enforce" or "observe".
+// Panics on invalid mode to fail-closed at construction time.
 func WithMode(mode string) Option {
+	if mode != "enforce" && mode != "observe" {
+		panic("invalid mode " + mode + ": must be \"enforce\" or \"observe\"")
+	}
 	return func(g *Guard) { g.mode = mode }
 }
 
