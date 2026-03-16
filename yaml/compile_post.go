@@ -30,7 +30,7 @@ func compilePost(
 		effect = "warn"
 	}
 
-	isShadow, _ := raw["_shadow"].(bool)
+	isObserve, _ := raw["_shadow"].(bool)
 	source := "yaml_postcondition"
 
 	// Extract output.text regex patterns for redaction
@@ -64,7 +64,7 @@ func compilePost(
 		},
 	}
 
-	if isShadow {
+	if isObserve {
 		post.Mode = "observe"
 	}
 

@@ -34,7 +34,7 @@ func compilePre(
 		timeoutEffect = "deny"
 	}
 
-	isShadow, _ := raw["_shadow"].(bool)
+	isObserve, _ := raw["_shadow"].(bool)
 	source := "yaml_precondition"
 
 	pre := contract.Precondition{
@@ -62,7 +62,7 @@ func compilePre(
 		},
 	}
 
-	if isShadow {
+	if isObserve {
 		pre.Mode = "observe"
 	}
 

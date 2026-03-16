@@ -78,8 +78,8 @@ func Compile(bundle map[string]any, opts ...CompileOption) (CompiledBundle, erro
 			}
 			result.Postconditions = append(result.Postconditions, post)
 		case "session":
-			isShadow, _ := raw["_shadow"].(bool)
-			if !isShadow {
+			isObserve, _ := raw["_shadow"].(bool)
+			if !isObserve {
 				result.Limits = mergeSessionLimits(raw, result.Limits)
 			}
 			sc := compileSession(raw, mode, result.Limits)

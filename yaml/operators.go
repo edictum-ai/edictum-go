@@ -163,10 +163,10 @@ func opMatches(fv, ov any, sel string) EvalResult {
 		return typeMismatch("matches", sel, fv)
 	}
 	truncated := truncateRegexInput(s)
-	pattern, _ := ov.(string)
-	re, err := regexp.Compile(pattern)
+	// Handle pre-compiled *regexp.Regexp (from precompileRegexes) or string.
+	re, err := toRegexp(ov)
 	if err != nil {
-		return policyError(fmt.Sprintf("matches: invalid regex '%s'", pattern))
+		return policyError(fmt.Sprintf("matches: %s", err))
 	}
 	if re.MatchString(truncated) {
 		return pass()
@@ -185,14 +185,25 @@ func opMatchesAny(fv, ov any, sel string) EvalResult {
 		return policyError("matches_any: expected list operand")
 	}
 	for _, item := range list {
-		pattern, _ := item.(string)
-		re, err := regexp.Compile(pattern)
+		re, err := toRegexp(item)
 		if err != nil {
-			return policyError(fmt.Sprintf("matches_any: invalid regex '%s'", pattern))
+			return policyError(fmt.Sprintf("matches_any: %s", err))
 		}
 		if re.MatchString(truncated) {
 			return pass()
 		}
 	}
 	return fail()
+}
+
+// toRegexp converts a string or *regexp.Regexp to *regexp.Regexp.
+func toRegexp(v any) (*regexp.Regexp, error) {
+	switch val := v.(type) {
+	case *regexp.Regexp:
+		return val, nil
+	case string:
+		return regexp.Compile(val)
+	default:
+		return nil, fmt.Errorf("invalid regex type %T", v)
+	}
 }

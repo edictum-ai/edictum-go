@@ -20,7 +20,7 @@ func compileSession(
 		msgTemplate, _ = then["message"].(string)
 	}
 
-	isShadow, _ := raw["_shadow"].(bool)
+	isObserve, _ := raw["_shadow"].(bool)
 	source := "yaml_session"
 
 	sc := contract.SessionContract{
@@ -50,7 +50,7 @@ func compileSession(
 		},
 	}
 
-	if isShadow {
+	if isObserve {
 		sc.Mode = "observe"
 	}
 
@@ -87,6 +87,9 @@ func mergeSessionLimits(raw map[string]any, existing pipeline.OperationLimits) p
 	if perTool, ok := limitsMap["max_calls_per_tool"].(map[string]any); ok {
 		for tool, v := range perTool {
 			n := intOr(v, 0)
+			if n <= 0 {
+				continue // Skip zero/negative — would deny all calls to this tool
+			}
 			if existing, found := result.MaxCallsPerTool[tool]; found {
 				if n < existing {
 					result.MaxCallsPerTool[tool] = n
