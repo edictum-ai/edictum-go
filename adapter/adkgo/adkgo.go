@@ -41,8 +41,8 @@ func (a *Adapter) WrapTool(
 ) func(ctx context.Context, args map[string]any) (any, error) {
 	return func(ctx context.Context, args map[string]any) (any, error) {
 		return a.guard.Run(ctx, toolName, args,
-			func(a map[string]any) (any, error) {
-				return fn(ctx, a)
+			func(m map[string]any) (any, error) {
+				return fn(ctx, m)
 			})
 	}
 }
