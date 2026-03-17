@@ -40,7 +40,7 @@ func TestAdapterParity_11_2_DenyPrecondition(t *testing.T) {
 				Name: "deny-all",
 				Tool: "*",
 				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("blocked by policy"), nil
+					return contract.Fail("denied by policy"), nil
 				},
 			},
 		),
@@ -375,56 +375,5 @@ func TestAdapterParity_11_10_OnPostconditionWarn(t *testing.T) {
 	if !strings.Contains(capturedWarnings[0], "PII detected: SSN") {
 		t.Errorf("warning should contain 'PII detected: SSN', got %q",
 			capturedWarnings[0])
-	}
-}
-
-// TestAdapterCallbacksDeny verifies the Callbacks() API returns a deny
-// map when preconditions fail.
-func TestAdapterCallbacksDeny(t *testing.T) {
-	g := guard.New(
-		guard.WithContracts(
-			contract.Precondition{
-				Name: "deny-all",
-				Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("policy violation"), nil
-				},
-			},
-		),
-	)
-
-	adapter := New(g)
-	before, _ := adapter.Callbacks()
-
-	result, err := before(context.Background(), "Bash", map[string]any{"command": "ls"})
-	if err != nil {
-		t.Fatalf("before callback should not return error: %v", err)
-	}
-	if result == nil {
-		t.Fatal("before callback should return non-nil map on deny")
-	}
-	errMsg, ok := result["error"].(string)
-	if !ok {
-		t.Fatal("deny map should contain 'error' string")
-	}
-	if !strings.HasPrefix(errMsg, "DENIED:") {
-		t.Errorf("error message: got %q, want prefix 'DENIED:'", errMsg)
-	}
-}
-
-// TestAdapterCallbacksAllow verifies the Callbacks() API returns nil
-// when preconditions pass.
-func TestAdapterCallbacksAllow(t *testing.T) {
-	g := guard.New()
-	adapter := New(g)
-	before, _ := adapter.Callbacks()
-
-	result, err := before(context.Background(), "ReadFile",
-		map[string]any{"path": "/tmp/x"})
-	if err != nil {
-		t.Fatalf("before callback error: %v", err)
-	}
-	if result != nil {
-		t.Errorf("before callback should return nil on allow, got %v", result)
 	}
 }

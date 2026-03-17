@@ -9,6 +9,7 @@ package langchaingo
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/edictum-ai/edictum-go/guard"
 )
@@ -42,9 +43,12 @@ func (a *Adapter) WrapTool(
 			return "", err
 		}
 
+		if result == nil {
+			return "", nil
+		}
 		s, ok := result.(string)
 		if !ok {
-			return "", nil
+			return fmt.Sprintf("%v", result), nil
 		}
 		return s, nil
 	}
