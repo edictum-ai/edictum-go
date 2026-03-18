@@ -56,11 +56,14 @@ func (g *Guard) handleApproval(
 	if err != nil {
 		// Context cancellation/deadline → treat as approval timeout.
 		// Apply timeout_effect rather than propagating the raw error.
+		// Use a fresh context for post-timeout operations (audit, execution)
+		// since the original context is expired.
 		if ctx.Err() != nil {
 			decision = approval.Decision{
 				Status:    approval.StatusTimeout,
 				Timestamp: time.Now().UTC(),
 			}
+			ctx = context.Background()
 		} else {
 			return nil, fmt.Errorf("poll approval: %w", err)
 		}
