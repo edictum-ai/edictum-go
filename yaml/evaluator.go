@@ -2,6 +2,8 @@
 package yaml
 
 import (
+	"fmt"
+
 	"github.com/edictum-ai/edictum-go/envelope"
 )
 
@@ -118,6 +120,9 @@ func evalNot(expr map[string]any, env envelope.ToolEnvelope, outputText string, 
 
 // evalLeaf evaluates a leaf node: one selector key mapping to one operator block.
 func evalLeaf(leaf map[string]any, env envelope.ToolEnvelope, outputText string, ec *evalCtx) EvalResult {
+	if len(leaf) != 1 {
+		return policyError(fmt.Sprintf("leaf expression must have exactly 1 selector, got %d", len(leaf)))
+	}
 	// Extract the single selector key.
 	var selector string
 	var operatorBlock any

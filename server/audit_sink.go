@@ -162,8 +162,9 @@ func (s *AuditSink) restoreEvents(events []map[string]any) {
 	defer s.mu.Unlock()
 	s.buffer = append(events, s.buffer...)
 	if len(s.buffer) > s.maxBufferSize {
-		dropped := len(s.buffer) - s.maxBufferSize
-		s.buffer = s.buffer[dropped:]
+		// Truncate from the end (drop newest arrivals), preserving the
+		// restored (older) events that need to be retried first.
+		s.buffer = s.buffer[:s.maxBufferSize]
 	}
 }
 

@@ -78,18 +78,14 @@ func Compile(bundle map[string]any, opts ...CompileOption) (CompiledBundle, erro
 			}
 			result.Postconditions = append(result.Postconditions, post)
 		case "sandbox":
-			// Sandbox contracts compile to Preconditions with Source="yaml_sandbox".
-			// Full sandbox compilation (path/command/domain checks) requires the
-			// guard to wire them through the sandbox package at runtime.
-			sb, err := compilePre(raw, mode, cc)
-			if err != nil {
-				return CompiledBundle{}, err
-			}
-			sb.Source = "yaml_sandbox"
+			// Sandbox contracts use within/not_within/allows/not_allows — not
+			// when/then — so they go through compileSandbox, not compilePre.
+			// Actual sandbox evaluation is wired by the guard at runtime.
+			sb := compileSandbox(raw, mode)
 			result.SandboxContracts = append(result.SandboxContracts, sb)
 		case "session":
 			isObserve, _ := raw["_shadow"].(bool)
-			if !isObserve {
+			if !isObserve && mode != "observe" {
 				result.Limits = mergeSessionLimits(raw, result.Limits)
 			}
 			sc := compileSession(raw, mode, result.Limits)
