@@ -31,9 +31,11 @@ func compileSandbox(raw map[string]any, mode string) contract.Precondition {
 		Tool:   tool,
 		Mode:   mode,
 		Source: "yaml_sandbox",
-		// Stub: actual sandbox checks are wired by guard.
+		// Fail-closed stub: if the guard does not replace this Check
+		// with actual sandbox evaluation, the contract denies all calls.
+		// This ensures uninitialized sandbox contracts never silently pass.
 		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Pass(), nil
+			return contract.Fail("sandbox contract not initialized — guard must wire sandbox.Check"), nil
 		},
 	}
 	if isObserve {
