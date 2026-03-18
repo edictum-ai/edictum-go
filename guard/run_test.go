@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/approval"
@@ -353,4 +354,50 @@ func TestRunAttemptsIncrement(t *testing.T) {
 	if len(events) < 6 {
 		t.Errorf("expected >= 6 events, got %d", len(events))
 	}
+}
+
+func TestRun_ApprovalContextTimeout(t *testing.T) {
+	// When context expires during approval polling, the guard should
+	// treat it as a timeout and apply timeout_effect, not return raw error.
+	g := New(
+		WithContracts(
+			contract.Precondition{
+				Name: "needs-approval", Tool: "*", Effect: "approve",
+				Timeout: 1, TimeoutEffect: "allow",
+				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+					return contract.Fail("needs approval"), nil
+				},
+			},
+		),
+		WithApprovalBackend(&blockingApprovalBackend{}),
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	// Should succeed because timeout_effect="allow"
+	result, err := g.Run(ctx, "TestTool", map[string]any{},
+		func(_ map[string]any) (any, error) { return "executed", nil })
+	if err != nil {
+		t.Fatalf("expected allow on timeout, got error: %v", err)
+	}
+	if result != "executed" {
+		t.Fatalf("expected 'executed', got %v", result)
+	}
+}
+
+// blockingApprovalBackend always blocks on PollApprovalStatus until context cancels.
+type blockingApprovalBackend struct{}
+
+func (b *blockingApprovalBackend) RequestApproval(
+	_ context.Context, toolName string, toolArgs map[string]any, message string, opts ...approval.RequestOption,
+) (approval.Request, error) {
+	return approval.NewRequest("test-id", toolName, toolArgs, message, opts...), nil
+}
+
+func (b *blockingApprovalBackend) PollApprovalStatus(
+	ctx context.Context, _ string,
+) (approval.Decision, error) {
+	<-ctx.Done()
+	return approval.Decision{}, ctx.Err()
 }

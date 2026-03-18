@@ -54,9 +54,14 @@ func (g *Guard) handleApproval(
 
 	decision, err := g.approvalBackend.PollApprovalStatus(ctx, req.ApprovalID())
 	if err != nil {
-		// Context cancellation with a timeout decision should be handled
-		// as a timeout, not an error — apply timeout_effect.
-		if decision.Status != approval.StatusTimeout {
+		// Context cancellation/deadline → treat as approval timeout.
+		// Apply timeout_effect rather than propagating the raw error.
+		if ctx.Err() != nil {
+			decision = approval.Decision{
+				Status:    approval.StatusTimeout,
+				Timestamp: time.Now().UTC(),
+			}
+		} else {
 			return nil, fmt.Errorf("poll approval: %w", err)
 		}
 	}
