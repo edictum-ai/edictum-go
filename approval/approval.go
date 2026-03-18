@@ -99,24 +99,24 @@ func deepCopyMap(src map[string]any) map[string]any {
 	}
 	dst := make(map[string]any, len(src))
 	for k, v := range src {
-		switch val := v.(type) {
-		case map[string]any:
-			dst[k] = deepCopyMap(val)
-		case []any:
-			cp := make([]any, len(val))
-			for i, elem := range val {
-				if m, ok := elem.(map[string]any); ok {
-					cp[i] = deepCopyMap(m)
-				} else {
-					cp[i] = elem
-				}
-			}
-			dst[k] = cp
-		default:
-			dst[k] = v
-		}
+		dst[k] = deepCopyValue(v)
 	}
 	return dst
+}
+
+func deepCopyValue(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		return deepCopyMap(val)
+	case []any:
+		cp := make([]any, len(val))
+		for i, elem := range val {
+			cp[i] = deepCopyValue(elem)
+		}
+		return cp
+	default:
+		return v
+	}
 }
 
 // NewRequest creates a Request with the given fields. Required for

@@ -37,6 +37,11 @@ func WithLimits(limits pipeline.OperationLimits) Option {
 // WithContracts adds contracts to the guard. Accepts Precondition,
 // Postcondition, and SessionContract values. Each is sorted into
 // enforce or observe lists based on its Mode field.
+//
+// Panics on unsupported types (construction-time programmer error,
+// like regexp.MustCompile). This is intentional: the functional option
+// signature has no error return, and silently ignoring an unknown type
+// would violate the API design rule "never silently ignore".
 func WithContracts(contracts ...any) Option {
 	return func(g *Guard) {
 		for _, c := range contracts {
