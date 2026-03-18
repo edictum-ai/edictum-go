@@ -2,6 +2,7 @@ package guard
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -58,7 +59,7 @@ func (g *Guard) handleApproval(
 		// Apply timeout_effect rather than propagating the raw error.
 		// Use a fresh context for post-timeout operations (audit, execution)
 		// since the original context is expired.
-		if ctx.Err() != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			decision = approval.Decision{
 				Status:    approval.StatusTimeout,
 				Timestamp: time.Now().UTC(),
