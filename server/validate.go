@@ -51,6 +51,12 @@ func enforceTLS(baseURL string, allowInsecure bool) error {
 	if err != nil {
 		return fmt.Errorf("invalid base URL: %w", err)
 	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf(
+			"unsupported URL scheme %q — only http and https are accepted",
+			parsed.Scheme,
+		)
+	}
 	if parsed.Scheme != "http" {
 		return nil
 	}

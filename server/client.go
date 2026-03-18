@@ -121,6 +121,9 @@ func (c *Client) Env() string { return c.env }
 func (c *Client) BundleName() string { return c.bundleName }
 
 // doRequest executes an HTTP request with exponential backoff retry.
+// Only GET requests are retried on network errors and 5xx responses.
+// POST/PUT/DELETE are non-idempotent and must not be retried to avoid
+// duplicate side effects (e.g., double session increments, duplicate approvals).
 // When nilOn404 is true, a 404 response returns (nil, nil).
 func (c *Client) doRequest(
 	ctx context.Context,
@@ -129,6 +132,7 @@ func (c *Client) doRequest(
 	nilOn404 bool,
 ) (map[string]any, error) {
 	var lastErr error
+	idempotent := method == http.MethodGet
 
 	for attempt := range c.maxRetries {
 		req, err := c.buildRequest(ctx, method, path, body)
@@ -138,6 +142,9 @@ func (c *Client) doRequest(
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
+			if !idempotent {
+				return nil, err
+			}
 			lastErr = err
 			if attempt < c.maxRetries-1 {
 				sleepBackoff(ctx, attempt)
@@ -149,6 +156,9 @@ func (c *Client) doRequest(
 		respBody, readErr := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if readErr != nil {
+			if !idempotent {
+				return nil, fmt.Errorf("read response: %w", readErr)
+			}
 			lastErr = fmt.Errorf("read response: %w", readErr)
 			if attempt < c.maxRetries-1 {
 				sleepBackoff(ctx, attempt)
@@ -158,6 +168,9 @@ func (c *Client) doRequest(
 		}
 
 		if resp.StatusCode >= 500 {
+			if !idempotent {
+				return nil, &Error{StatusCode: resp.StatusCode, Detail: string(respBody)}
+			}
 			lastErr = &Error{StatusCode: resp.StatusCode, Detail: string(respBody)}
 			if attempt < c.maxRetries-1 {
 				sleepBackoff(ctx, attempt)

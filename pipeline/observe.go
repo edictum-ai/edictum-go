@@ -25,6 +25,9 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 
 	// Observe preconditions
 	for _, c := range shadowPres {
+		if c.When != nil && !c.When(ctx, env) {
+			continue
+		}
 		verdict, err := c.Check(ctx, env)
 		if err != nil {
 			log.Printf("Observe-mode precondition %s raised: %v", contractName(c.Name), err)
@@ -48,6 +51,9 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 
 	// Observe sandbox contracts
 	for _, c := range shadowSandbox {
+		if c.When != nil && !c.When(ctx, env) {
+			continue
+		}
 		verdict, err := c.Check(ctx, env)
 		if err != nil {
 			log.Printf("Observe-mode sandbox %s raised: %v", contractName(c.Name), err)
