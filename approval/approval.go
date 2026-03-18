@@ -104,3 +104,20 @@ func WithTimeout(d time.Duration) RequestOption {
 func WithTimeoutEffect(effect string) RequestOption {
 	return func(r *Request) { r.timeoutEffect = effect }
 }
+
+// NewRequest creates a Request with the given fields. Required for
+// Backend implementations outside the approval package, since Request
+// fields are unexported for immutability.
+func NewRequest(approvalID, toolName string, toolArgs map[string]any, message string, opts ...RequestOption) Request {
+	r := Request{
+		approvalID: approvalID,
+		toolName:   toolName,
+		toolArgs:   toolArgs,
+		message:    message,
+		createdAt:  time.Now().UTC(),
+	}
+	for _, opt := range opts {
+		opt(&r)
+	}
+	return r
+}
