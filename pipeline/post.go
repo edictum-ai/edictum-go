@@ -109,6 +109,9 @@ func (p *GovernancePipeline) PostExecute(
 
 	// 3. Observe-mode postconditions (never affect real decision)
 	for _, c := range p.provider.GetObservePostconditions(env) {
+		if c.When != nil && !c.When(ctx, env) {
+			continue
+		}
 		verdict, err := c.Check(ctx, env, toolResponse)
 		if err != nil {
 			log.Printf("Observe-mode postcondition %s raised: %v",

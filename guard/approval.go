@@ -2,6 +2,7 @@ package guard
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -54,7 +55,19 @@ func (g *Guard) handleApproval(
 
 	decision, err := g.approvalBackend.PollApprovalStatus(ctx, req.ApprovalID())
 	if err != nil {
-		return nil, fmt.Errorf("poll approval: %w", err)
+		// Context cancellation/deadline → treat as approval timeout.
+		// Apply timeout_effect rather than propagating the raw error.
+		// Use a fresh context for post-timeout operations (audit, execution)
+		// since the original context is expired.
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			decision = approval.Decision{
+				Status:    approval.StatusTimeout,
+				Timestamp: time.Now().UTC(),
+			}
+			ctx = context.Background()
+		} else {
+			return nil, fmt.Errorf("poll approval: %w", err)
+		}
 	}
 
 	approved := false
