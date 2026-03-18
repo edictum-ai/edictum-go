@@ -82,7 +82,12 @@ func (g *Guard) Run(
 		return nil, fmt.Errorf("envelope create: %w", err)
 	}
 
-	// Increment attempts
+	// Increment attempts BEFORE pre-execute checks limits.MaxAttempts.
+	// This is intentional parity with Python (_runner.py:79) where
+	// increment_attempts() is called before pre_execute(). With
+	// max_attempts=1, the first call sees attempt_count=1 which equals
+	// the limit, so it is allowed; the second call sees attempt_count=2
+	// which exceeds the limit, so it is denied.
 	if _, err := sess.IncrementAttempts(ctx); err != nil {
 		return nil, fmt.Errorf("increment attempts: %w", err)
 	}

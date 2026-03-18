@@ -167,7 +167,25 @@ func deepCopyMap(src map[string]any) map[string]any {
 			dst[k] = deepCopyMap(val)
 		case []any:
 			cp := make([]any, len(val))
-			copy(cp, val)
+			for i, elem := range val {
+				switch ev := elem.(type) {
+				case map[string]any:
+					cp[i] = deepCopyMap(ev)
+				case []any:
+					// Recurse via deepCopyMap wrapping — reuse the slice path.
+					inner := make([]any, len(ev))
+					for j, e2 := range ev {
+						if m2, ok := e2.(map[string]any); ok {
+							inner[j] = deepCopyMap(m2)
+						} else {
+							inner[j] = e2
+						}
+					}
+					cp[i] = inner
+				default:
+					cp[i] = elem
+				}
+			}
 			dst[k] = cp
 		default:
 			dst[k] = v
