@@ -84,6 +84,7 @@ func (w *SSEWatcher) Watch(ctx context.Context) error {
 			return err
 		}
 
+		connectedAt = time.Now()
 		err := w.connectAndListen(ctx)
 		if err == nil {
 			// Clean disconnect -- reset backoff.
@@ -103,12 +104,11 @@ func (w *SSEWatcher) Watch(ctx context.Context) error {
 			return nil
 		}
 
-		// If connection was stable, reset backoff.
+		// If connection was stable (>30s), reset backoff.
 		if !connectedAt.IsZero() && time.Since(connectedAt) >= 30*time.Second {
 			delay = w.reconnectDelay
 			consecutiveFailures = 0
 		}
-		connectedAt = time.Time{}
 
 		consecutiveFailures++
 		if consecutiveFailures <= 3 {
@@ -126,7 +126,6 @@ func (w *SSEWatcher) Watch(ctx context.Context) error {
 			float64(delay)*2,
 			float64(w.maxReconnectDelay),
 		))
-		_ = connectedAt // suppress unused warning; set inside connectAndListen
 	}
 }
 

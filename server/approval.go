@@ -80,6 +80,14 @@ func (b *ApprovalBackend) PollApprovalStatus(
 	for {
 		resp, err := b.client.Get(ctx, "/api/v1/approvals/"+approvalID)
 		if err != nil {
+			// Context cancellation/timeout → return StatusTimeout
+			if ctx.Err() != nil {
+				return approval.Decision{
+					Approved:  false,
+					Status:    approval.StatusTimeout,
+					Timestamp: time.Now().UTC(),
+				}, ctx.Err()
+			}
 			return approval.Decision{}, err
 		}
 		if resp == nil {

@@ -93,8 +93,18 @@ func (s *AuditSink) Flush(ctx context.Context) {
 }
 
 // Close stops the flush goroutine and flushes remaining events.
+// Safe to call multiple times.
 func (s *AuditSink) Close(ctx context.Context) {
-	close(s.stopCh)
+	s.mu.Lock()
+	select {
+	case <-s.stopCh:
+		// Already closed.
+		s.mu.Unlock()
+		return
+	default:
+		close(s.stopCh)
+	}
+	s.mu.Unlock()
 	<-s.doneCh
 	s.flush(ctx)
 }
