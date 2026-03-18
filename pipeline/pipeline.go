@@ -45,6 +45,9 @@ func (p *GovernancePipeline) PreExecute(
 	}
 
 	// 1. Attempt limit
+	// NOTE: attempts is pre-incremented in guard.Run() before this check.
+	// With max_attempts=N, exactly N calls are allowed before denial.
+	// This matches Python parity: increment_attempts() before pre_execute().
 	if counters["attempts"] >= limits.MaxAttempts {
 		return PreDecision{
 			Action:             "deny",

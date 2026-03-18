@@ -1,6 +1,8 @@
 package guard
 
 import (
+	"fmt"
+
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
 	"github.com/edictum-ai/edictum-go/contract"
@@ -63,6 +65,8 @@ func WithContracts(contracts ...any) Option {
 					g.state.sessionContracts = append(
 						g.state.sessionContracts, v)
 				}
+			default:
+				panic(fmt.Sprintf("WithContracts: unsupported type %T", c))
 			}
 		}
 	}

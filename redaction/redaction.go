@@ -175,6 +175,9 @@ func (p *Policy) RedactResult(result string, maxLength int) string {
 		maxLength = 500
 	}
 	r := result
+	if len(r) > maxRegexInput {
+		r = r[:maxRegexInput]
+	}
 	for _, bp := range p.bashPatterns {
 		r = bp.re.ReplaceAllString(r, bp.replacement)
 	}

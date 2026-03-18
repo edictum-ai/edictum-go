@@ -1,5 +1,7 @@
 package envelope
 
+import "github.com/edictum-ai/edictum-go/internal/deepcopy"
+
 // Principal identifies who is making the tool call.
 type Principal struct {
 	userID    string
@@ -25,16 +27,9 @@ func (p Principal) Role() string { return p.role }
 // TicketRef returns the principal's ticket reference.
 func (p Principal) TicketRef() string { return p.ticketRef }
 
-// Claims returns a copy of the principal's claims.
+// Claims returns a deep copy of the principal's claims.
 func (p Principal) Claims() map[string]any {
-	if p.claims == nil {
-		return nil
-	}
-	cp := make(map[string]any, len(p.claims))
-	for k, v := range p.claims {
-		cp[k] = v
-	}
-	return cp
+	return deepcopy.Map(p.claims)
 }
 
 // PrincipalOption configures a Principal.
@@ -68,10 +63,7 @@ func WithTicketRef(ref string) PrincipalOption {
 // WithClaims sets the principal's claims (deep-copied).
 func WithClaims(claims map[string]any) PrincipalOption {
 	return func(p *Principal) {
-		p.claims = make(map[string]any, len(claims))
-		for k, v := range claims {
-			p.claims[k] = v
-		}
+		p.claims = deepcopy.Map(claims)
 	}
 }
 

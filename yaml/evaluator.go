@@ -139,6 +139,10 @@ func evalLeaf(leaf map[string]any, env envelope.ToolEnvelope, outputText string,
 		return policyError("operator block is not a map")
 	}
 
+	if len(block) != 1 {
+		return policyError(fmt.Sprintf("operator block must have exactly 1 operator, got %d", len(block)))
+	}
+
 	// Extract the single operator.
 	var opName string
 	var opValue any

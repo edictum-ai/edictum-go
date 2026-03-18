@@ -226,7 +226,9 @@ func (w *SSEWatcher) handleContractUpdate(data string) {
 	}
 }
 
-// Close stops the watcher.
+// Close signals the watcher to stop. For immediate shutdown, also cancel
+// the context passed to Watch(). Close without context cancellation waits
+// for the current SSE connection to disconnect naturally.
 func (w *SSEWatcher) Close() {
 	w.mu.Lock()
 	defer w.mu.Unlock()

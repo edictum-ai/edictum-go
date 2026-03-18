@@ -50,6 +50,8 @@ func (g *Guard) Run(
 	env := g.environment
 	sid := g.sessionID
 	policyVersion := g.state.policyVersion
+	backend := g.backend
+	registry := g.toolRegistry
 	g.mu.RUnlock()
 
 	cfg := &runConfig{sessionID: sid, environment: env}
@@ -57,7 +59,7 @@ func (g *Guard) Run(
 		opt(cfg)
 	}
 
-	sess, err := session.New(cfg.sessionID, g.backend)
+	sess, err := session.New(cfg.sessionID, backend)
 	if err != nil {
 		return nil, fmt.Errorf("session create: %w", err)
 	}
@@ -76,7 +78,7 @@ func (g *Guard) Run(
 		RunID:       cfg.sessionID,
 		Environment: cfg.environment,
 		Principal:   principal,
-		Registry:    g.toolRegistry,
+		Registry:    registry,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("envelope create: %w", err)

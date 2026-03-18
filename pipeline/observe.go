@@ -18,13 +18,13 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 	sess *session.Session,
 ) []map[string]any {
 	// Pre-allocate results slice based on total observe contract count.
-	shadowPres := p.provider.GetObservePreconditions(env)
-	shadowSandbox := p.provider.GetObserveSandboxContracts(env)
-	shadowSession := p.provider.GetObserveSessionContracts()
-	results := make([]map[string]any, 0, len(shadowPres)+len(shadowSandbox)+len(shadowSession))
+	observePres := p.provider.GetObservePreconditions(env)
+	observeSandbox := p.provider.GetObserveSandboxContracts(env)
+	observeSession := p.provider.GetObserveSessionContracts()
+	results := make([]map[string]any, 0, len(observePres)+len(observeSandbox)+len(observeSession))
 
 	// Observe preconditions
-	for _, c := range shadowPres {
+	for _, c := range observePres {
 		if c.When != nil && !c.When(ctx, env) {
 			continue
 		}
@@ -50,7 +50,7 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 	}
 
 	// Observe sandbox contracts
-	for _, c := range shadowSandbox {
+	for _, c := range observeSandbox {
 		if c.When != nil && !c.When(ctx, env) {
 			continue
 		}
@@ -76,7 +76,7 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 	}
 
 	// Observe session contracts
-	for _, sc := range shadowSession {
+	for _, sc := range observeSession {
 		verdict, err := sc.Check(ctx, sess)
 		if err != nil {
 			log.Printf("Observe-mode session contract %s raised: %v", contractName(sc.Name), err)
