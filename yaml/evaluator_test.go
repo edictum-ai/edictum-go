@@ -351,6 +351,23 @@ func TestMissingFieldsFalse(t *testing.T) {
 	}
 }
 
+// --- Multi-key leaf -> PolicyError ---
+
+func TestEvalLeaf_MultiKeyReturnsError(t *testing.T) {
+	expr := map[string]any{
+		"args.name":  map[string]any{"equals": "test"},
+		"args.other": map[string]any{"equals": "bad"},
+	}
+	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+		ToolName: "Test",
+		Args:     map[string]any{"name": "test", "other": "bad"},
+	})
+	result := EvaluateExpression(expr, env, "")
+	if !result.PolicyError {
+		t.Fatal("expected PolicyError for multi-key leaf")
+	}
+}
+
 // --- 3.25: Type mismatch -> PolicyError ---
 
 func TestTypeMismatchPolicyError(t *testing.T) {

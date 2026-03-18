@@ -116,6 +116,17 @@ func (s *AuditSink) BufferLen() int {
 	return len(s.buffer)
 }
 
+// BufferCallIDs returns the call_id of each buffered event, in order. For testing.
+func (s *AuditSink) BufferCallIDs() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ids := make([]string, len(s.buffer))
+	for i, ev := range s.buffer {
+		ids[i], _ = ev["call_id"].(string)
+	}
+	return ids
+}
+
 func (s *AuditSink) mapEvent(event *audit.Event) map[string]any {
 	return map[string]any{
 		"call_id":   event.CallID,
