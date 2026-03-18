@@ -34,7 +34,10 @@ func (b *Backend) Get(ctx context.Context, key string) (string, error) {
 		// 404 — key does not exist.
 		return "", nil
 	}
-	val, _ := resp["value"].(string)
+	val, ok := resp["value"].(string)
+	if !ok {
+		return "", fmt.Errorf("server response missing or non-string 'value' field")
+	}
 	return val, nil
 }
 

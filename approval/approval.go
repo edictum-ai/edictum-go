@@ -36,16 +36,9 @@ func (r Request) ApprovalID() string { return r.approvalID }
 // ToolName returns the tool name.
 func (r Request) ToolName() string { return r.toolName }
 
-// ToolArgs returns a defensive copy of the tool arguments.
+// ToolArgs returns a defensive deep copy of the tool arguments.
 func (r Request) ToolArgs() map[string]any {
-	if r.toolArgs == nil {
-		return nil
-	}
-	cp := make(map[string]any, len(r.toolArgs))
-	for k, v := range r.toolArgs {
-		cp[k] = v
-	}
-	return cp
+	return deepCopyMap(r.toolArgs)
 }
 
 // Message returns the approval message.
@@ -56,16 +49,9 @@ func (r Request) Message() string { return r.message }
 // concrete type is *envelope.Principal when set by the pipeline.
 func (r Request) Principal() any { return r.principal }
 
-// Metadata returns a defensive copy of the request metadata.
+// Metadata returns a defensive deep copy of the request metadata.
 func (r Request) Metadata() map[string]any {
-	if r.metadata == nil {
-		return nil
-	}
-	cp := make(map[string]any, len(r.metadata))
-	for k, v := range r.metadata {
-		cp[k] = v
-	}
-	return cp
+	return deepCopyMap(r.metadata)
 }
 
 // CreatedAt returns the time the request was created.
@@ -105,6 +91,34 @@ func WithTimeoutEffect(effect string) RequestOption {
 	return func(r *Request) { r.timeoutEffect = effect }
 }
 
+// deepCopyMap recursively copies a map[string]any.
+// Local to approval to avoid importing internal/deepcopy from a public package.
+func deepCopyMap(src map[string]any) map[string]any {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]any, len(src))
+	for k, v := range src {
+		dst[k] = deepCopyValue(v)
+	}
+	return dst
+}
+
+func deepCopyValue(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		return deepCopyMap(val)
+	case []any:
+		cp := make([]any, len(val))
+		for i, elem := range val {
+			cp[i] = deepCopyValue(elem)
+		}
+		return cp
+	default:
+		return v
+	}
+}
+
 // NewRequest creates a Request with the given fields. Required for
 // Backend implementations outside the approval package, since Request
 // fields are unexported for immutability.
@@ -112,7 +126,7 @@ func NewRequest(approvalID, toolName string, toolArgs map[string]any, message st
 	r := Request{
 		approvalID: approvalID,
 		toolName:   toolName,
-		toolArgs:   toolArgs,
+		toolArgs:   deepCopyMap(toolArgs),
 		message:    message,
 		createdAt:  time.Now().UTC(),
 	}

@@ -52,6 +52,8 @@ func ClassifyBash(command string) SideEffect {
 }
 
 // ToolRegistry maps tool names to their side effect classification.
+// ToolRegistry is not safe for concurrent Register and Classify.
+// Register all tools before passing to a Guard.
 type ToolRegistry struct {
 	tools map[string]toolConfig
 }

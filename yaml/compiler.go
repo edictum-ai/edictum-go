@@ -93,6 +93,10 @@ func Compile(bundle map[string]any, opts ...CompileOption) (CompiledBundle, erro
 		}
 	}
 
+	// NOTE: top-level "limits" key is not read here. Limits come exclusively
+	// from session contracts via mergeSessionLimits, matching Python parity
+	// (compiler.py starts from OperationLimits() and only merges per-session).
+
 	if tools, ok := bundle["tools"].(map[string]any); ok {
 		result.Tools = make(map[string]map[string]any, len(tools))
 		for k, v := range tools {
