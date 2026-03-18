@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -163,6 +164,14 @@ func (s *AuditSink) flush(ctx context.Context) {
 
 	_, err := s.client.Post(ctx, "/api/v1/events", map[string]any{"events": events})
 	if err != nil {
+		// 4xx client errors (except 429) are permanent failures — don't retry.
+		// Restoring events on auth errors (401/403) would cause infinite retry
+		// loops that eventually overflow the buffer and lose all events.
+		var se *Error
+		if errors.As(err, &se) && se.StatusCode >= 400 && se.StatusCode < 500 && se.StatusCode != 429 {
+			log.Printf("server: permanently lost %d audit events due to client error: %v", len(events), err)
+			return
+		}
 		log.Printf("server: failed to flush %d audit events, restoring to buffer: %v", len(events), err)
 		s.restoreEvents(events)
 	}
