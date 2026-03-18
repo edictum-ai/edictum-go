@@ -95,7 +95,10 @@ func (b *Backend) BatchGet(ctx context.Context, keys []string) (map[string]strin
 		return nil, err
 	}
 
-	values, _ := resp["values"].(map[string]any)
+	values, ok := resp["values"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("server batch response missing or malformed 'values' map")
+	}
 	result := make(map[string]string, len(keys))
 	for _, key := range keys {
 		if v, ok := values[key]; ok {

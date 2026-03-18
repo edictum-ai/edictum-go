@@ -160,6 +160,11 @@ func (w *SSEWatcher) connectAndListen(ctx context.Context) error {
 
 func (w *SSEWatcher) readEvents(ctx context.Context, resp *http.Response) error {
 	scanner := bufio.NewScanner(resp.Body)
+	// Contract bundles can be up to MaxBundleSize (1 MB). SSE data lines
+	// carry the full JSON-encoded bundle, so the scanner buffer must be
+	// large enough to hold at least that plus SSE framing overhead.
+	const sseBufSize = 1_100_000 // ~1 MB + overhead for SSE framing
+	scanner.Buffer(make([]byte, 0, sseBufSize), sseBufSize)
 	var eventType, data string
 
 	for scanner.Scan() {

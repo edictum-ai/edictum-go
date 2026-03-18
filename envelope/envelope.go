@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+
+	"github.com/edictum-ai/edictum-go/internal/deepcopy"
 )
 
 // SideEffect classifies the impact of a tool call.
@@ -42,16 +44,10 @@ type ToolEnvelope struct {
 // ToolName returns the tool name.
 func (e ToolEnvelope) ToolName() string { return e.toolName }
 
-// Args returns a copy of the tool arguments.
+// Args returns a deep copy of the tool arguments.
+// Nested maps and slices are recursively copied to prevent mutation.
 func (e ToolEnvelope) Args() map[string]any {
-	if e.args == nil {
-		return nil
-	}
-	cp := make(map[string]any, len(e.args))
-	for k, v := range e.args {
-		cp[k] = v
-	}
-	return cp
+	return deepcopy.Map(e.args)
 }
 
 // CallID returns the call ID.
@@ -93,16 +89,10 @@ func (e ToolEnvelope) BashCommand() string { return e.bashCommand }
 // FilePath returns the extracted file path.
 func (e ToolEnvelope) FilePath() string { return e.filePath }
 
-// Metadata returns a copy of the metadata.
+// Metadata returns a deep copy of the metadata.
+// Nested maps and slices are recursively copied to prevent mutation.
 func (e ToolEnvelope) Metadata() map[string]any {
-	if e.metadata == nil {
-		return nil
-	}
-	cp := make(map[string]any, len(e.metadata))
-	for k, v := range e.metadata {
-		cp[k] = v
-	}
-	return cp
+	return deepcopy.Map(e.metadata)
 }
 
 // ValidateToolName validates a tool name, rejecting empty, control chars, and path separators.
