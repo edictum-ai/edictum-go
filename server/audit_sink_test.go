@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -233,5 +234,69 @@ func TestAuditSinkRestoreOverflow_DropsNewest(t *testing.T) {
 		if ids[i] != w {
 			t.Errorf("buffer[%d] = %q, want %q", i, ids[i], w)
 		}
+	}
+}
+
+func TestAuditSinkPermanentDropOn4xx(t *testing.T) {
+	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusBadRequest} {
+		t.Run(fmt.Sprintf("HTTP%d", code), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(code)
+				_, _ = w.Write([]byte("error"))
+			}))
+			defer srv.Close()
+
+			client, err := NewClient(ClientConfig{BaseURL: srv.URL, APIKey: "key", MaxRetries: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			sink := NewAuditSink(client,
+				WithBatchSize(1000),
+				WithFlushInterval(10*time.Second),
+				WithMaxBufferSize(100),
+			)
+			defer sink.Close(context.Background())
+
+			ctx := context.Background()
+			event := audit.NewEvent()
+			event.ToolName = "TestTool"
+			_ = sink.Emit(ctx, &event)
+
+			sink.Flush(ctx)
+
+			if n := sink.BufferLen(); n != 0 {
+				t.Errorf("HTTP %d: expected 0 buffered events after permanent drop, got %d", code, n)
+			}
+		})
+	}
+}
+
+func TestAuditSinkRestoreOn429(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte("rate limited"))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(ClientConfig{BaseURL: srv.URL, APIKey: "key", MaxRetries: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sink := NewAuditSink(client,
+		WithBatchSize(1000),
+		WithFlushInterval(10*time.Second),
+		WithMaxBufferSize(100),
+	)
+	defer sink.Close(context.Background())
+
+	ctx := context.Background()
+	event := audit.NewEvent()
+	event.ToolName = "TestTool"
+	_ = sink.Emit(ctx, &event)
+
+	sink.Flush(ctx)
+
+	if n := sink.BufferLen(); n != 1 {
+		t.Errorf("HTTP 429: expected 1 buffered event after restore, got %d", n)
 	}
 }
