@@ -8,6 +8,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"sync"
 	"time"
@@ -130,12 +131,12 @@ func (w *SSEWatcher) Watch(ctx context.Context) error {
 }
 
 func (w *SSEWatcher) connectAndListen(ctx context.Context) error {
-	url := w.client.baseURL + "/api/v1/stream?env=" + w.client.env
+	sseURL := w.client.baseURL + "/api/v1/stream?env=" + neturl.QueryEscape(w.client.env)
 	if w.client.bundleName != "" {
-		url += "&bundle_name=" + w.client.bundleName
+		sseURL += "&bundle_name=" + neturl.QueryEscape(w.client.bundleName)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sseURL, nil)
 	if err != nil {
 		return fmt.Errorf("build SSE request: %w", err)
 	}
