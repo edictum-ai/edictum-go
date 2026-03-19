@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      issues: write
+      issues: read
 
     steps:
       - name: Checkout repository
@@ -56,7 +56,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ steps.app-token.outputs.token }}
-          claude_args: '--model claude-sonnet-4-6 --max-turns 30 --allowedTools "Bash(git diff:*),Bash(git log:*),Bash(cat:*),Bash(gh issue create:*),Read,Glob,Grep,Write"'
+          # Issue creation removed — warnings stay in the PR comment, not as noise issues.
+          claude_args: '--model claude-sonnet-4-6 --max-turns 30 --allowedTools "Bash(git diff:*),Bash(git log:*),Bash(cat:*),Read,Glob,Grep,Write"'
           prompt: |
             You are an adversarial code reviewer for Edictum Go — a **security product** (runtime contract enforcement for AI agent tool calls). A single vulnerability destroys the credibility of a startup that sells trust. Think like an attacker first, reviewer second.
 
@@ -103,9 +104,9 @@ jobs:
 
             8. Do NOT post the comment yourself. The workflow handles posting after validation.
 
-            9. For WARNING-level findings (not critical), auto-create GitHub issues
-               using `gh issue create` so they are tracked without blocking the PR.
-               Use labels: `fix:` prefix in title, body includes file/line/description.
+            9. Warnings and suggestions are included in the PR review comment only —
+               do NOT create GitHub issues for them. The PR author reads the comment and
+               decides whether to address warnings before merging.
 
             ## Rules
             - One pass. If the PR is clean, say so and stop.
@@ -113,7 +114,7 @@ jobs:
             - Do NOT flag style/formatting (linters handle that).
             - ALWAYS include the attack path for security issues.
             - ALWAYS include file path + line number + concrete fix with code.
-            - Warnings should be filed as GitHub issues, not block CI.
+            - Warnings stay in the PR comment for the author to review.
 
       - name: Validate and post review comment
         env:
