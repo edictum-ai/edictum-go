@@ -272,8 +272,11 @@ contracts:
 	if ov.ContractID != "shared-id" {
 		t.Errorf("override contract_id: got %q, want %q", ov.ContractID, "shared-id")
 	}
-	basePath := filepath.Join(dir, "01-base.yaml")
-	overridePath := filepath.Join(dir, "02-override.yaml")
+	// Canonicalize expected paths — t.TempDir() may not be canonical
+	// (e.g. /var → /private/var on macOS).
+	canonDir, _ := filepath.EvalSymlinks(dir)
+	basePath := filepath.Join(canonDir, "01-base.yaml")
+	overridePath := filepath.Join(canonDir, "02-override.yaml")
 	if ov.OriginalSource != basePath {
 		t.Errorf("original_source: got %q, want %q", ov.OriginalSource, basePath)
 	}

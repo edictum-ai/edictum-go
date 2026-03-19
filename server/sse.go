@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -23,6 +24,12 @@ type Reloader interface {
 // SSEWatcher connects to the server's SSE endpoint for contract updates.
 // On receiving a new bundle, it calls the Reloader. Reconnects with
 // exponential backoff on disconnect.
+//
+// Handles two event types:
+//   - Regular contract_update: YAML is in the event data (raw "yaml" or
+//     base64 "yaml_bytes"). Calls ReloadFromYAML directly.
+//   - Assignment change: event has "_assignment_changed" and "bundle_name".
+//     Fetches the full bundle from the server, then calls ReloadFromYAML.
 type SSEWatcher struct {
 	client            *Client
 	reloader          Reloader
@@ -132,8 +139,8 @@ func (w *SSEWatcher) Watch(ctx context.Context) error {
 
 func (w *SSEWatcher) connectAndListen(ctx context.Context) error {
 	sseURL := w.client.baseURL + "/api/v1/stream?env=" + neturl.QueryEscape(w.client.env)
-	if w.client.bundleName != "" {
-		sseURL += "&bundle_name=" + neturl.QueryEscape(w.client.bundleName)
+	if bn := w.client.BundleName(); bn != "" {
+		sseURL += "&bundle_name=" + neturl.QueryEscape(bn)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sseURL, nil)
@@ -188,7 +195,7 @@ func (w *SSEWatcher) readEvents(ctx context.Context, resp *http.Response) error 
 		case line == "":
 			// Empty line = end of event.
 			if eventType == "contract_update" && data != "" {
-				w.handleContractUpdate(data)
+				w.handleContractUpdate(ctx, data)
 			}
 			eventType = ""
 			data = ""
@@ -197,33 +204,126 @@ func (w *SSEWatcher) readEvents(ctx context.Context, resp *http.Response) error 
 	return scanner.Err()
 }
 
-func (w *SSEWatcher) handleContractUpdate(data string) {
+// handleContractUpdate processes a contract_update SSE event.
+// Two sub-types:
+//   - Assignment change: has "_assignment_changed" + "bundle_name".
+//     Fetches the full bundle from the server and reloads.
+//   - Regular update: has "yaml" (raw) or "yaml_bytes" (base64).
+//     Decodes and reloads directly.
+func (w *SSEWatcher) handleContractUpdate(ctx context.Context, data string) {
 	var bundle map[string]any
 	if err := json.Unmarshal([]byte(data), &bundle); err != nil {
 		log.Printf("server: invalid JSON in SSE contract_update event: %v", err)
 		return
 	}
 
-	yamlStr, _ := bundle["yaml"].(string)
-	if yamlStr == "" {
-		log.Printf("server: SSE contract_update missing 'yaml' field")
+	if isAssignment, _ := bundle["_assignment_changed"].(bool); isAssignment {
+		w.handleAssignmentChange(ctx, bundle)
 		return
 	}
 
-	yamlBytes := []byte(yamlStr)
+	yamlBytes, sigB64 := extractYAML(bundle)
+	if yamlBytes == nil {
+		log.Printf("server: SSE contract_update missing 'yaml' or 'yaml_bytes' field")
+		return
+	}
 
-	// Verify signature if public key is configured.
-	if w.publicKeyHex != "" {
-		sigB64, _ := bundle["signature"].(string)
-		if err := VerifyBundleSignature(yamlBytes, sigB64, w.publicKeyHex); err != nil {
-			log.Printf("server: bundle verification failed: %v", err)
-			return
-		}
+	if !w.verifySignature(yamlBytes, sigB64) {
+		return
 	}
 
 	if err := w.reloader.ReloadFromYAML(yamlBytes); err != nil {
 		log.Printf("server: failed to reload contracts: %v", err)
 	}
+}
+
+// handleAssignmentChange processes an _assignment_changed event.
+// Fetches the full bundle from the server, reloads, and updates the
+// client's bundle name.
+func (w *SSEWatcher) handleAssignmentChange(ctx context.Context, bundle map[string]any) {
+	newName, _ := bundle["bundle_name"].(string)
+	if newName == "" {
+		log.Printf("server: SSE assignment event missing 'bundle_name'")
+		return
+	}
+
+	resp, err := w.client.Get(ctx, fmt.Sprintf("/api/v1/bundles/%s/current", newName))
+	if err != nil {
+		log.Printf("server: failed to fetch assigned bundle %q: %v", newName, err)
+		return
+	}
+	if resp == nil {
+		log.Printf("server: assigned bundle %q not found on server (404)", newName)
+		return
+	}
+
+	yamlBytes, sigB64 := extractYAMLFromResponse(resp)
+	if yamlBytes == nil {
+		log.Printf("server: assigned bundle %q response missing yaml_bytes", newName)
+		return
+	}
+
+	if !w.verifySignature(yamlBytes, sigB64) {
+		return
+	}
+
+	if err := w.reloader.ReloadFromYAML(yamlBytes); err != nil {
+		log.Printf("server: failed to reload assigned bundle %q: %v", newName, err)
+		return
+	}
+
+	w.client.SetBundleName(newName)
+}
+
+// extractYAML extracts YAML bytes from an SSE event payload.
+// Tries "yaml_bytes" (base64) first, then "yaml" (raw string).
+func extractYAML(bundle map[string]any) (yamlBytes []byte, sigB64 string) {
+	sigB64, _ = bundle["signature"].(string)
+
+	if b64, ok := bundle["yaml_bytes"].(string); ok && b64 != "" {
+		decoded, err := base64.StdEncoding.DecodeString(b64)
+		if err != nil {
+			log.Printf("server: invalid base64 in SSE yaml_bytes: %v", err)
+			return nil, ""
+		}
+		return decoded, sigB64
+	}
+
+	if raw, ok := bundle["yaml"].(string); ok && raw != "" {
+		return []byte(raw), sigB64
+	}
+
+	return nil, ""
+}
+
+// extractYAMLFromResponse extracts YAML bytes from a server HTTP response
+// (e.g., /api/v1/bundles/{name}/current). Uses "yaml_bytes" (base64).
+func extractYAMLFromResponse(resp map[string]any) (yamlBytes []byte, sigB64 string) {
+	sigB64, _ = resp["signature"].(string)
+
+	b64, _ := resp["yaml_bytes"].(string)
+	if b64 == "" {
+		return nil, ""
+	}
+	decoded, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		log.Printf("server: invalid base64 in response yaml_bytes: %v", err)
+		return nil, ""
+	}
+	return decoded, sigB64
+}
+
+// verifySignature checks the bundle signature if a public key is configured.
+// Returns true if verification passes or no key is configured.
+func (w *SSEWatcher) verifySignature(yamlBytes []byte, sigB64 string) bool {
+	if w.publicKeyHex == "" {
+		return true
+	}
+	if err := VerifyBundleSignature(yamlBytes, sigB64, w.publicKeyHex); err != nil {
+		log.Printf("server: bundle verification failed: %v", err)
+		return false
+	}
+	return true
 }
 
 // Close signals the watcher to stop. For immediate shutdown, also cancel

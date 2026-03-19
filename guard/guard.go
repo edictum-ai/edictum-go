@@ -2,6 +2,7 @@
 package guard
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"sync"
@@ -71,8 +72,9 @@ type Guard struct {
 	factoryCfg *factoryCfg
 
 	// Server fields — set by FromServer, nil otherwise.
-	serverClient serverClient // interface to avoid import cycle
-	sseCloser    sseCloser    // interface to avoid import cycle
+	serverClient serverClient       // interface to avoid import cycle
+	sseCloser    sseCloser          // interface to avoid import cycle
+	watchCancel  context.CancelFunc // cancels the SSE watcher goroutine
 }
 
 // New creates a new Guard with the given options.

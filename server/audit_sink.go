@@ -145,7 +145,7 @@ func (s *AuditSink) mapEvent(event *audit.Event) map[string]any {
 			"decision_name":   event.DecisionName,
 			"reason":          event.Reason,
 			"policy_version":  event.PolicyVersion,
-			"bundle_name":     s.client.bundleName,
+			"bundle_name":     s.client.BundleName(),
 		},
 	}
 }

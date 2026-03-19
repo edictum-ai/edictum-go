@@ -2,27 +2,35 @@ package guard
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
+	"time"
 
 	"github.com/edictum-ai/edictum-go/server"
 	yamlpkg "github.com/edictum-ai/edictum-go/yaml"
 )
 
+// assignmentTimeout is how long FromServer waits for the server to push
+// a bundle in server-assigned mode (empty bundle name).
+const assignmentTimeout = 30 * time.Second
+
 // FromServer creates a Guard connected to an edictum-console server.
 // The server provides contracts via HTTP, with optional SSE hot-reload.
 //
-// Required: url, apiKey, agentID, and WithBundleName (via opts).
+// When WithBundleName is set, the named bundle is fetched immediately.
+// When WithBundleName is omitted (server-assigned mode), FromServer
+// starts the SSE watcher and waits up to 30 seconds for the server to
+// assign a bundle via an _assignment_changed event.
+//
 // Use WithVerifySignatures, WithAutoWatch, WithAllowInsecure, WithTags
 // for server-specific configuration. Standard Guard options (WithMode,
 // WithEnvironment, etc.) are also accepted and override server defaults.
 func FromServer(url, apiKey, agentID string, opts ...Option) (*Guard, error) {
 	fc, environment := extractFactoryAndEnv(opts)
 
-	if fc.bundleName == "" {
+	if fc.bundleName == "" && !fc.autoWatch {
 		return nil, fmt.Errorf(
-			"FromServer: WithBundleName is required; " +
-				"server-assigned mode (empty bundle name) is not yet supported in Go")
+			"FromServer: auto_watch must be true when bundle_name is empty; " +
+				"server-assigned mode requires the SSE connection to receive the bundle")
 	}
 	if fc.verifySignatures && fc.signingPublicKey == "" {
 		return nil, fmt.Errorf(
@@ -46,7 +54,25 @@ func FromServer(url, apiKey, agentID string, opts ...Option) (*Guard, error) {
 	serverBackend := server.NewBackend(client)
 	serverApproval := server.NewApprovalBackend(client)
 
-	// Fetch the current bundle from the server.
+	serverDefaults := []Option{
+		WithAuditSink(serverAudit),
+		WithBackend(serverBackend),
+		WithApprovalBackend(serverApproval),
+	}
+
+	if fc.bundleName != "" {
+		return fromServerWithBundle(fc, client, serverAudit, serverDefaults, opts)
+	}
+	return fromServerAssigned(fc, client, serverDefaults, opts)
+}
+
+// fromServerWithBundle handles the case where a bundle name is known.
+func fromServerWithBundle(
+	fc *factoryCfg,
+	client *server.Client,
+	serverAudit *server.AuditSink,
+	serverDefaults, userOpts []Option,
+) (*Guard, error) {
 	ctx := context.Background()
 	resp, err := client.Get(ctx, fmt.Sprintf("/api/v1/bundles/%s/current", fc.bundleName))
 	if err != nil {
@@ -58,29 +84,17 @@ func FromServer(url, apiKey, agentID string, opts ...Option) (*Guard, error) {
 		return nil, fmt.Errorf("FromServer: bundle %q not found on server", fc.bundleName)
 	}
 
-	// Decode the YAML from the server response.
-	yamlB64, _ := resp["yaml_bytes"].(string)
-	bundleYAML, err := base64.StdEncoding.DecodeString(yamlB64)
+	bundleYAML, err := decodeYAMLResponse(resp)
 	if err != nil {
 		serverAudit.Close(ctx)
-		return nil, fmt.Errorf("FromServer: invalid base64 in yaml_bytes: %w", err)
+		return nil, fmt.Errorf("FromServer: %w", err)
 	}
 
-	// Optional signature verification.
-	if fc.verifySignatures {
-		sigB64, _ := resp["signature"].(string)
-		if sigB64 == "" {
-			serverAudit.Close(ctx)
-			return nil, fmt.Errorf(
-				"FromServer: server response missing signature but verify_signatures is true")
-		}
-		if verifyErr := server.VerifyBundleSignature(bundleYAML, sigB64, fc.signingPublicKey); verifyErr != nil {
-			serverAudit.Close(ctx)
-			return nil, fmt.Errorf("FromServer: %w", verifyErr)
-		}
+	if err := verifyIfNeeded(fc, resp, bundleYAML); err != nil {
+		serverAudit.Close(ctx)
+		return nil, fmt.Errorf("FromServer: %w", err)
 	}
 
-	// Parse and compile the bundle.
 	data, hash, err := yamlpkg.LoadBundleString(string(bundleYAML))
 	if err != nil {
 		serverAudit.Close(ctx)
@@ -92,47 +106,55 @@ func FromServer(url, apiKey, agentID string, opts ...Option) (*Guard, error) {
 		return nil, fmt.Errorf("FromServer: %w", err)
 	}
 
-	// Build option list: server defaults → compiled → user (user wins).
-	serverDefaults := []Option{
-		WithAuditSink(serverAudit),
-		WithBackend(serverBackend),
-		WithApprovalBackend(serverApproval),
-	}
 	compiledDefaults := compiledOpts(compiled, hash.String())
-
-	allOpts := make([]Option, 0, len(serverDefaults)+len(compiledDefaults)+len(opts))
+	allOpts := make([]Option, 0, len(serverDefaults)+len(compiledDefaults)+len(userOpts))
 	allOpts = append(allOpts, serverDefaults...)
 	allOpts = append(allOpts, compiledDefaults...)
-	allOpts = append(allOpts, opts...)
+	allOpts = append(allOpts, userOpts...)
+
+	g := New(allOpts...)
+	g.serverClient = client
+	if fc.autoWatch {
+		startWatcher(g, client, fc)
+	}
+	return g, nil
+}
+
+// fromServerAssigned handles server-assigned mode: starts the SSE watcher
+// and waits for the server to push the first bundle assignment.
+func fromServerAssigned(
+	fc *factoryCfg,
+	client *server.Client,
+	serverDefaults, userOpts []Option,
+) (*Guard, error) {
+	allOpts := make([]Option, 0, len(serverDefaults)+len(userOpts))
+	allOpts = append(allOpts, serverDefaults...)
+	allOpts = append(allOpts, userOpts...)
 
 	g := New(allOpts...)
 	g.serverClient = client
 
-	// Start SSE watcher for hot-reload if enabled.
-	if fc.autoWatch {
-		var watcherOpts []server.SSEWatcherOption
-		if fc.signingPublicKey != "" {
-			watcherOpts = append(watcherOpts, server.WithPublicKey(fc.signingPublicKey))
-		}
-		watcher := server.NewSSEWatcher(client, g, watcherOpts...)
-		g.sseCloser = watcher
-		go watcher.Watch(context.Background()) //nolint:errcheck // background watcher logs errors
-	}
+	readyCh := make(chan struct{})
+	nr := &notifyingReloader{inner: g, readyCh: readyCh}
 
-	return g, nil
-}
+	var watcherOpts []server.SSEWatcherOption
+	if fc.signingPublicKey != "" {
+		watcherOpts = append(watcherOpts, server.WithPublicKey(fc.signingPublicKey))
+	}
+	watcher := server.NewSSEWatcher(client, nr, watcherOpts...)
+	g.sseCloser = watcher
+	watchCtx, watchCancel := context.WithCancel(context.Background())
+	g.watchCancel = watchCancel
+	go watcher.Watch(watchCtx) //nolint:errcheck // background watcher logs errors
 
-// Close stops the SSE watcher and flushes audit events.
-// Safe to call on guards not created by FromServer (no-op).
-// Safe to call multiple times.
-func (g *Guard) Close(ctx context.Context) {
-	if g.sseCloser != nil {
-		g.sseCloser.Close()
-	}
-	type flusher interface {
-		Close(context.Context)
-	}
-	if f, ok := g.auditSink.(flusher); ok {
-		f.Close(ctx)
+	select {
+	case <-readyCh:
+		return g, nil
+	case <-time.After(assignmentTimeout):
+		g.Close(context.Background())
+		return nil, fmt.Errorf(
+			"FromServer: server did not push a bundle assignment within %v; "+
+				"check that the server has an assignment rule matching this agent's tags",
+			assignmentTimeout)
 	}
 }

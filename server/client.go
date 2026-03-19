@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -31,10 +32,14 @@ type Client struct {
 	apiKey     string
 	agentID    string
 	env        string
-	bundleName string
 	tags       map[string]string
 	maxRetries int
 	httpClient *http.Client
+
+	// bundleMu protects bundleName which may be updated by the SSE
+	// watcher during server-assigned mode.
+	bundleMu   sync.RWMutex
+	bundleName string
 }
 
 // NewClient creates a validated Client. Returns an error if configuration
@@ -117,8 +122,21 @@ func (c *Client) AgentID() string { return c.agentID }
 // Env returns the configured environment.
 func (c *Client) Env() string { return c.env }
 
-// BundleName returns the configured bundle name.
-func (c *Client) BundleName() string { return c.bundleName }
+// BundleName returns the current bundle name. Thread-safe: may be updated
+// by the SSE watcher during server-assigned mode.
+func (c *Client) BundleName() string {
+	c.bundleMu.RLock()
+	defer c.bundleMu.RUnlock()
+	return c.bundleName
+}
+
+// SetBundleName updates the bundle name. Called by the SSE watcher when
+// the server assigns a new bundle in server-assigned mode.
+func (c *Client) SetBundleName(name string) {
+	c.bundleMu.Lock()
+	defer c.bundleMu.Unlock()
+	c.bundleName = name
+}
 
 // doRequest executes an HTTP request with exponential backoff retry.
 // Only GET requests are retried on network errors and 5xx responses.

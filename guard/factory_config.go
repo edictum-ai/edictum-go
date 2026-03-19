@@ -1,6 +1,8 @@
 package guard
 
 import (
+	"log"
+
 	"github.com/edictum-ai/edictum-go/envelope"
 )
 
@@ -83,12 +85,16 @@ func WithAllowInsecure() Option {
 
 // WithVerifySignatures enables Ed25519 signature verification on bundles
 // fetched from the server. The publicKeyHex must be a hex-encoded Ed25519
-// public key. Only used with FromServer.
+// public key. Only used with FromServer — logs a warning if passed to New()
+// since signature verification requires a server connection.
 func WithVerifySignatures(publicKeyHex string) Option {
 	return func(g *Guard) {
 		if g.factoryCfg != nil {
 			g.factoryCfg.verifySignatures = true
 			g.factoryCfg.signingPublicKey = publicKeyHex
+		} else {
+			log.Printf("guard: WithVerifySignatures has no effect outside FromServer; "+
+				"signature verification requires a server connection (key=%q)", publicKeyHex)
 		}
 	}
 }

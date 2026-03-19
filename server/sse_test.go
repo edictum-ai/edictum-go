@@ -218,6 +218,68 @@ func TestEd25519Verification(t *testing.T) {
 	})
 }
 
+// --- 10.10b: SSE assignment change ---
+
+func TestSSEAssignmentChange(t *testing.T) {
+	bundleYAML := "apiVersion: edictum/v1\nkind: ContractBundle"
+	yamlB64 := base64.StdEncoding.EncodeToString([]byte(bundleYAML))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/bundles/assigned-bundle/current" {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]string{"yaml_bytes": yamlB64})
+			return
+		}
+		// SSE stream: send an _assignment_changed event.
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			return
+		}
+		data, _ := json.Marshal(map[string]any{
+			"_assignment_changed": true,
+			"bundle_name":         "assigned-bundle",
+		})
+		_, _ = fmt.Fprintf(w, "event: contract_update\ndata: %s\n\n", data)
+		flusher.Flush()
+		time.Sleep(200 * time.Millisecond)
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(ClientConfig{BaseURL: srv.URL, APIKey: "key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reloader := &mockReloader{}
+	watcher := NewSSEWatcher(client, reloader)
+	defer watcher.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	go func() { _ = watcher.Watch(ctx) }()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if reloader.callCount() > 0 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if reloader.callCount() == 0 {
+		t.Fatal("expected reloader to be called after assignment change")
+	}
+	if got := reloader.lastCall(); got != bundleYAML {
+		t.Errorf("reload YAML: got %q, want %q", got, bundleYAML)
+	}
+	if got := client.BundleName(); got != "assigned-bundle" {
+		t.Errorf("BundleName() = %q, want %q", got, "assigned-bundle")
+	}
+}
+
 // --- 10.13: BundleVerificationError ---
 
 func TestBundleVerificationError(t *testing.T) {

@@ -6,11 +6,14 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 const validBundleYAML = `apiVersion: edictum/v1
@@ -269,8 +272,8 @@ func TestFromServer_BundleNameRequired(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when WithBundleName is missing")
 	}
-	if !strings.Contains(err.Error(), "WithBundleName is required") {
-		t.Errorf("error = %q, want it to contain %q", err.Error(), "WithBundleName is required")
+	if !strings.Contains(err.Error(), "auto_watch must be true") {
+		t.Errorf("error = %q, want it to contain %q", err.Error(), "auto_watch must be true")
 	}
 }
 
@@ -370,4 +373,65 @@ func TestFromServer_Close(t *testing.T) {
 	// Guard should still be usable for reads after Close (no panic).
 	_ = g.Mode()
 	_ = g.PolicyVersion()
+}
+
+func TestFromServer_ServerAssignedMode(t *testing.T) {
+	yamlB64 := base64.StdEncoding.EncodeToString([]byte(validBundleYAML))
+
+	// Track whether the assigned bundle endpoint has been enabled.
+	var bundleReady sync.Mutex
+	bundleReady.Lock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/v1/bundles/auto-bundle/current":
+			// Only serve after SSE has pushed the assignment.
+			bundleReady.Lock()
+			bundleReady.Unlock() //nolint:staticcheck // gate pattern
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]string{"yaml_bytes": yamlB64})
+
+		case strings.HasPrefix(r.URL.Path, "/api/v1/bundles/") && strings.HasSuffix(r.URL.Path, "/current"):
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"detail":"not found"}`))
+
+		case strings.HasPrefix(r.URL.Path, "/api/v1/stream"):
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Header().Set("Cache-Control", "no-cache")
+			flusher, ok := w.(http.Flusher)
+			if !ok {
+				return
+			}
+			data, _ := json.Marshal(map[string]any{
+				"_assignment_changed": true,
+				"bundle_name":         "auto-bundle",
+			})
+			// Enable the bundle endpoint before sending the SSE event.
+			bundleReady.Unlock()
+			_, _ = fmt.Fprintf(w, "event: contract_update\ndata: %s\n\n", data)
+			flusher.Flush()
+			time.Sleep(2 * time.Second)
+
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	g, err := FromServer(
+		srv.URL, "test-key", "agent-1",
+		// No WithBundleName -- server-assigned mode.
+		WithAllowInsecure(),
+	)
+	if err != nil {
+		t.Fatalf("FromServer returned error: %v", err)
+	}
+	defer g.Close(context.Background())
+
+	g.mu.RLock()
+	nPre := len(g.state.preconditions)
+	g.mu.RUnlock()
+	if nPre == 0 {
+		t.Error("expected at least one precondition from the assigned bundle")
+	}
 }

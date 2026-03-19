@@ -70,30 +70,50 @@ func buildCompileOpts(fc *factoryCfg) []yamlpkg.CompileOption {
 // resolvePaths resolves a path to a list of YAML file paths.
 // If path is a file, returns [path]. If path is a directory,
 // returns all .yaml/.yml files sorted alphabetically.
+//
+// All paths are canonicalized via filepath.EvalSymlinks. When scanning
+// a directory, entries whose resolved target falls outside the canonical
+// root are silently skipped (symlink escape prevention).
 func resolvePaths(path string) ([]string, error) {
-	info, err := os.Stat(path)
+	canonical, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := os.Stat(canonical)
 	if err != nil {
 		return nil, err
 	}
 
 	if !info.IsDir() {
-		return []string{path}, nil
+		return []string{canonical}, nil
 	}
 
-	entries, err := os.ReadDir(path)
+	entries, err := os.ReadDir(canonical)
 	if err != nil {
 		return nil, err
 	}
 
+	prefix := canonical + string(filepath.Separator)
 	var files []string
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
 		ext := strings.ToLower(filepath.Ext(e.Name()))
-		if ext == ".yaml" || ext == ".yml" {
-			files = append(files, filepath.Join(path, e.Name()))
+		if ext != ".yaml" && ext != ".yml" {
+			continue
 		}
+		full := filepath.Join(canonical, e.Name())
+		resolved, evalErr := filepath.EvalSymlinks(full)
+		if evalErr != nil {
+			continue // broken symlink — skip
+		}
+		// Ensure resolved target stays within the canonical root.
+		if !strings.HasPrefix(resolved, prefix) && resolved != canonical {
+			continue // symlink escapes contracts directory — skip
+		}
+		files = append(files, resolved)
 	}
 	sort.Strings(files)
 	return files, nil
