@@ -38,7 +38,7 @@ type Client struct {
 }
 
 // NewClient creates a validated Client. Returns an error if configuration
-// is invalid (bad identifiers, TLS violation, tag limits).
+// is invalid (bad identifiers, TLS enforcement error, tag limits).
 func NewClient(cfg ClientConfig) (*Client, error) {
 	if cfg.AgentID == "" {
 		cfg.AgentID = "default"

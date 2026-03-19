@@ -180,9 +180,9 @@ func mergeObserveAlongside(
 ) {
 	for _, c := range contractList(layer) {
 		cid, _ := c["id"].(string)
-		shadowID := cid + ":candidate"
+		observeID := cid + ":candidate"
 		cp := deepcopy.Map(c)
-		cp["id"] = shadowID
+		cp["id"] = observeID
 		cp["mode"] = "observe"
 		cp["_observe"] = true
 

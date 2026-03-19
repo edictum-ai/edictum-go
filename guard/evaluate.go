@@ -18,7 +18,7 @@ type ContractResult struct {
 	PolicyError  bool
 }
 
-// EvaluationResult is the result of dry-run evaluation.
+// EvaluationResult is the result of offline contract evaluation.
 type EvaluationResult struct {
 	Verdict            string // "allow" | "deny" | "warn"
 	ToolName           string
@@ -29,7 +29,7 @@ type EvaluationResult struct {
 	PolicyError        bool
 }
 
-// EvalOption configures a single Evaluate() invocation.
+// EvalOption configures a single Evaluate() call.
 type EvalOption func(*evalConfig)
 
 type evalConfig struct {
@@ -53,7 +53,7 @@ func WithEvalEnvironment(env string) EvalOption {
 	return func(c *evalConfig) { c.environment = env }
 }
 
-// Evaluate performs a dry-run evaluation of a tool call against all
+// Evaluate performs an offline evaluation of a tool call against all
 // matching contracts. Unlike Run(), this never executes the tool and
 // evaluates all matching contracts exhaustively (no short-circuit on
 // first deny). Session contracts are skipped (no session state).

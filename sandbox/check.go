@@ -13,10 +13,10 @@ import (
 // Evaluation order:
 //  1. Path checks: not_within denies first, then within requires match.
 //  2. Command checks: first token must be in allowed commands list.
-//  3. Domain checks: blocked_domains deny, then allowed_domains require match.
+//  3. Domain checks: BlockedDomains deny, then AllowedDomains require match.
 //
 // Returns contract.Pass() if all checks pass, or contract.Fail(message)
-// on the first violation.
+// on the first denial.
 func Check(env envelope.ToolEnvelope, cfg Config) (contract.Verdict, error) {
 	msg := cfg.message()
 
@@ -59,7 +59,7 @@ func Check(env envelope.ToolEnvelope, cfg Config) (contract.Verdict, error) {
 			if hostname == "" {
 				continue
 			}
-			// blocked_domains: deny if hostname matches any blocked pattern
+			// BlockedDomains: deny if hostname matches any denied domain pattern
 			if len(cfg.BlockedDomains) > 0 && DomainMatches(hostname, cfg.BlockedDomains) {
 				return contract.Fail(msg), nil
 			}

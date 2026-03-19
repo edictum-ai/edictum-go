@@ -11,7 +11,7 @@ import (
 	"github.com/edictum-ai/edictum-go/session"
 )
 
-// RunOption configures a single Run() invocation.
+// RunOption configures a single Run() call.
 type RunOption func(*runConfig)
 
 type runConfig struct {

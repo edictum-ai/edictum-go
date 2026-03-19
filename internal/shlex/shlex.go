@@ -9,7 +9,7 @@ package shlex
 
 import "strings"
 
-// Split splits a command string into tokens using shell-like rules.
+// Split splits a command string into tokens using shell-like syntax.
 // Handles single quotes, double quotes, and backslash escapes.
 // On unclosed quotes, falls back to whitespace split with quote
 // stripping (fail-closed: paths are still extracted).

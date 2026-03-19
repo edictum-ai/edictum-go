@@ -114,7 +114,7 @@ func (c *CompositeSink) Sinks() []Sink {
 
 // Emit sends the event to all sinks, collecting errors.
 // Each sink receives an independent copy to prevent a mutating sink
-// from corrupting the event seen by later sinks in the chain.
+// from corrupting the event seen by later sinks in the fan-out.
 func (c *CompositeSink) Emit(ctx context.Context, event *Event) error {
 	var errs []error
 	for _, s := range c.sinks {
