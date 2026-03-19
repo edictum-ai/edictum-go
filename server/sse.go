@@ -138,16 +138,16 @@ func (w *SSEWatcher) Watch(ctx context.Context) error {
 }
 
 func (w *SSEWatcher) connectAndListen(ctx context.Context) error {
-	sseURL := w.client.baseURL + "/api/v1/stream?env=" + neturl.QueryEscape(w.client.env)
+	streamPath := "/api/v1/stream?env=" + neturl.QueryEscape(w.client.Env())
 	if bn := w.client.BundleName(); bn != "" {
-		sseURL += "&bundle_name=" + neturl.QueryEscape(bn)
+		streamPath += "&bundle_name=" + neturl.QueryEscape(bn)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sseURL, nil)
+	// Use Client.buildRequest for auth headers, then override Accept.
+	req, err := w.client.buildRequest(ctx, http.MethodGet, streamPath, nil)
 	if err != nil {
 		return fmt.Errorf("build SSE request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+w.client.apiKey)
 	req.Header.Set("Accept", "text/event-stream")
 
 	// Use a client without timeout for long-lived SSE connections.

@@ -64,18 +64,24 @@ func verifyIfNeeded(fc *factoryCfg, resp map[string]any, bundleYAML []byte) erro
 
 // Close stops the SSE watcher and flushes audit events.
 // Safe to call on guards not created by FromServer (no-op).
-// Safe to call multiple times.
+// Safe to call multiple times concurrently.
 func (g *Guard) Close(ctx context.Context) {
-	if g.watchCancel != nil {
-		g.watchCancel()
+	g.mu.RLock()
+	cancel := g.watchCancel
+	closer := g.sseCloser
+	sink := g.auditSink
+	g.mu.RUnlock()
+
+	if cancel != nil {
+		cancel()
 	}
-	if g.sseCloser != nil {
-		g.sseCloser.Close()
+	if closer != nil {
+		closer.Close()
 	}
 	type flusher interface {
 		Close(context.Context)
 	}
-	if f, ok := g.auditSink.(flusher); ok {
+	if f, ok := sink.(flusher); ok {
 		f.Close(ctx)
 	}
 }
