@@ -114,7 +114,7 @@ jobs:
             - Do NOT flag style/formatting (linters handle that).
             - ALWAYS include the attack path for security issues.
             - ALWAYS include file path + line number + concrete fix with code.
-            - Warnings should be filed as GitHub issues, not block CI.
+            - Warnings stay in the PR comment for the author to review.
 
       - name: Validate and post review comment
         env:
