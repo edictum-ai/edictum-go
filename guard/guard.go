@@ -15,6 +15,16 @@ import (
 	"github.com/edictum-ai/edictum-go/session"
 )
 
+// serverClient is satisfied by *server.Client. Defined here to avoid
+// an import cycle between guard and server.
+type serverClient interface{}
+
+// sseCloser is satisfied by *server.SSEWatcher. Allows the guard to
+// stop the SSE goroutine on Close without importing server directly.
+type sseCloser interface {
+	Close()
+}
+
 // compiledState is an immutable snapshot of compiled contracts.
 // All slices are treated as immutable after construction.
 // The guard swaps the entire state atomically under a write lock
@@ -34,7 +44,7 @@ type compiledState struct {
 }
 
 // Guard is the main entry point for runtime contract enforcement.
-// Implements pipeline.ContractProvider.
+// Implements pipeline.ContractProvider and server.Reloader.
 type Guard struct {
 	mu                sync.RWMutex
 	environment       string
@@ -55,6 +65,14 @@ type Guard struct {
 	principalResolver func(toolName string, args map[string]any) *envelope.Principal
 	approvalBackend   approval.Backend
 	sessionID         string
+
+	// factoryCfg is non-nil only during factory option extraction.
+	// Never present on a returned Guard.
+	factoryCfg *factoryCfg
+
+	// Server fields — set by FromServer, nil otherwise.
+	serverClient serverClient // interface to avoid import cycle
+	sseCloser    sseCloser    // interface to avoid import cycle
 }
 
 // New creates a new Guard with the given options.
