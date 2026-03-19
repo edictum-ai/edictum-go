@@ -184,7 +184,7 @@ func mergeObserveAlongside(
 		cp := deepcopy.Map(c)
 		cp["id"] = shadowID
 		cp["mode"] = "observe"
-		cp["_shadow"] = true
+		cp["_observe"] = true
 
 		raw, _ := merged["contracts"].([]any)
 		merged["contracts"] = append(raw, cp)

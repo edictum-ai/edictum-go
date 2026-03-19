@@ -84,7 +84,7 @@ func Compile(bundle map[string]any, opts ...CompileOption) (CompiledBundle, erro
 			sb := compileSandbox(raw, mode)
 			result.SandboxContracts = append(result.SandboxContracts, sb)
 		case "session":
-			isObserve, _ := raw["_shadow"].(bool)
+			isObserve, _ := raw["_observe"].(bool)
 			if !isObserve && mode != "observe" {
 				result.Limits = mergeSessionLimits(raw, result.Limits)
 			}

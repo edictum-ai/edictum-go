@@ -50,11 +50,11 @@ func validateSchema(data map[string]any) error {
 				return fmt.Errorf("yaml: contract %q has invalid mode %q (must be 'enforce' or 'observe')", cm["id"], modeVal)
 			}
 		}
-		// Reject _shadow in user-supplied YAML. This is an internal key
+		// Reject _observe in user-supplied YAML. This is an internal key
 		// added by the composer for observe_alongside — if a user sets it
 		// directly, they can silently downgrade any contract to observe mode.
-		if _, has := cm["_shadow"]; has {
-			return fmt.Errorf("yaml: contract %q uses reserved internal key '_shadow'", cm["id"])
+		if _, has := cm["_observe"]; has {
+			return fmt.Errorf("yaml: contract %q uses reserved internal key '_observe'", cm["id"])
 		}
 	}
 	return nil

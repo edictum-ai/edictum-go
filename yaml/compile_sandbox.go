@@ -24,7 +24,7 @@ func compileSandbox(raw map[string]any, mode string) contract.Precondition {
 	if t, ok := raw["tool"].(string); ok {
 		tool = t
 	}
-	isObserve, _ := raw["_shadow"].(bool)
+	isObserve, _ := raw["_observe"].(bool)
 
 	pre := contract.Precondition{
 		Name:   cid,

@@ -20,7 +20,7 @@ func compileSession(
 		msgTemplate, _ = then["message"].(string)
 	}
 
-	isObserve, _ := raw["_shadow"].(bool)
+	isObserve, _ := raw["_observe"].(bool)
 	source := "yaml_session"
 
 	sc := contract.SessionContract{
