@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -383,16 +382,13 @@ func TestFromServer_Close(t *testing.T) {
 func TestFromServer_ServerAssignedMode(t *testing.T) {
 	yamlB64 := base64.StdEncoding.EncodeToString([]byte(validBundleYAML))
 
-	// Track whether the assigned bundle endpoint has been enabled.
-	var bundleReady sync.Mutex
-	bundleReady.Lock()
+	// Gate: bundle endpoint blocks until SSE has pushed the assignment.
+	bundleReady := make(chan struct{})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/api/v1/bundles/auto-bundle/current":
-			// Only serve after SSE has pushed the assignment.
-			bundleReady.Lock()
-			bundleReady.Unlock() //nolint:staticcheck // gate pattern
+			<-bundleReady // wait until SSE has pushed the assignment
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]string{"yaml_bytes": yamlB64})
 
@@ -412,7 +408,11 @@ func TestFromServer_ServerAssignedMode(t *testing.T) {
 				"bundle_name":         "auto-bundle",
 			})
 			// Enable the bundle endpoint before sending the SSE event.
-			bundleReady.Unlock()
+			select {
+			case <-bundleReady:
+			default:
+				close(bundleReady)
+			}
 			_, _ = fmt.Fprintf(w, "event: contract_update\ndata: %s\n\n", data)
 			flusher.Flush()
 			time.Sleep(2 * time.Second)
