@@ -142,9 +142,13 @@ func fromServerAssigned(
 		watcherOpts = append(watcherOpts, server.WithPublicKey(fc.signingPublicKey))
 	}
 	watcher := server.NewSSEWatcher(client, nr, watcherOpts...)
-	g.sseCloser = watcher
 	watchCtx, watchCancel := context.WithCancel(context.Background())
+
+	g.mu.Lock()
+	g.sseCloser = watcher
 	g.watchCancel = watchCancel
+	g.mu.Unlock()
+
 	go watcher.Watch(watchCtx) //nolint:errcheck // background watcher logs errors
 
 	select {

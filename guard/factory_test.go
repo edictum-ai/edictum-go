@@ -306,7 +306,7 @@ func TestReloadFromYAML_SwapsContracts(t *testing.T) {
 	newYAML := `apiVersion: edictum/v1
 kind: ContractBundle
 contracts:
-  - id: rule-a
+  - id: contract-a
     type: pre
     tool: Bash
     when:
@@ -315,7 +315,7 @@ contracts:
     then:
       effect: deny
       message: "no ls"
-  - id: rule-b
+  - id: contract-b
     type: pre
     tool: ReadFile
     when:

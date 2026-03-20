@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/edictum-ai/edictum-go/server"
 )
 
 const validBundleYAML = `apiVersion: edictum/v1
@@ -233,8 +236,9 @@ func TestFromServer_VerifySignatures_InvalidSignature(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid signature")
 	}
-	if !strings.Contains(err.Error(), "verification failed") {
-		t.Errorf("error = %q, want it to contain %q", err.Error(), "verification failed")
+	var bve *server.BundleVerificationError
+	if !errors.As(err, &bve) {
+		t.Errorf("expected *BundleVerificationError, got %T: %v", err, err)
 	}
 }
 
@@ -258,8 +262,9 @@ func TestFromServer_VerifySignatures_MissingSignature(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing signature")
 	}
-	if !strings.Contains(err.Error(), "missing signature") {
-		t.Errorf("error = %q, want it to contain %q", err.Error(), "missing signature")
+	var bve *server.BundleVerificationError
+	if !errors.As(err, &bve) {
+		t.Errorf("expected *BundleVerificationError, got %T: %v", err, err)
 	}
 }
 

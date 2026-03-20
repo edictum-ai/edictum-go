@@ -26,15 +26,21 @@ func (r *notifyingReloader) ReloadFromYAML(yamlBytes []byte) error {
 	return err
 }
 
+// startWatcher creates and starts the SSE watcher goroutine.
+// Writes to g.sseCloser and g.watchCancel are protected by g.mu.
 func startWatcher(g *Guard, client *server.Client, fc *factoryCfg) {
 	var watcherOpts []server.SSEWatcherOption
 	if fc.signingPublicKey != "" {
 		watcherOpts = append(watcherOpts, server.WithPublicKey(fc.signingPublicKey))
 	}
 	watcher := server.NewSSEWatcher(client, g, watcherOpts...)
-	g.sseCloser = watcher
 	watchCtx, watchCancel := context.WithCancel(context.Background())
+
+	g.mu.Lock()
+	g.sseCloser = watcher
 	g.watchCancel = watchCancel
+	g.mu.Unlock()
+
 	go watcher.Watch(watchCtx) //nolint:errcheck // background watcher logs errors
 }
 
@@ -56,8 +62,9 @@ func verifyIfNeeded(fc *factoryCfg, resp map[string]any, bundleYAML []byte) erro
 	}
 	sigB64, _ := resp["signature"].(string)
 	if sigB64 == "" {
-		return fmt.Errorf(
-			"server response missing signature but verify_signatures is true")
+		return &server.BundleVerificationError{
+			Message: "server response missing signature but verify_signatures is true",
+		}
 	}
 	return server.VerifyBundleSignature(bundleYAML, sigB64, fc.signingPublicKey)
 }
