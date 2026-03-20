@@ -150,8 +150,9 @@ func (w *SSEWatcher) connectAndListen(ctx context.Context) error {
 	}
 	req.Header.Set("Accept", "text/event-stream")
 
-	// Use a client without timeout for long-lived SSE connections.
-	sseHTTP := &http.Client{}
+	// Reuse the client's transport (TLS config, proxy, etc.) but without
+	// the request timeout — SSE connections are long-lived.
+	sseHTTP := &http.Client{Transport: w.client.httpClient.Transport}
 	resp, err := sseHTTP.Do(req)
 	if err != nil {
 		return fmt.Errorf("SSE connect: %w", err)
