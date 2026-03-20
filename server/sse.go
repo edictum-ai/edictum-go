@@ -246,6 +246,12 @@ func (w *SSEWatcher) handleAssignmentChange(ctx context.Context, bundle map[stri
 		log.Printf("server: SSE assignment event missing 'bundle_name'")
 		return
 	}
+	// Validate before interpolating into URL path — an attacker controlling
+	// the SSE stream could inject path traversal (../../) or query params.
+	if err := validateIdentifier("bundle_name", newName); err != nil {
+		log.Printf("server: SSE assignment event rejected: %v", err)
+		return
+	}
 
 	resp, err := w.client.Get(ctx, fmt.Sprintf("/api/v1/bundles/%s/current", newName))
 	if err != nil {

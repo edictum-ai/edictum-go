@@ -24,7 +24,7 @@ type factoryCfg struct {
 }
 
 // WithCustomOperators sets custom condition operators for YAML compilation.
-// Only used with FromYAML and FromYAMLString; ignored by New.
+// Factory-only: has no effect when passed to New() directly.
 func WithCustomOperators(ops map[string]func(any, any) bool) Option {
 	return func(g *Guard) {
 		if g.factoryCfg != nil {
@@ -34,7 +34,7 @@ func WithCustomOperators(ops map[string]func(any, any) bool) Option {
 }
 
 // WithCustomSelectors sets custom envelope selectors for YAML compilation.
-// Only used with FromYAML and FromYAMLString; ignored by New.
+// Factory-only: has no effect when passed to New() directly.
 func WithCustomSelectors(sels map[string]func(envelope.ToolEnvelope) map[string]any) Option {
 	return func(g *Guard) {
 		if g.factoryCfg != nil {
@@ -44,7 +44,7 @@ func WithCustomSelectors(sels map[string]func(envelope.ToolEnvelope) map[string]
 }
 
 // WithBundleName sets the contract bundle lineage to track on the server.
-// Required for FromServer. The server uses this to look up the current bundle.
+// Factory-only: has no effect when passed to New() directly.
 func WithBundleName(name string) Option {
 	return func(g *Guard) {
 		if g.factoryCfg != nil {
@@ -54,7 +54,7 @@ func WithBundleName(name string) Option {
 }
 
 // WithTags sets key-value metadata describing this agent instance.
-// Only used with FromServer; ignored by New.
+// Factory-only: has no effect when passed to New() directly.
 func WithTags(tags map[string]string) Option {
 	return func(g *Guard) {
 		if g.factoryCfg != nil {
@@ -64,7 +64,8 @@ func WithTags(tags map[string]string) Option {
 }
 
 // WithAutoWatch controls whether the SSE watcher for contract hot-reload
-// starts automatically. Default: true. Only used with FromServer.
+// starts automatically. Default: true.
+// Factory-only: has no effect when passed to New() directly.
 func WithAutoWatch(enabled bool) Option {
 	return func(g *Guard) {
 		if g.factoryCfg != nil {
@@ -74,7 +75,7 @@ func WithAutoWatch(enabled bool) Option {
 }
 
 // WithAllowInsecure permits plaintext HTTP to non-loopback hosts.
-// Only used with FromServer. Default: false.
+// Factory-only: has no effect when passed to New() directly.
 func WithAllowInsecure() Option {
 	return func(g *Guard) {
 		if g.factoryCfg != nil {
@@ -85,7 +86,7 @@ func WithAllowInsecure() Option {
 
 // WithVerifySignatures enables Ed25519 signature verification on bundles
 // fetched from the server. The publicKeyHex must be a hex-encoded Ed25519
-// public key. Only used with FromServer — logs a warning if passed to New()
+// public key. Factory-only: logs a warning when passed to New() directly
 // since signature verification requires a server connection.
 func WithVerifySignatures(publicKeyHex string) Option {
 	return func(g *Guard) {
