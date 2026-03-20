@@ -171,7 +171,8 @@ func (w *SSEWatcher) readEvents(ctx context.Context, resp *http.Response) error 
 	// Contract bundles can be up to MaxBundleSize (1 MB). SSE data lines
 	// carry the full JSON-encoded bundle, so the scanner buffer must be
 	// large enough to hold at least that plus SSE framing overhead.
-	const sseBufSize = 1_100_000 // ~1 MB + overhead for SSE framing
+	const sseBufSize = 1_100_000     // ~1 MB + overhead for SSE framing
+	const maxSSEEventSize = 10 << 20 // 10 MB cap on accumulated data: lines
 	scanner.Buffer(make([]byte, 0, sseBufSize), sseBufSize)
 	var eventType, data string
 
@@ -198,6 +199,11 @@ func (w *SSEWatcher) readEvents(ctx context.Context, resp *http.Response) error 
 				data = chunk
 			} else {
 				data = data + "\n" + chunk
+			}
+			if len(data) > maxSSEEventSize {
+				log.Printf("server: SSE event too large (>%d bytes), dropping", maxSSEEventSize)
+				data = ""
+				eventType = ""
 			}
 		case line == "":
 			// Empty line = end of event.

@@ -110,7 +110,7 @@ func resolvePaths(path string) ([]string, error) {
 			continue // broken symlink — skip
 		}
 		// Ensure resolved target stays within the canonical root.
-		if !strings.HasPrefix(resolved, prefix) && resolved != canonical {
+		if !strings.HasPrefix(resolved, prefix) {
 			continue // symlink escapes contracts directory — skip
 		}
 		files = append(files, resolved)

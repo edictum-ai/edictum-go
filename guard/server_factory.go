@@ -100,7 +100,8 @@ func fromServerWithBundle(
 		serverAudit.Close(ctx)
 		return nil, fmt.Errorf("FromServer: %w", err)
 	}
-	compiled, err := yamlpkg.Compile(data)
+	compOpts := buildCompileOpts(fc)
+	compiled, err := yamlpkg.Compile(data, compOpts...)
 	if err != nil {
 		serverAudit.Close(ctx)
 		return nil, fmt.Errorf("FromServer: %w", err)
@@ -114,6 +115,7 @@ func fromServerWithBundle(
 	allOpts = append(allOpts, userOpts...)
 
 	g := New(allOpts...)
+	g.compileOpts = compOpts
 	g.serverClient = client
 	if fc.autoWatch {
 		startWatcher(g, client, fc)
@@ -134,6 +136,7 @@ func fromServerAssigned(
 	allOpts = append(allOpts, userOpts...)
 
 	g := New(allOpts...)
+	g.compileOpts = buildCompileOpts(fc)
 	g.serverClient = client
 
 	readyCh := make(chan struct{})
