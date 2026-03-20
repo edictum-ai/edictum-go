@@ -292,3 +292,35 @@ func TestBundleVerificationError(t *testing.T) {
 		t.Errorf("expected *BundleVerificationError, got %T", err)
 	}
 }
+
+// --- Security bypass tests ---
+
+func TestSecuritySSEBundleNameInjection(t *testing.T) {
+	malicious := []string{
+		"../../etc/passwd",     // path traversal
+		"../secret",            // single-step traversal
+		"bundle?injected=true", // query string injection
+		"bundle#fragment",      // fragment injection
+		"bundle name",          // space
+		"bundle\x00null",       // null byte
+		"",                     // empty
+	}
+
+	client, _ := NewClient(ClientConfig{BaseURL: "http://127.0.0.1:1", APIKey: "k"})
+	for _, name := range malicious {
+		t.Run(fmt.Sprintf("name=%q", name), func(t *testing.T) {
+			reloader := &mockReloader{}
+			w := NewSSEWatcher(client, reloader)
+
+			bundle := map[string]any{
+				"_assignment_changed": true,
+				"bundle_name":         name,
+			}
+			w.handleAssignmentChange(context.Background(), bundle)
+
+			if reloader.callCount() != 0 {
+				t.Errorf("bundle_name %q was not rejected — reloader called", name)
+			}
+		})
+	}
+}

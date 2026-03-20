@@ -340,6 +340,113 @@ contracts:
 	}
 }
 
+// --- Security bypass tests ---
+
+func TestSecurityResolvePaths_SymlinkEscape(t *testing.T) {
+	// Place a valid file inside the dir so FromYAML doesn't error on empty dir.
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "01-legit.yaml"), validBundle)
+
+	// Create an escaping symlink to a file outside the directory.
+	externalDir := t.TempDir()
+	writeFile(t, filepath.Join(externalDir, "evil.yaml"), `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: injected
+    type: session`)
+	link := filepath.Join(dir, "02-escape.yaml")
+	if err := os.Symlink(filepath.Join(externalDir, "evil.yaml"), link); err != nil {
+		t.Skipf("symlinks not supported: %v", err)
+	}
+
+	g, err := FromYAML(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Only the legit file's contracts (1 pre + 1 post) should load.
+	// The escaping symlink's session contract must be skipped.
+	if len(g.state.sessionContracts) != 0 {
+		t.Error("escaping symlink was not skipped — session contract loaded from outside")
+	}
+}
+
+func TestSecurityResolvePaths_SymlinkToParent(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "secret.yaml"), `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: parent-secret
+    type: session`)
+
+	dir := filepath.Join(root, "contracts")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dir, "01-legit.yaml"), validBundle)
+
+	link := filepath.Join(dir, "02-traversal.yaml")
+	if err := os.Symlink(filepath.Join(root, "secret.yaml"), link); err != nil {
+		t.Skipf("symlinks not supported: %v", err)
+	}
+
+	g, err := FromYAML(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(g.state.sessionContracts) != 0 {
+		t.Error("parent-directory symlink was not skipped — session contract loaded")
+	}
+}
+
+func TestReloadFromYAML_ToolRegistryReplaced(t *testing.T) {
+	yamlWithTools := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: t1
+    type: pre
+    tool: Bash
+    when:
+      "args.command":
+        contains: "ls"
+    then:
+      effect: deny
+      message: "no ls"
+tools:
+  OldTool:
+    side_effect: read
+    idempotent: true`
+	g, err := FromYAMLString(yamlWithTools)
+	if err != nil {
+		t.Fatal(err)
+	}
+	se, idem := g.toolRegistry.Classify("OldTool")
+	if se != "read" || !idem {
+		t.Fatalf("OldTool before: got (%q, %v), want (read, true)", se, idem)
+	}
+
+	// Reload with bundle that has no tools section — OldTool should be gone.
+	newYAML := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: t2
+    type: pre
+    tool: Bash
+    when:
+      "args.command":
+        contains: "rm"
+    then:
+      effect: deny
+      message: "no rm"`
+	if err := g.ReloadFromYAML([]byte(newYAML)); err != nil {
+		t.Fatal(err)
+	}
+	// After reload, OldTool returns the default (irreversible, false).
+	se2, idem2 := g.toolRegistry.Classify("OldTool")
+	if se2 == "read" || idem2 {
+		t.Error("OldTool should have been cleared after reload without tools section")
+	}
+}
+
 // writeFile is a test helper that creates a file with the given content.
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()

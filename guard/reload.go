@@ -23,23 +23,25 @@ func (g *Guard) ReloadFromYAML(yamlBytes []byte) error {
 
 	newState := buildCompiledState(compiled, hash.String())
 
+	// Build a fresh registry so tool removals take effect. Mutating
+	// the existing registry would accumulate stale entries from prior bundles.
+	newRegistry := envelope.NewToolRegistry()
+	for name, cfg := range compiled.Tools {
+		se := envelope.SideEffectIrreversible
+		if v, ok := cfg["side_effect"].(string); ok {
+			se = envelope.SideEffect(v)
+		}
+		idem := false
+		if v, ok := cfg["idempotent"].(bool); ok {
+			idem = v
+		}
+		newRegistry.Register(name, se, idem)
+	}
+
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.state = newState
-
-	if compiled.Tools != nil {
-		for name, cfg := range compiled.Tools {
-			se := envelope.SideEffectIrreversible
-			if v, ok := cfg["side_effect"].(string); ok {
-				se = envelope.SideEffect(v)
-			}
-			idem := false
-			if v, ok := cfg["idempotent"].(bool); ok {
-				idem = v
-			}
-			g.toolRegistry.Register(name, se, idem)
-		}
-	}
+	g.toolRegistry = newRegistry
 
 	return nil
 }
