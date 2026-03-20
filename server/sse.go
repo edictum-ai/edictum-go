@@ -191,7 +191,13 @@ func (w *SSEWatcher) readEvents(ctx context.Context, resp *http.Response) error 
 		case strings.HasPrefix(line, "event: "):
 			eventType = strings.TrimPrefix(line, "event: ")
 		case strings.HasPrefix(line, "data: "):
-			data = strings.TrimPrefix(line, "data: ")
+			// Per RFC 8895 §9.2.6, multiple data: lines are joined with \n.
+			chunk := strings.TrimPrefix(line, "data: ")
+			if data == "" {
+				data = chunk
+			} else {
+				data = data + "\n" + chunk
+			}
 		case line == "":
 			// Empty line = end of event.
 			if eventType == "contract_update" && data != "" {

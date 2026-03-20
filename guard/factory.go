@@ -43,7 +43,7 @@ func FromYAMLString(content string, opts ...Option) (*Guard, error) {
 		return nil, fmt.Errorf("FromYAMLString: %w", err)
 	}
 
-	g := buildGuardFromCompiled(compiled, hash.String(), opts)
+	g := buildGuardFromCompiled(compiled, hash.String(), compOpts, opts)
 	return g, nil
 }
 
@@ -105,18 +105,23 @@ func fromYAMLInternal(path string, opts []Option) (*Guard, *yamlpkg.CompositionR
 		return nil, nil, fmt.Errorf("FromYAML: %w", err)
 	}
 
-	g := buildGuardFromCompiled(compiled, policyVersion, opts)
+	g := buildGuardFromCompiled(compiled, policyVersion, compOpts, opts)
 	return g, &report, nil
 }
 
 // buildGuardFromCompiled creates a Guard from compiled YAML contracts.
 // Factory-derived options are applied first, then user options override.
-func buildGuardFromCompiled(compiled yamlpkg.CompiledBundle, policyVersion string, userOpts []Option) *Guard {
+// suppressFactoryWarnings prevents spurious log output from factory-only
+// options that are passed through to New().
+func buildGuardFromCompiled(compiled yamlpkg.CompiledBundle, policyVersion string, compOpts []yamlpkg.CompileOption, userOpts []Option) *Guard {
 	factoryDefaults := compiledOpts(compiled, policyVersion)
 
-	allOpts := make([]Option, 0, len(factoryDefaults)+len(userOpts))
+	allOpts := make([]Option, 0, 1+len(factoryDefaults)+len(userOpts))
+	allOpts = append(allOpts, suppressFactoryWarnings())
 	allOpts = append(allOpts, factoryDefaults...)
 	allOpts = append(allOpts, userOpts...)
 
-	return New(allOpts...)
+	g := New(allOpts...)
+	g.compileOpts = compOpts
+	return g
 }

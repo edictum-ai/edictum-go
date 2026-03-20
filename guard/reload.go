@@ -16,7 +16,13 @@ func (g *Guard) ReloadFromYAML(yamlBytes []byte) error {
 		return err
 	}
 
-	compiled, err := yamlpkg.Compile(data)
+	// Reuse compile options from factory construction so custom
+	// operators/selectors survive hot-reload.
+	var compOpts []yamlpkg.CompileOption
+	if stored, ok := g.compileOpts.([]yamlpkg.CompileOption); ok {
+		compOpts = stored
+	}
+	compiled, err := yamlpkg.Compile(data, compOpts...)
 	if err != nil {
 		return err
 	}

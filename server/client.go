@@ -171,8 +171,15 @@ func (c *Client) doRequest(
 			return nil, lastErr
 		}
 
-		respBody, readErr := io.ReadAll(resp.Body)
+		// Cap response size to prevent OOM from a rogue/compromised server.
+		// Bundles are max 1 MB; 10 MB gives generous headroom for all endpoints.
+		const maxResponseSize = 10 << 20
+		lr := io.LimitReader(resp.Body, int64(maxResponseSize)+1)
+		respBody, readErr := io.ReadAll(lr)
 		_ = resp.Body.Close()
+		if readErr == nil && len(respBody) > maxResponseSize {
+			return nil, fmt.Errorf("response too large (>%d bytes)", maxResponseSize)
+		}
 		if readErr != nil {
 			if !idempotent {
 				return nil, fmt.Errorf("read response: %w", readErr)

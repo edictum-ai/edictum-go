@@ -107,7 +107,8 @@ func fromServerWithBundle(
 	}
 
 	compiledDefaults := compiledOpts(compiled, hash.String())
-	allOpts := make([]Option, 0, len(serverDefaults)+len(compiledDefaults)+len(userOpts))
+	allOpts := make([]Option, 0, 1+len(serverDefaults)+len(compiledDefaults)+len(userOpts))
+	allOpts = append(allOpts, suppressFactoryWarnings())
 	allOpts = append(allOpts, serverDefaults...)
 	allOpts = append(allOpts, compiledDefaults...)
 	allOpts = append(allOpts, userOpts...)
@@ -127,7 +128,8 @@ func fromServerAssigned(
 	client *server.Client,
 	serverDefaults, userOpts []Option,
 ) (*Guard, error) {
-	allOpts := make([]Option, 0, len(serverDefaults)+len(userOpts))
+	allOpts := make([]Option, 0, 1+len(serverDefaults)+len(userOpts))
+	allOpts = append(allOpts, suppressFactoryWarnings())
 	allOpts = append(allOpts, serverDefaults...)
 	allOpts = append(allOpts, userOpts...)
 

@@ -71,6 +71,15 @@ type Guard struct {
 	// Never present on a returned Guard.
 	factoryCfg *factoryCfg
 
+	// factoryBuild suppresses factory-only option warnings during
+	// internal New() calls from factory constructors.
+	factoryBuild bool
+
+	// compileOpts stores []yaml.CompileOption set by factory constructors.
+	// ReloadFromYAML reuses them so custom operators/selectors survive reload.
+	// Typed as any to avoid importing yaml in guard.go.
+	compileOpts any
+
 	// Server fields — set by FromServer, nil otherwise.
 	serverClient serverClient       // interface to avoid import cycle
 	sseCloser    sseCloser          // interface to avoid import cycle
