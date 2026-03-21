@@ -54,5 +54,5 @@ If you find a bug that exists in multiple repos, file ONE issue in `edictum-ai/.
 - [ ] Go-native tests written
 - [ ] Security tests with `TestSecurity` prefix
 - [ ] Race detector passes: `go test -race ./...`
-- [ ] Terminology matches `.docs-style-guide.md`
+- [ ] Terminology matches canonical table in [`CLAUDE.md`](../../CLAUDE.md#terminology-enforcement)
 - [ ] Tracking issue updated with PR link
