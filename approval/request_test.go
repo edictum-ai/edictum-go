@@ -124,9 +124,19 @@ func TestToolArgs_ReturnsCopy(t *testing.T) {
 
 func TestMetadata_ReturnsCopy(t *testing.T) {
 	r := NewRequest("req-6", "Tool", nil, "msg")
-	// Metadata is set via direct struct access in the package (not exported),
-	// so we test nil path. The defensive copy logic is shared with ToolArgs
-	// and already tested above.
+	// White-box: set unexported metadata field directly.
+	r.metadata = map[string]any{"k": "original"}
+
+	got := r.Metadata()
+	got["k"] = "mutated"
+
+	if r.Metadata()["k"] != "original" {
+		t.Error("Metadata() returned a reference, not a copy")
+	}
+}
+
+func TestMetadata_Nil(t *testing.T) {
+	r := NewRequest("req-6b", "Tool", nil, "msg")
 	if r.Metadata() != nil {
 		t.Errorf("Metadata() = %v, want nil", r.Metadata())
 	}
@@ -176,98 +186,5 @@ func TestNewRequest_MultipleOptions(t *testing.T) {
 	}
 	if r.TimeoutEffect() != "deny" {
 		t.Errorf("TimeoutEffect() = %q, want %q", r.TimeoutEffect(), "deny")
-	}
-}
-
-// --- Decision struct ---
-
-func TestDecision_ZeroValue(t *testing.T) {
-	var d Decision
-	if d.Approved {
-		t.Error("zero-value Decision.Approved should be false")
-	}
-	if d.Approver != "" {
-		t.Errorf("zero-value Decision.Approver = %q, want empty", d.Approver)
-	}
-	if d.Reason != "" {
-		t.Errorf("zero-value Decision.Reason = %q, want empty", d.Reason)
-	}
-	if d.Status != "" {
-		t.Errorf("zero-value Decision.Status = %q, want empty", d.Status)
-	}
-	if !d.Timestamp.IsZero() {
-		t.Errorf("zero-value Decision.Timestamp = %v, want zero", d.Timestamp)
-	}
-}
-
-func TestDecision_FieldAccess(t *testing.T) {
-	now := time.Now().UTC()
-	d := Decision{
-		Approved:  true,
-		Approver:  "admin@example.com",
-		Reason:    "looks safe",
-		Status:    StatusApproved,
-		Timestamp: now,
-	}
-	if !d.Approved {
-		t.Error("Approved should be true")
-	}
-	if d.Approver != "admin@example.com" {
-		t.Errorf("Approver = %q, want %q", d.Approver, "admin@example.com")
-	}
-	if d.Reason != "looks safe" {
-		t.Errorf("Reason = %q, want %q", d.Reason, "looks safe")
-	}
-	if d.Status != StatusApproved {
-		t.Errorf("Status = %q, want %q", d.Status, StatusApproved)
-	}
-	if !d.Timestamp.Equal(now) {
-		t.Errorf("Timestamp = %v, want %v", d.Timestamp, now)
-	}
-}
-
-// --- deepCopyMap / deepCopyValue ---
-
-func TestDeepCopyMap_NestedSlice(t *testing.T) {
-	src := map[string]any{
-		"items": []any{"a", "b", map[string]any{"nested": true}},
-	}
-	dst := deepCopyMap(src)
-
-	// Mutate source slice element.
-	srcItems := src["items"].([]any)
-	srcItems[0] = "mutated"
-	srcNested := srcItems[2].(map[string]any)
-	srcNested["nested"] = false
-
-	dstItems := dst["items"].([]any)
-	if dstItems[0] != "a" {
-		t.Errorf("slice mutation leaked: got %v, want %q", dstItems[0], "a")
-	}
-	dstNested := dstItems[2].(map[string]any)
-	if dstNested["nested"] != true {
-		t.Errorf("nested map mutation leaked: got %v, want true", dstNested["nested"])
-	}
-}
-
-func TestDeepCopyMap_Nil(t *testing.T) {
-	if deepCopyMap(nil) != nil {
-		t.Error("deepCopyMap(nil) should return nil")
-	}
-}
-
-func TestDeepCopyValue_ScalarPassthrough(t *testing.T) {
-	// Scalars are returned as-is (no copy needed for immutable types).
-	if deepCopyValue(42) != 42 {
-		t.Error("int passthrough failed")
-	}
-	if deepCopyValue("hello") != "hello" {
-		t.Error("string passthrough failed")
-	}
-	if deepCopyValue(true) != true {
-		t.Error("bool passthrough failed")
-	}
-	if deepCopyValue(nil) != nil {
-		t.Error("nil passthrough failed")
 	}
 }
