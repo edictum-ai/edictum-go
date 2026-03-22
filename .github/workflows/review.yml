@@ -143,7 +143,6 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 5
     permissions:
-      contents: read
       pull-requests: write
       issues: read
 
@@ -152,10 +151,8 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 1
+      # No checkout needed — post job only downloads an artifact and calls gh API.
+      # Avoids landing untrusted PR code on a runner with pull-requests: write.
 
       - name: Generate app token
         id: app-token
@@ -183,7 +180,8 @@ jobs:
               -X PATCH -F body=@/tmp/review.md
             echo "Updated existing review comment ${EXISTING_ID}"
           else
-            gh pr comment "${PR_NUMBER}" --body-file /tmp/review.md
+            gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+              -F body=@/tmp/review.md
             echo "Created new review comment"
           fi
 
