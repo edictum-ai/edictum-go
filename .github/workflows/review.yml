@@ -116,12 +116,8 @@ jobs:
             - ALWAYS include file path + line number + concrete fix with code.
             - Warnings stay in the PR comment for the author to review.
 
-      - name: Validate and post review comment
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+      - name: Validate review file
         run: |
-          # Validate review file exists and contains the required marker
           if [ ! -f /tmp/review.md ]; then
             echo "::error::Review file /tmp/review.md not found. Claude may have failed."
             exit 1
@@ -132,6 +128,48 @@ jobs:
             exit 1
           fi
 
+      - name: Upload review artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: review-comment
+          path: /tmp/review.md
+          retention-days: 1
+
+  # Separate job for posting the comment. Uses its own concurrency group
+  # with cancel-in-progress: true to serialize the check-then-act sequence
+  # and prevent duplicate sticky comments when multiple pushes arrive.
+  post:
+    needs: review
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+
+    concurrency:
+      group: review-post-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Download review artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: review-comment
+          path: /tmp
+
+      - name: Post or update sticky comment
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
           # Post or update sticky comment
           EXISTING_ID=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
             --jq '[.[] | select(.body | contains("<!-- edictum-review -->"))] | last | .id // empty')
