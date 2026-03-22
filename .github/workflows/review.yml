@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: read   # posting moved to `post` job; least-privilege
       issues: read
 
     steps:
@@ -152,6 +152,11 @@ jobs:
       cancel-in-progress: true
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 1
+
       - name: Generate app token
         id: app-token
         uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
