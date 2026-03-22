@@ -238,7 +238,7 @@ func TestAuditSinkRestoreOverflow_DropsNewest(t *testing.T) {
 }
 
 func TestAuditSinkPermanentDropOn4xx(t *testing.T) {
-	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusBadRequest} {
+	for _, code := range []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound} {
 		t.Run(fmt.Sprintf("HTTP%d", code), func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(code)
