@@ -1,0 +1,40 @@
+name: Parity Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 4 * * 1'  # Weekly Monday 4am UTC
+
+permissions:
+  contents: read
+
+jobs:
+  behavioral-fixtures:
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: edictum-ai/edictum-schemas
+          ref: 814bbf65ab630d042e11ca6022a93bf4552b99b8  # pin to known-good commit
+          path: edictum-schemas
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.26"
+
+      - name: Run behavioral fixtures
+        run: |
+          echo "Fixture runner not yet implemented — placeholder for tracking"
+          echo "Fixtures available at: edictum-schemas/fixtures/behavioral/"
+          ls edictum-schemas/fixtures/behavioral/ || true
+          echo "::warning::Behavioral fixture runner not yet implemented — results are not validated"
+
+      - name: Run adversarial fixtures
+        run: |
+          echo "Adversarial fixtures available at: edictum-schemas/fixtures/adversarial/"
+          ls edictum-schemas/fixtures/adversarial/ || true
+          echo "::warning::Adversarial fixture runner not yet implemented — results are not validated"
