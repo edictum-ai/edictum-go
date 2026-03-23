@@ -185,9 +185,10 @@ go test -race ./...                   # test with race detector
 go test -run "TestSecurity" ./...     # security boundary tests only
 go test ./pipeline/...                # test pipeline only
 go test ./envelope/...                # test envelope only
-golangci-lint run ./...               # lint
-go vet ./...                          # vet
+golangci-lint run ./...               # lint (includes govet, gosec, staticcheck)
 ```
+
+> **Note:** `go vet` is included in golangci-lint via the `govet` linter and does not need to be run separately.
 
 ## Pre-Merge Verification
 
@@ -195,10 +196,9 @@ Every change MUST pass these checks before committing:
 
 ```bash
 go build ./...                        # all packages build
-go test ./...                         # full test suite
-go test -race ./...                   # race detector
-golangci-lint run ./...               # lint
-go vet ./...                          # vet
+go test -race ./...                   # full test suite with race detector
+go test -run "TestSecurity" ./...     # security boundary tests
+golangci-lint run ./...               # lint (includes govet)
 # If touching adapters:
 go test -run "TestAdapterParity" ./adapter/...
 ```
