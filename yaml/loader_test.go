@@ -613,6 +613,30 @@ contracts:
 	}
 }
 
+// Cat 3.6 — Sandbox: non-string entries in not_allows.domains are rejected
+func TestLoadBundleString_SandboxNonStringNotAllowsDomainsRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: bad-not-allows-doms
+    type: sandbox
+    tool: fetch
+    allows:
+      domains:
+        - "*.example.com"
+    not_allows:
+      domains:
+        - 42
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for non-string not_allows.domains entry")
+	}
+	if !strings.Contains(err.Error(), "not_allows.domains[0] must be a string") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSecurity_ShadowInjection(t *testing.T) {
 	// A user-supplied YAML bundle must not be able to set _observe: true
 	// on a contract. This internal key is reserved for observe_alongside

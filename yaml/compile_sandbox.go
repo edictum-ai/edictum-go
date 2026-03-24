@@ -93,7 +93,9 @@ func resolvePaths(paths []string) ([]string, error) {
 }
 
 // toStringSlice converts an []any of strings to []string. Returns nil if
-// v is nil or not a slice.
+// v is nil or not a slice. Non-string items are silently dropped — callers
+// in the production path are protected by validateSandboxContracts which
+// rejects non-string entries before compilation.
 func toStringSlice(v any) []string {
 	items, ok := v.([]any)
 	if !ok || len(items) == 0 {
