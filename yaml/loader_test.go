@@ -321,7 +321,7 @@ contracts:
 	}
 }
 
-// Cat 3.6 — Sandbox: not_within requires within
+// Cat 3.6 — Sandbox: not_within without within (no primary constraint)
 func TestLoadBundleString_SandboxNotWithinRequiresWithin(t *testing.T) {
 	y := `apiVersion: edictum/v1
 kind: ContractBundle
@@ -336,12 +336,13 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for not_within without within")
 	}
-	if !strings.Contains(err.Error(), "not_within requires within") {
+	// Rejected by the primary constraint check (no within or allows).
+	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-// Cat 3.6 — Sandbox: not_allows requires allows
+// Cat 3.6 — Sandbox: not_allows without allows (no primary constraint)
 func TestLoadBundleString_SandboxNotAllowsRequiresAllows(t *testing.T) {
 	y := `apiVersion: edictum/v1
 kind: ContractBundle
@@ -350,14 +351,15 @@ contracts:
     type: sandbox
     tool: Bash
     not_allows:
-      commands:
-        - rm
+      domains:
+        - evil.com
 `
 	_, _, err := LoadBundleString(y)
 	if err == nil {
 		t.Fatal("expected error for not_allows without allows")
 	}
-	if !strings.Contains(err.Error(), "not_allows requires allows") {
+	// Rejected by the primary constraint check (no within or allows).
+	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -386,6 +388,50 @@ contracts:
 	}
 }
 
+// Cat 3.6 — Sandbox: not_allows.commands is rejected (only domains valid)
+func TestLoadBundleString_SandboxNotAllowsCommandsRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: sb4
+    type: sandbox
+    tool: Bash
+    allows:
+      commands:
+        - ls
+    not_allows:
+      commands:
+        - rm
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for not_allows.commands")
+	}
+	if !strings.Contains(err.Error(), "not_allows.commands is not supported") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Cat 3.6 — Sandbox: non-string entries in within are rejected
+func TestLoadBundleString_SandboxNonStringWithinRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: bad-within
+    type: sandbox
+    tool: read_file
+    within:
+      - 42
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for non-string within entry")
+	}
+	if !strings.Contains(err.Error(), "within[0] must be a string") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 // Cat 3.6 — Sandbox: valid with both within and not_within
 func TestLoadBundleString_SandboxValidWithBothWithin(t *testing.T) {
 	y := `apiVersion: edictum/v1
@@ -401,6 +447,62 @@ contracts:
 `
 	_, _, err := LoadBundleString(y)
 	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Cat 3.6 — Sandbox: empty sandbox (no constraints) is rejected
+func TestLoadBundleString_SandboxEmptyRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: empty-sb
+    type: sandbox
+    tool: Bash
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for sandbox with no constraints")
+	}
+	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Cat 3.6 — Sandbox: within: [] (empty list) is rejected
+func TestLoadBundleString_SandboxEmptyWithinRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: empty-within
+    type: sandbox
+    tool: read_file
+    within: []
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for sandbox with empty within list")
+	}
+	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Cat 3.6 — Sandbox: allows: {} (empty map) is rejected
+func TestLoadBundleString_SandboxEmptyAllowsRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: empty-allows
+    type: sandbox
+    tool: Bash
+    allows: {}
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for sandbox with empty allows")
+	}
+	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -466,6 +568,72 @@ func TestLoadBundle_FileNotFound(t *testing.T) {
 	_, _, err := LoadBundle("/nonexistent/path/bundle.yaml")
 	if err == nil {
 		t.Fatal("expected error for missing file")
+	}
+}
+
+// Cat 3.6 — Sandbox: non-string entries in allows.commands are rejected
+func TestLoadBundleString_SandboxNonStringCommandsRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: bad-cmds
+    type: sandbox
+    tool: Bash
+    allows:
+      commands:
+        - 42
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for non-string allows.commands entry")
+	}
+	if !strings.Contains(err.Error(), "allows.commands[0] must be a string") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Cat 3.6 — Sandbox: non-string entries in allows.domains are rejected
+func TestLoadBundleString_SandboxNonStringDomainsRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: bad-doms
+    type: sandbox
+    tool: fetch
+    allows:
+      domains:
+        - true
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for non-string allows.domains entry")
+	}
+	if !strings.Contains(err.Error(), "allows.domains[0] must be a string") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Cat 3.6 — Sandbox: non-string entries in not_allows.domains are rejected
+func TestLoadBundleString_SandboxNonStringNotAllowsDomainsRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: bad-not-allows-doms
+    type: sandbox
+    tool: fetch
+    allows:
+      domains:
+        - "*.example.com"
+    not_allows:
+      domains:
+        - 42
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for non-string not_allows.domains entry")
+	}
+	if !strings.Contains(err.Error(), "not_allows.domains[0] must be a string") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

@@ -182,33 +182,3 @@ func exprHasSelector(expr any, target string) bool {
 	_, found := m[target]
 	return found
 }
-
-func validateSandboxContracts(data map[string]any) error {
-	contracts, _ := data["contracts"].([]any)
-	for _, c := range contracts {
-		cm, _ := c.(map[string]any)
-		if cm["type"] != "sandbox" {
-			continue
-		}
-		cid, _ := cm["id"].(string)
-		if _, ok := cm["not_within"]; ok {
-			if _, ok := cm["within"]; !ok {
-				return fmt.Errorf("yaml: contract %q: not_within requires within to also be set", cid)
-			}
-		}
-		if _, ok := cm["not_allows"]; ok {
-			if _, ok := cm["allows"]; !ok {
-				return fmt.Errorf("yaml: contract %q: not_allows requires allows to also be set", cid)
-			}
-		}
-		if na, ok := cm["not_allows"].(map[string]any); ok {
-			if _, ok := na["domains"]; ok {
-				allows, _ := cm["allows"].(map[string]any)
-				if _, ok := allows["domains"]; !ok {
-					return fmt.Errorf("yaml: contract %q: not_allows.domains requires allows.domains to also be set", cid)
-				}
-			}
-		}
-	}
-	return nil
-}

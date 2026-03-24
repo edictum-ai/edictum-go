@@ -2,44 +2,113 @@ package yaml
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
 
 	"github.com/edictum-ai/edictum-go/contract"
 	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/sandbox"
 )
 
-// compileSandbox creates a stub Precondition for sandbox contracts.
-// Sandbox contracts use within/not_within/allows/not_allows — not when/then —
-// so they cannot go through compilePre. The actual sandbox evaluation is wired
-// by the guard through the sandbox package at runtime.
+// compileSandbox creates a Precondition for sandbox contracts with the
+// sandbox evaluation logic baked into the Check closure.
 //
-// Check is a pass-through stub. The guard package replaces this with
-// actual sandbox evaluation at runtime via the sandbox package. The YAML
-// compiler's role is to produce routing metadata (Name, Tool, Source, Mode)
-// — the security-critical sandbox checks (path/command/domain) are wired
-// when the guard processes SandboxContracts from the compiled bundle.
-func compileSandbox(raw map[string]any, mode string) contract.Precondition {
+// Sandbox contracts use within/not_within/allows/not_allows — not when/then —
+// so they cannot go through compilePre. The YAML fields are parsed into a
+// sandbox.Config and the Check function calls sandbox.Check directly.
+func compileSandbox(raw map[string]any, mode string) (contract.Precondition, error) {
 	cid, _ := raw["id"].(string)
-	// Sandbox contracts use "tools" (list) not "tool" (single).
 	tool := "*"
 	if t, ok := raw["tool"].(string); ok {
 		tool = t
 	}
 	isObserve, _ := raw["_observe"].(bool)
 
+	cfg, err := parseSandboxConfig(raw)
+	if err != nil {
+		return contract.Precondition{}, fmt.Errorf("contract %q: %w", cid, err)
+	}
+
 	pre := contract.Precondition{
 		Name:   cid,
 		Tool:   tool,
 		Mode:   mode,
 		Source: "yaml_sandbox",
-		// Fail-closed stub: if the guard does not replace this Check
-		// with actual sandbox evaluation, the contract denies all calls.
-		// This ensures uninitialized sandbox contracts never silently pass.
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("sandbox contract not initialized — guard must wire sandbox.Check"), nil
+		Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+			return sandbox.Check(env, cfg)
 		},
 	}
 	if isObserve {
 		pre.Mode = "observe"
 	}
-	return pre
+	return pre, nil
+}
+
+// parseSandboxConfig extracts sandbox boundaries from a raw YAML contract map.
+// Path prefixes (within/not_within) are resolved via filepath.EvalSymlinks to
+// match the resolution performed by sandbox.ExtractPaths on incoming tool calls.
+func parseSandboxConfig(raw map[string]any) (sandbox.Config, error) {
+	within, err := resolvePaths(toStringSlice(raw["within"]))
+	if err != nil {
+		return sandbox.Config{}, fmt.Errorf("within: %w", err)
+	}
+	notWithin, err := resolvePaths(toStringSlice(raw["not_within"]))
+	if err != nil {
+		return sandbox.Config{}, fmt.Errorf("not_within: %w", err)
+	}
+
+	cfg := sandbox.Config{
+		Within:    within,
+		NotWithin: notWithin,
+	}
+	if msg, ok := raw["message"].(string); ok {
+		cfg.Message = msg
+	}
+	if allows, ok := raw["allows"].(map[string]any); ok {
+		cfg.AllowedCommands = toStringSlice(allows["commands"])
+		cfg.AllowedDomains = toStringSlice(allows["domains"])
+	}
+	if notAllows, ok := raw["not_allows"].(map[string]any); ok {
+		cfg.BlockedDomains = toStringSlice(notAllows["domains"])
+	}
+	return cfg, nil
+}
+
+// resolvePaths resolves each path via filepath.EvalSymlinks. Returns an
+// error if any path cannot be resolved — a typo or non-existent boundary
+// path would silently produce a broken sandbox contract otherwise.
+func resolvePaths(paths []string) ([]string, error) {
+	if len(paths) == 0 {
+		return paths, nil
+	}
+	out := make([]string, len(paths))
+	for i, p := range paths {
+		resolved, err := filepath.EvalSymlinks(p)
+		if err != nil {
+			return nil, fmt.Errorf("cannot resolve boundary path %q: %w", p, err)
+		}
+		out[i] = resolved
+	}
+	return out, nil
+}
+
+// toStringSlice converts an []any of strings to []string. Returns nil if
+// v is nil or not a slice. Non-string items are silently dropped — callers
+// in the production path are protected by validateSandboxContracts which
+// rejects non-string entries before compilation.
+func toStringSlice(v any) []string {
+	items, ok := v.([]any)
+	if !ok || len(items) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
