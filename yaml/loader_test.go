@@ -571,6 +571,48 @@ func TestLoadBundle_FileNotFound(t *testing.T) {
 	}
 }
 
+// Cat 3.6 — Sandbox: non-string entries in allows.commands are rejected
+func TestLoadBundleString_SandboxNonStringCommandsRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: bad-cmds
+    type: sandbox
+    tool: Bash
+    allows:
+      commands:
+        - 42
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for non-string allows.commands entry")
+	}
+	if !strings.Contains(err.Error(), "allows.commands[0] must be a string") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Cat 3.6 — Sandbox: non-string entries in allows.domains are rejected
+func TestLoadBundleString_SandboxNonStringDomainsRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: bad-doms
+    type: sandbox
+    tool: fetch
+    allows:
+      domains:
+        - true
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for non-string allows.domains entry")
+	}
+	if !strings.Contains(err.Error(), "allows.domains[0] must be a string") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSecurity_ShadowInjection(t *testing.T) {
 	// A user-supplied YAML bundle must not be able to set _observe: true
 	// on a contract. This internal key is reserved for observe_alongside
