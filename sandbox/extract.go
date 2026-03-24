@@ -179,11 +179,7 @@ func resolvePath(p string) string {
 	parts := make([]string, 0, 4)
 	current := cleaned
 	existingPrefix := deepestExistingPrefix(cleaned)
-	for {
-		if current == existingPrefix {
-			break
-		}
-
+	for current != existingPrefix {
 		parts = append(parts, filepath.Base(current))
 		current = filepath.Dir(current)
 	}

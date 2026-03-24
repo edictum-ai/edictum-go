@@ -344,7 +344,9 @@ func TestPolicy_RedactArgs_StringArgPasswordFlag(t *testing.T) {
 
 func TestPolicy_RedactArgs_StringArgURLCredentials(t *testing.T) {
 	p := NewPolicy()
-	got := p.RedactArgs(map[string]any{"url": "https://admin:secret123@db.example.com"})
+	got := p.RedactArgs(map[string]any{
+		"url": "https://admin:secret123@db.example.com", //nolint:gosec // test fixture for URL credential redaction
+	})
 	if got["url"] != "https://admin:[REDACTED]@db.example.com" {
 		t.Fatalf("url = %q", got["url"])
 	}

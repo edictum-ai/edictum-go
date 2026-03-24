@@ -175,7 +175,7 @@ func TestExtractPathsDeduplication(t *testing.T) {
 func TestResolvePath_ResolvesSymlinkedParentForMissingLeaf(t *testing.T) {
 	root := t.TempDir()
 	realDir := filepath.Join(root, "real")
-	if err := os.Mkdir(realDir, 0o755); err != nil {
+	if err := os.Mkdir(realDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
