@@ -69,6 +69,7 @@ type Guard struct {
 	sessionID         string
 
 	telemetry *telemetry.GovernanceTelemetry
+	telOpts   []telemetry.Option // accumulated before New() builds telemetry
 
 	// factoryCfg is non-nil only during factory option extraction.
 	// Never present on a returned Guard.
@@ -108,8 +109,9 @@ func New(opts ...Option) *Guard {
 		opt(g)
 	}
 	if g.telemetry == nil {
-		g.telemetry = telemetry.New()
+		g.telemetry = telemetry.New(g.telOpts...)
 	}
+	g.telOpts = nil // release after construction
 	g.redactionPolicy = ensureRedaction(g.redactionPolicy)
 	classifyContracts(g)
 	return g

@@ -63,6 +63,41 @@ func TestWithTelemetry_SpanErrorOnDeny(t *testing.T) {
 	}
 }
 
+func TestWithTracerProviderAndMeterProvider_BothWork(t *testing.T) {
+	tp := newTTP()
+	mp := newTMP()
+	g := New(WithTracerProvider(tp), WithMeterProvider(mp))
+
+	_, err := g.Run(context.Background(), "Bash",
+		map[string]any{"command": "ls"}, nopCallable)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	// Verify tracer received the span.
+	tp.tracer.mu.Lock()
+	spans := tp.tracer.spans
+	tp.tracer.mu.Unlock()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+
+	// Verify meter received the counter.
+	mp.meter.mu.Lock()
+	recs := mp.meter.recs
+	mp.meter.mu.Unlock()
+	found := false
+	for _, r := range recs {
+		if r.Name == "edictum.calls.allowed" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected edictum.calls.allowed via WithMeterProvider")
+	}
+}
+
 func TestWithTelemetry_MetricsRecorded(t *testing.T) {
 	mp := newTMP()
 	tp := newTTP()
