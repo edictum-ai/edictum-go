@@ -19,9 +19,14 @@ var redirectPrefixRe = regexp.MustCompile(`^(?:\d*>>|>>|\d*>|>|<<|<)`)
 // omitted here: sandbox allowlists should still accept commands like
 // "echo $HOME", even though envelope-side side-effect classification remains
 // conservative and treats "$"-containing shell as irreversible.
+//
+// Python is the canonical reference: redirects are not treated as command
+// separators here because they do not start a second command. Redirect safety
+// is enforced by path extraction/path constraints, while redirect-prefixed
+// commands still fail closed below.
 var shellOperators = []string{
-	"\n", "\r", "<(", "<<", "${", ">", ">>", "|", ";", "&&", "||",
-	"$(", "`", "#{",
+	"\n", "\r", ";", "|", "&", "`",
+	"$(", "${", "$'", "<(", ">(", "<<<", "<<",
 }
 
 // pathArgKeys are argument keys that conventionally hold file paths.

@@ -247,6 +247,26 @@ func TestCompositeSink_DeepCopiesEvaluatedRecords(t *testing.T) {
 	}
 }
 
+func TestCompositeSink_DeepCopiesPrincipal(t *testing.T) {
+	first := &mutatingSink{
+		mutate: func(event *Event) {
+			event.Principal.(map[string]any)["user_id"] = "mutated"
+		},
+	}
+	second := &captureSink{}
+	comp := NewCompositeSink(first, second)
+
+	event := NewEvent()
+	event.Principal = map[string]any{"user_id": "original"}
+
+	if err := comp.Emit(context.Background(), &event); err != nil {
+		t.Fatalf("Emit error: %v", err)
+	}
+	if got := second.last.Principal.(map[string]any)["user_id"]; got != "original" {
+		t.Fatalf("Principal leaked mutation: got %v, want original", got)
+	}
+}
+
 // --- CollectingSink ---
 
 func TestCollectingSink_BasicEmit(t *testing.T) {

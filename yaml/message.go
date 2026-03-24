@@ -33,7 +33,7 @@ func expandMessage(
 		}
 		opts = append(opts, withOutputPresent(outputPresent))
 
-		ec := evalCtx{outputPresent: true}
+		ec := evalCtx{}
 		for _, opt := range opts {
 			opt(&ec)
 		}

@@ -56,6 +56,9 @@ func (c *CollectingSink) Emit(_ context.Context, event *Event) error {
 	if event.ToolArgs != nil {
 		cp.ToolArgs = deepCopyMap(event.ToolArgs)
 	}
+	if pm, ok := event.Principal.(map[string]any); ok {
+		cp.Principal = deepCopyMap(pm)
+	}
 	if event.HooksEvaluated != nil {
 		cp.HooksEvaluated = deepCopyRecordSlice(event.HooksEvaluated)
 	}
@@ -160,6 +163,9 @@ func deepCopyEvents(events []Event) []Event {
 func deepCopyEvent(e Event) Event {
 	if e.ToolArgs != nil {
 		e.ToolArgs = deepCopyMap(e.ToolArgs)
+	}
+	if pm, ok := e.Principal.(map[string]any); ok {
+		e.Principal = deepCopyMap(pm)
 	}
 	if e.HooksEvaluated != nil {
 		e.HooksEvaluated = deepCopyRecordSlice(e.HooksEvaluated)

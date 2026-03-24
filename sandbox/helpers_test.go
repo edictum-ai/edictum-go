@@ -49,8 +49,14 @@ func TestExtractCommand(t *testing.T) {
 		{"redirect prefix", "Bash", map[string]any{"command": "> /tmp/out echo hi"}, "\x00"},
 		{"fd redirect prefix", "Bash", map[string]any{"command": "2>/tmp/err cmd"}, "\x00"},
 		{"semicolon chaining", "Bash", map[string]any{"command": "ls; rm -rf /"}, "\x00"},
+		{"background execution", "Bash", map[string]any{"command": "ls & rm -rf /"}, "\x00"},
 		{"logical and chaining", "Bash", map[string]any{"command": "ls && cat /etc/shadow"}, "\x00"},
 		{"command substitution", "Bash", map[string]any{"command": "ls $(rm -rf /)"}, "\x00"},
+		{"write process substitution", "Bash", map[string]any{"command": "ls >(cat /etc/shadow)"}, "\x00"},
+		{"herestring", "Bash", map[string]any{"command": "ls <<< $(cat /etc/shadow)"}, "\x00"},
+		{"ansi c quoting", "Bash", map[string]any{"command": "echo $'\\x3b' rm -rf /"}, "\x00"},
+		{"safe output redirect", "Bash", map[string]any{"command": "echo hi > /tmp/out"}, "echo"},
+		{"safe input redirect", "Bash", map[string]any{"command": "cat < /tmp/in"}, "cat"},
 		{"environment variable expansion allowed", "Bash", map[string]any{"command": "echo $HOME"}, "echo"},
 	}
 	for _, tt := range tests {

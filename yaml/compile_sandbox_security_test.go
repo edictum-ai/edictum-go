@@ -62,7 +62,6 @@ func TestSecurityYAMLSandboxCommandInjection(t *testing.T) {
 		"ls || rm -rf /",
 		"ls $(rm -rf /)",
 		"ls `rm -rf /`",
-		"ls > /etc/cron.d/evil",
 		"cat /etc/shadow",
 	}
 	for _, cmd := range injections {
@@ -74,6 +73,31 @@ func TestSecurityYAMLSandboxCommandInjection(t *testing.T) {
 		if v.Passed() {
 			t.Errorf("expected deny for command %q via YAML-compiled sandbox", cmd)
 		}
+	}
+}
+
+func TestSecurityYAMLSandboxRedirectDeniedByPathConstraint(t *testing.T) {
+	dir := t.TempDir()
+	raw := map[string]any{
+		"id":     "redirect-sandbox",
+		"tool":   "Bash",
+		"within": []any{dir},
+		"allows": map[string]any{
+			"commands": []any{"echo"},
+		},
+	}
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
+
+	env := makeSandboxEnv(t, "Bash", map[string]any{"command": "echo payload > /etc/cron.d/evil"})
+	v, err := pre.Check(context.Background(), env)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v.Passed() {
+		t.Fatal("expected deny for redirect target outside allowed paths")
 	}
 }
 

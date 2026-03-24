@@ -87,6 +87,27 @@ func TestSecurityRedirectSentinelDenied(t *testing.T) {
 	}
 }
 
+func TestSecurityRedirectDeniedByPathConstraint(t *testing.T) {
+	env := testEnv(t, "Bash", map[string]any{"command": "echo payload > /etc/passwd"})
+	cmd := ExtractCommand(env)
+	if cmd != "echo" {
+		t.Fatalf("ExtractCommand() = %q, want %q", cmd, "echo")
+	}
+
+	cfg := Config{
+		Within:          []string{"/workspace"},
+		AllowedCommands: []string{"echo"},
+		Message:         "Command not allowed",
+	}
+	v, err := Check(env, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v.Passed() {
+		t.Error("expected deny for redirect target outside allowed paths, got pass")
+	}
+}
+
 // --- Security: combined path + command check ---
 
 func TestSecurityCombinedPathAndCommand(t *testing.T) {
