@@ -412,6 +412,26 @@ contracts:
 	}
 }
 
+// Cat 3.6 — Sandbox: non-string entries in within are rejected
+func TestLoadBundleString_SandboxNonStringWithinRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: bad-within
+    type: sandbox
+    tool: read_file
+    within:
+      - 42
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for non-string within entry")
+	}
+	if !strings.Contains(err.Error(), "within[0] must be a string") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 // Cat 3.6 — Sandbox: valid with both within and not_within
 func TestLoadBundleString_SandboxValidWithBothWithin(t *testing.T) {
 	y := `apiVersion: edictum/v1
