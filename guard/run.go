@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	edictum "github.com/edictum-ai/edictum-go"
@@ -123,6 +124,7 @@ func (g *Guard) Run(
 	if pre.Action == "pending_approval" {
 		if mode == "observe" {
 			g.telemetry.RecordDenial(ctx, env2.ToolName())
+			span.SetAttributes(attribute.Bool("governance.observed_deny", true))
 			g.emitPreAudit(ctx, env2, sess, audit.ActionCallWouldDeny, pre, mode, policyVersion)
 			return g.executeAndPost(ctx, env2, sess, pipe, mode, policyVersion, toolCallable, args)
 		}
@@ -164,6 +166,7 @@ func (g *Guard) handlePreDecision(
 		}
 		// observe mode: record denial (contract fired) then fall through
 		g.telemetry.RecordDenial(ctx, env2.ToolName())
+		trace.SpanFromContext(ctx).SetAttributes(attribute.Bool("governance.observed_deny", true))
 	} else {
 		// Emit CALL_WOULD_DENY for per-contract observed denials
 		g.emitObservedDenials(ctx, env2, pre, policyVersion)

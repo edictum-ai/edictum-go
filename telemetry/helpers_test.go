@@ -93,7 +93,7 @@ type counterRecord struct {
 // testCounter records Add calls.
 type testCounter struct {
 	metricembedded.Int64Counter
-	mu      sync.Mutex
+	mu      *sync.Mutex // shared with testMeter
 	name    string
 	records *[]counterRecord
 }
@@ -119,7 +119,7 @@ type testMeter struct {
 }
 
 func (m *testMeter) Int64Counter(name string, _ ...metric.Int64CounterOption) (metric.Int64Counter, error) {
-	return &testCounter{name: name, records: &m.records}, nil
+	return &testCounter{mu: &m.mu, name: name, records: &m.records}, nil
 }
 
 func (m *testMeter) getRecords() []counterRecord {

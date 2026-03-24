@@ -75,7 +75,7 @@ type cRec struct {
 
 type tCounter struct {
 	metricembedded.Int64Counter
-	mu   sync.Mutex
+	mu   *sync.Mutex // shared with tMeter
 	name string
 	recs *[]cRec
 }
@@ -96,7 +96,7 @@ type tMeter struct {
 }
 
 func (m *tMeter) Int64Counter(name string, _ ...metric.Int64CounterOption) (metric.Int64Counter, error) {
-	return &tCounter{name: name, recs: &m.recs}, nil
+	return &tCounter{mu: &m.mu, name: name, recs: &m.recs}, nil
 }
 
 type tMP struct {

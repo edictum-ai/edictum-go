@@ -92,6 +92,7 @@ func (g *Guard) handleApproval(
 	}
 
 	if approved {
+		g.telemetry.RecordAllowed(ctx, env2.ToolName())
 		g.fireOnAllow(env2)
 		return g.executeAndPost(ctx, env2, sess, pipe, mode, policyVersion, toolCallable, args)
 	}
