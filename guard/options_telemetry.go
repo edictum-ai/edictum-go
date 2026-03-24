@@ -13,6 +13,9 @@ import (
 // Safe to combine with WithMeterProvider — both are applied together.
 // Overrides any prior WithTelemetry (last writer wins).
 func WithTracerProvider(tp trace.TracerProvider) Option {
+	if tp == nil {
+		panic("WithTracerProvider: nil TracerProvider")
+	}
 	return func(g *Guard) {
 		g.telemetry = nil // clear WithTelemetry if set
 		g.telOpts = append(g.telOpts, telemetry.WithTracerProvider(tp))
@@ -25,6 +28,9 @@ func WithTracerProvider(tp trace.TracerProvider) Option {
 // Safe to combine with WithTracerProvider — both are applied together.
 // Overrides any prior WithTelemetry (last writer wins).
 func WithMeterProvider(mp metric.MeterProvider) Option {
+	if mp == nil {
+		panic("WithMeterProvider: nil MeterProvider")
+	}
 	return func(g *Guard) {
 		g.telemetry = nil // clear WithTelemetry if set
 		g.telOpts = append(g.telOpts, telemetry.WithMeterProvider(mp))

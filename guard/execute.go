@@ -64,6 +64,9 @@ func (g *Guard) executeAndPost(
 	g.emitPostAudit(ctx, env2, sess, postAction, post, mode, policyVersion)
 
 	if !toolSuccess {
+		// Tool execution failed — Error status reflects the tool outcome.
+		// This intentionally overwrites any prior governance status
+		// (e.g., approval timeout) because the tool itself failed.
 		telemetry.SetSpanError(trace.SpanFromContext(ctx), "tool failed")
 		return nil, &edictum.ToolError{Message: fmt.Sprintf("%v", result)}
 	}
