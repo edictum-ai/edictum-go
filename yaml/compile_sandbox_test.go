@@ -33,7 +33,10 @@ func TestCompileSandbox_WithinAllows(t *testing.T) {
 			dir,
 		},
 	}
-	pre := compileSandbox(raw, "enforce")
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
 
 	if pre.Name != "safe-paths" {
 		t.Errorf("Name: got %q, want %q", pre.Name, "safe-paths")
@@ -64,7 +67,10 @@ func TestCompileSandbox_WithinDenies(t *testing.T) {
 		"within":  []any{dir},
 		"message": "restricted path",
 	}
-	pre := compileSandbox(raw, "enforce")
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
 
 	env := makeSandboxEnv(t, "read_file", map[string]any{"path": "/etc/passwd"})
 	v, err := pre.Check(context.Background(), env)
@@ -93,7 +99,10 @@ func TestCompileSandbox_NotWithinDenies(t *testing.T) {
 		"within":     []any{dir},
 		"not_within": []any{excluded},
 	}
-	pre := compileSandbox(raw, "enforce")
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
 
 	resolved, _ := filepath.EvalSymlinks(excluded)
 	env := makeSandboxEnv(t, "read_file", map[string]any{"path": resolved + "/id_rsa"})
@@ -115,7 +124,10 @@ func TestCompileSandbox_AllowedCommands(t *testing.T) {
 			"commands": []any{"ls", "cat", "grep"},
 		},
 	}
-	pre := compileSandbox(raw, "enforce")
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
 
 	// Allowed command
 	env := makeSandboxEnv(t, "Bash", map[string]any{"command": "ls -la /tmp"})
@@ -140,13 +152,17 @@ func TestCompileSandbox_AllowedCommands(t *testing.T) {
 
 // TestCompileSandbox_ObserveMode verifies _observe flag sets mode correctly.
 func TestCompileSandbox_ObserveMode(t *testing.T) {
+	dir := t.TempDir()
 	raw := map[string]any{
 		"id":       "obs-sandbox",
 		"tool":     "Bash",
 		"_observe": true,
-		"within":   []any{"/home/"},
+		"within":   []any{dir},
 	}
-	pre := compileSandbox(raw, "enforce")
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
 	if pre.Mode != "observe" {
 		t.Errorf("Mode: got %q, want %q", pre.Mode, "observe")
 	}
@@ -154,13 +170,31 @@ func TestCompileSandbox_ObserveMode(t *testing.T) {
 
 // TestCompileSandbox_DefaultTool verifies wildcard tool when not specified.
 func TestCompileSandbox_DefaultTool(t *testing.T) {
+	dir := t.TempDir()
 	raw := map[string]any{
 		"id":     "no-tool",
-		"within": []any{"/safe/"},
+		"within": []any{dir},
 	}
-	pre := compileSandbox(raw, "enforce")
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
 	if pre.Tool != "*" {
 		t.Errorf("Tool: got %q, want %q", pre.Tool, "*")
+	}
+}
+
+// TestCompileSandbox_NonExistentPathErrors verifies that non-existent
+// boundary paths produce an error instead of silently degrading.
+func TestCompileSandbox_NonExistentPathErrors(t *testing.T) {
+	raw := map[string]any{
+		"id":     "bad-paths",
+		"tool":   "read_file",
+		"within": []any{"/nonexistent/path/that/does/not/exist"},
+	}
+	_, err := compileSandbox(raw, "enforce")
+	if err == nil {
+		t.Fatal("expected error for non-existent boundary path, got nil")
 	}
 }
 
@@ -183,7 +217,10 @@ func TestParseSandboxConfig(t *testing.T) {
 			"domains": []any{"evil.com"},
 		},
 	}
-	cfg := parseSandboxConfig(raw)
+	cfg, err := parseSandboxConfig(raw)
+	if err != nil {
+		t.Fatalf("parseSandboxConfig: %v", err)
+	}
 
 	if len(cfg.Within) != 2 {
 		t.Errorf("Within length: got %d, want 2", len(cfg.Within))
@@ -234,7 +271,10 @@ func TestSecurityYAMLSandboxPathTraversal(t *testing.T) {
 		"tool":   "read_file",
 		"within": []any{dir},
 	}
-	pre := compileSandbox(raw, "enforce")
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
 
 	traversals := []string{
 		resolved + "/../etc/shadow",
@@ -263,7 +303,10 @@ func TestSecurityYAMLSandboxCommandInjection(t *testing.T) {
 			"commands": []any{"ls"},
 		},
 	}
-	pre := compileSandbox(raw, "enforce")
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
 
 	injections := []string{
 		"rm -rf /",
@@ -287,11 +330,12 @@ func TestSecurityYAMLSandboxCommandInjection(t *testing.T) {
 	}
 }
 
-// TestSecurityYAMLSandboxCommandChaining documents the known bypass:
-// space-separated chaining operators (||, &&, |) pass through the
-// command allowlist because only the first token is checked.
-// If this test starts failing, that is a security improvement.
-func TestSecurityYAMLSandboxCommandChaining(t *testing.T) {
+// TestKnownLimitation_CommandChaining documents the known first-token-only
+// bypass. This is NOT a security test — it records current behavior.
+// Space-separated chaining operators (||, &&, |) pass through the command
+// allowlist because only the first token is checked. If this test starts
+// failing, that is a security improvement.
+func TestKnownLimitation_CommandChaining(t *testing.T) {
 	raw := map[string]any{
 		"id":   "cmd-sandbox",
 		"tool": "Bash",
@@ -299,7 +343,10 @@ func TestSecurityYAMLSandboxCommandChaining(t *testing.T) {
 			"commands": []any{"ls"},
 		},
 	}
-	pre := compileSandbox(raw, "enforce")
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
 
 	// These bypass the sandbox because first token "ls" is in the allowlist.
 	// Fixing this requires OS-level enforcement or multi-token command analysis.
@@ -334,7 +381,10 @@ func TestSecurityYAMLSandboxDomainBypass(t *testing.T) {
 			"domains": []any{"evil.example.com"},
 		},
 	}
-	pre := compileSandbox(raw, "enforce")
+	pre, err := compileSandbox(raw, "enforce")
+	if err != nil {
+		t.Fatalf("compileSandbox: %v", err)
+	}
 
 	bypasses := []struct {
 		url  string

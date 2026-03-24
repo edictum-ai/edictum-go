@@ -2,6 +2,7 @@ package yaml
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 
 	"github.com/edictum-ai/edictum-go/contract"
@@ -15,7 +16,7 @@ import (
 // Sandbox contracts use within/not_within/allows/not_allows — not when/then —
 // so they cannot go through compilePre. The YAML fields are parsed into a
 // sandbox.Config and the Check function calls sandbox.Check directly.
-func compileSandbox(raw map[string]any, mode string) contract.Precondition {
+func compileSandbox(raw map[string]any, mode string) (contract.Precondition, error) {
 	cid, _ := raw["id"].(string)
 	tool := "*"
 	if t, ok := raw["tool"].(string); ok {
@@ -23,7 +24,10 @@ func compileSandbox(raw map[string]any, mode string) contract.Precondition {
 	}
 	isObserve, _ := raw["_observe"].(bool)
 
-	cfg := parseSandboxConfig(raw)
+	cfg, err := parseSandboxConfig(raw)
+	if err != nil {
+		return contract.Precondition{}, fmt.Errorf("contract %q: %w", cid, err)
+	}
 
 	pre := contract.Precondition{
 		Name:   cid,
@@ -37,16 +41,25 @@ func compileSandbox(raw map[string]any, mode string) contract.Precondition {
 	if isObserve {
 		pre.Mode = "observe"
 	}
-	return pre
+	return pre, nil
 }
 
 // parseSandboxConfig extracts sandbox boundaries from a raw YAML contract map.
 // Path prefixes (within/not_within) are resolved via filepath.EvalSymlinks to
 // match the resolution performed by sandbox.ExtractPaths on incoming tool calls.
-func parseSandboxConfig(raw map[string]any) sandbox.Config {
+func parseSandboxConfig(raw map[string]any) (sandbox.Config, error) {
+	within, err := resolvePaths(toStringSlice(raw["within"]))
+	if err != nil {
+		return sandbox.Config{}, fmt.Errorf("within: %w", err)
+	}
+	notWithin, err := resolvePaths(toStringSlice(raw["not_within"]))
+	if err != nil {
+		return sandbox.Config{}, fmt.Errorf("not_within: %w", err)
+	}
+
 	cfg := sandbox.Config{
-		Within:    resolvePaths(toStringSlice(raw["within"])),
-		NotWithin: resolvePaths(toStringSlice(raw["not_within"])),
+		Within:    within,
+		NotWithin: notWithin,
 	}
 	if msg, ok := raw["message"].(string); ok {
 		cfg.Message = msg
@@ -58,26 +71,25 @@ func parseSandboxConfig(raw map[string]any) sandbox.Config {
 	if notAllows, ok := raw["not_allows"].(map[string]any); ok {
 		cfg.BlockedDomains = toStringSlice(notAllows["domains"])
 	}
-	return cfg
+	return cfg, nil
 }
 
-// resolvePaths resolves each path via filepath.EvalSymlinks. If resolution
-// fails (e.g. the path doesn't exist yet), filepath.Clean is used instead.
-// This ensures sandbox boundary paths match the resolved paths from
-// sandbox.ExtractPaths on incoming tool calls.
-func resolvePaths(paths []string) []string {
+// resolvePaths resolves each path via filepath.EvalSymlinks. Returns an
+// error if any path cannot be resolved — a typo or non-existent boundary
+// path would silently produce a broken sandbox contract otherwise.
+func resolvePaths(paths []string) ([]string, error) {
 	if len(paths) == 0 {
-		return paths
+		return paths, nil
 	}
 	out := make([]string, len(paths))
 	for i, p := range paths {
-		if resolved, err := filepath.EvalSymlinks(p); err == nil {
-			out[i] = resolved
-		} else {
-			out[i] = filepath.Clean(p)
+		resolved, err := filepath.EvalSymlinks(p)
+		if err != nil {
+			return nil, fmt.Errorf("cannot resolve boundary path %q: %w", p, err)
 		}
+		out[i] = resolved
 	}
-	return out
+	return out, nil
 }
 
 // toStringSlice converts an []any of strings to []string. Returns nil if

@@ -80,8 +80,10 @@ func Compile(bundle map[string]any, opts ...CompileOption) (CompiledBundle, erro
 		case "sandbox":
 			// Sandbox contracts use within/not_within/allows/not_allows — not
 			// when/then — so they go through compileSandbox, not compilePre.
-			// Actual sandbox evaluation is wired by the guard at runtime.
-			sb := compileSandbox(raw, mode)
+			sb, err := compileSandbox(raw, mode)
+			if err != nil {
+				return CompiledBundle{}, err
+			}
 			result.SandboxContracts = append(result.SandboxContracts, sb)
 		case "session":
 			isObserve, _ := raw["_observe"].(bool)
