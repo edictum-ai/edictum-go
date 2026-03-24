@@ -119,6 +119,26 @@ func (s *failingSink) Emit(_ context.Context, _ *Event) error {
 	return s.err
 }
 
+type mutatingSink struct {
+	mutate func(*Event)
+}
+
+func (s *mutatingSink) Emit(_ context.Context, event *Event) error {
+	if s.mutate != nil {
+		s.mutate(event)
+	}
+	return nil
+}
+
+type captureSink struct {
+	last Event
+}
+
+func (s *captureSink) Emit(_ context.Context, event *Event) error {
+	s.last = deepCopyEvent(*event)
+	return nil
+}
+
 func TestCompositeSink_FanOut(t *testing.T) {
 	s1 := &countingSink{}
 	s2 := &countingSink{}
@@ -194,6 +214,34 @@ func TestCompositeSink_PanicsOnEmpty(t *testing.T) {
 		}
 	}()
 	NewCompositeSink()
+}
+
+func TestCompositeSink_DeepCopiesEvaluatedRecords(t *testing.T) {
+	first := &mutatingSink{
+		mutate: func(event *Event) {
+			event.HooksEvaluated[0]["status"] = "mutated"
+			event.ContractsEvaluated[0]["details"].(map[string]any)["value"] = "changed"
+		},
+	}
+	second := &captureSink{}
+	comp := NewCompositeSink(first, second)
+
+	event := NewEvent()
+	event.HooksEvaluated = []map[string]any{{"status": "original"}}
+	event.ContractsEvaluated = []map[string]any{{
+		"details": map[string]any{"value": "kept"},
+	}}
+
+	if err := comp.Emit(context.Background(), &event); err != nil {
+		t.Fatalf("Emit error: %v", err)
+	}
+	if got := second.last.HooksEvaluated[0]["status"]; got != "original" {
+		t.Fatalf("HooksEvaluated leaked mutation: got %v, want original", got)
+	}
+	details := second.last.ContractsEvaluated[0]["details"].(map[string]any)
+	if got := details["value"]; got != "kept" {
+		t.Fatalf("ContractsEvaluated leaked mutation: got %v, want kept", got)
+	}
 }
 
 // --- CollectingSink ---

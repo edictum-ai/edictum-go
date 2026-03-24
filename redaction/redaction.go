@@ -159,9 +159,14 @@ func (p *Policy) redactValue(v any) any {
 			return redacted
 		}
 		if p.detectSecrets {
-			for _, bp := range p.bashPatterns {
-				val = bp.re.ReplaceAllString(val, bp.replacement)
+			capped := val
+			if len(capped) > maxRegexInput {
+				capped = capped[:maxRegexInput]
 			}
+			for _, bp := range p.bashPatterns {
+				capped = bp.re.ReplaceAllString(capped, bp.replacement)
+			}
+			val = capped
 		}
 		if len(val) > maxStringLength {
 			return val[:maxStringLength-3] + "..."

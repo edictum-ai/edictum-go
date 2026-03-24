@@ -353,6 +353,19 @@ func TestPolicy_RedactArgs_StringArgURLCredentials(t *testing.T) {
 	}
 }
 
+func TestPolicy_RedactArgs_StringArgPatternsCapRegexInput(t *testing.T) {
+	p := NewPolicy()
+	longValue := strings.Repeat("A", maxRegexInput+1000)
+	got := p.RedactArgs(map[string]any{"command": longValue})
+	command, ok := got["command"].(string)
+	if !ok {
+		t.Fatalf("command type = %T, want string", got["command"])
+	}
+	if len(command) > maxStringLength {
+		t.Fatalf("command length = %d, want <= %d", len(command), maxStringLength)
+	}
+}
+
 func TestPolicy_RedactArgs_ExactlyMaxLength(t *testing.T) {
 	p := NewPolicy()
 	exact := strings.Repeat("x", 1000)

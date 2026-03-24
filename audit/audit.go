@@ -127,6 +127,12 @@ func (c *CompositeSink) Emit(ctx context.Context, event *Event) error {
 		if event.ToolArgs != nil {
 			cp.ToolArgs = deepCopyMap(event.ToolArgs)
 		}
+		if event.HooksEvaluated != nil {
+			cp.HooksEvaluated = deepCopyRecordSlice(event.HooksEvaluated)
+		}
+		if event.ContractsEvaluated != nil {
+			cp.ContractsEvaluated = deepCopyRecordSlice(event.ContractsEvaluated)
+		}
 		if err := s.Emit(ctx, &cp); err != nil {
 			errs = append(errs, err)
 		}
