@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/otel/trace"
+
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/audit"
 	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
 // executeAndPost executes the tool callable and runs post-execution
@@ -61,8 +64,10 @@ func (g *Guard) executeAndPost(
 	g.emitPostAudit(ctx, env2, sess, postAction, post, mode, policyVersion)
 
 	if !toolSuccess {
+		telemetry.SetSpanError(trace.SpanFromContext(ctx), fmt.Sprintf("%v", result))
 		return nil, &edictum.ToolError{Message: fmt.Sprintf("%v", result)}
 	}
+	telemetry.SetSpanOK(trace.SpanFromContext(ctx))
 	if post.RedactedResponse != nil {
 		return post.RedactedResponse, nil
 	}

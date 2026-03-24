@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
 	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
 // handleApproval handles the pending_approval flow.
@@ -89,6 +92,7 @@ func (g *Guard) handleApproval(
 		return g.executeAndPost(ctx, env2, sess, pipe, mode, policyVersion, toolCallable, args)
 	}
 
+	telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval denied or timed out")
 	reason := decision.Reason
 	if reason == "" {
 		reason = pre.Reason

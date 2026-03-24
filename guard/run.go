@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/otel/trace"
+
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/audit"
 	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
 // RunOption configures a single Run() call.
@@ -84,6 +87,18 @@ func (g *Guard) Run(
 		return nil, fmt.Errorf("envelope create: %w", err)
 	}
 
+	// Start governance span
+	ctx, span := g.telemetry.Tracer().Start(ctx, "edictum.governance "+toolName,
+		trace.WithAttributes(telemetry.ToolSpanAttrs(
+			env2.ToolName(),
+			string(env2.SideEffect()),
+			env2.Environment(),
+			env2.RunID(),
+			env2.CallIndex(),
+		)...),
+	)
+	defer span.End()
+
 	// Increment attempts BEFORE pre-execute checks limits.MaxAttempts.
 	// This is intentional parity with Python (_runner.py:79) where
 	// increment_attempts() is called before pre_execute(). With
@@ -135,6 +150,8 @@ func (g *Guard) handlePreDecision(
 		g.emitPreAudit(ctx, env2, sess, action, pre, mode, policyVersion)
 
 		if mode == "enforce" {
+			telemetry.SetSpanError(trace.SpanFromContext(ctx), pre.Reason)
+			g.telemetry.RecordDenial(ctx, env2.ToolName())
 			g.fireOnDeny(env2, pre.Reason, pre.DecisionName)
 			return nil, &edictum.DeniedError{
 				Reason:         pre.Reason,
@@ -147,6 +164,7 @@ func (g *Guard) handlePreDecision(
 		// Emit CALL_WOULD_DENY for per-contract observed denials
 		g.emitObservedDenials(ctx, env2, pre, policyVersion)
 		g.emitPreAudit(ctx, env2, sess, audit.ActionCallAllowed, pre, mode, policyVersion)
+		g.telemetry.RecordAllowed(ctx, env2.ToolName())
 		g.fireOnAllow(env2)
 	}
 
