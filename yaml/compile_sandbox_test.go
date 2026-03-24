@@ -2,6 +2,8 @@ package yaml
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/edictum-ai/edictum-go/envelope"
@@ -22,12 +24,13 @@ func makeSandboxEnv(t *testing.T, tool string, args map[string]any) envelope.Too
 // TestCompileSandbox_WithinAllows verifies that a sandbox contract with
 // "within" paths produces a Check that allows paths inside the boundary.
 func TestCompileSandbox_WithinAllows(t *testing.T) {
+	// Use a temp dir so the path exists and resolves consistently.
+	dir := t.TempDir()
 	raw := map[string]any{
 		"id":   "safe-paths",
 		"tool": "read_file",
 		"within": []any{
-			"/home/",
-			"/tmp/",
+			dir,
 		},
 	}
 	pre := compileSandbox(raw, "enforce")
@@ -39,27 +42,27 @@ func TestCompileSandbox_WithinAllows(t *testing.T) {
 		t.Errorf("Source: got %q, want %q", pre.Source, "yaml_sandbox")
 	}
 
-	env := makeSandboxEnv(t, "read_file", map[string]any{"path": "/home/user/notes.txt"})
+	// Resolve the dir the same way ExtractPaths would.
+	resolved, _ := filepath.EvalSymlinks(dir)
+	env := makeSandboxEnv(t, "read_file", map[string]any{"path": resolved + "/notes.txt"})
 	v, err := pre.Check(context.Background(), env)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !v.Passed() {
-		t.Errorf("expected pass for path within /home/, got fail: %s", v.Message())
+		t.Errorf("expected pass for path within %s, got fail: %s", dir, v.Message())
 	}
 }
 
 // TestCompileSandbox_WithinDenies verifies that a path outside the boundary
 // is denied.
 func TestCompileSandbox_WithinDenies(t *testing.T) {
+	dir := t.TempDir()
 	raw := map[string]any{
-		"id":   "safe-paths",
-		"tool": "read_file",
-		"within": []any{
-			"/home/",
-			"/tmp/",
-		},
-		"message": "restricted to /home/ and /tmp/",
+		"id":      "safe-paths",
+		"tool":    "read_file",
+		"within":  []any{dir},
+		"message": "restricted path",
 	}
 	pre := compileSandbox(raw, "enforce")
 
@@ -71,7 +74,7 @@ func TestCompileSandbox_WithinDenies(t *testing.T) {
 	if v.Passed() {
 		t.Error("expected fail for path outside boundary, got pass")
 	}
-	if v.Message() != "restricted to /home/ and /tmp/" {
+	if v.Message() != "restricted path" {
 		t.Errorf("message: got %q, want custom message", v.Message())
 	}
 }
@@ -79,19 +82,21 @@ func TestCompileSandbox_WithinDenies(t *testing.T) {
 // TestCompileSandbox_NotWithinDenies verifies that not_within exclusions
 // deny paths even within allowed prefixes.
 func TestCompileSandbox_NotWithinDenies(t *testing.T) {
+	dir := t.TempDir()
+	excluded := filepath.Join(dir, "secret")
+	if err := os.MkdirAll(excluded, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	raw := map[string]any{
-		"id":   "safe-paths",
-		"tool": "read_file",
-		"within": []any{
-			"/home/user",
-		},
-		"not_within": []any{
-			"/home/user/.ssh",
-		},
+		"id":         "safe-paths",
+		"tool":       "read_file",
+		"within":     []any{dir},
+		"not_within": []any{excluded},
 	}
 	pre := compileSandbox(raw, "enforce")
 
-	env := makeSandboxEnv(t, "read_file", map[string]any{"path": "/home/user/.ssh/id_rsa"})
+	resolved, _ := filepath.EvalSymlinks(excluded)
+	env := makeSandboxEnv(t, "read_file", map[string]any{"path": resolved + "/id_rsa"})
 	v, err := pre.Check(context.Background(), env)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -161,9 +166,14 @@ func TestCompileSandbox_DefaultTool(t *testing.T) {
 
 // TestParseSandboxConfig verifies full config extraction.
 func TestParseSandboxConfig(t *testing.T) {
+	dir := t.TempDir()
+	subdir := filepath.Join(dir, "sub")
+	if err := os.MkdirAll(subdir, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	raw := map[string]any{
-		"within":     []any{"/home/", "/tmp/"},
-		"not_within": []any{"/home/.ssh"},
+		"within":     []any{dir, subdir},
+		"not_within": []any{subdir},
 		"message":    "sandbox violation",
 		"allows": map[string]any{
 			"commands": []any{"ls", "cat"},
@@ -175,11 +185,11 @@ func TestParseSandboxConfig(t *testing.T) {
 	}
 	cfg := parseSandboxConfig(raw)
 
-	if len(cfg.Within) != 2 || cfg.Within[0] != "/home/" || cfg.Within[1] != "/tmp/" {
-		t.Errorf("Within: got %v", cfg.Within)
+	if len(cfg.Within) != 2 {
+		t.Errorf("Within length: got %d, want 2", len(cfg.Within))
 	}
-	if len(cfg.NotWithin) != 1 || cfg.NotWithin[0] != "/home/.ssh" {
-		t.Errorf("NotWithin: got %v", cfg.NotWithin)
+	if len(cfg.NotWithin) != 1 {
+		t.Errorf("NotWithin length: got %d, want 1", len(cfg.NotWithin))
 	}
 	if cfg.Message != "sandbox violation" {
 		t.Errorf("Message: got %q", cfg.Message)
@@ -209,5 +219,103 @@ func TestToStringSlice(t *testing.T) {
 	got := toStringSlice([]any{"a", "b"})
 	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
 		t.Errorf("valid input: got %v, want [a b]", got)
+	}
+}
+
+// --- Security bypass tests (TestSecurity prefix for CI filtering) ---
+
+// TestSecurityYAMLSandboxPathTraversal verifies that path traversal
+// attempts through YAML-compiled sandbox contracts are denied.
+func TestSecurityYAMLSandboxPathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	resolved, _ := filepath.EvalSymlinks(dir)
+	raw := map[string]any{
+		"id":     "safe-paths",
+		"tool":   "read_file",
+		"within": []any{dir},
+	}
+	pre := compileSandbox(raw, "enforce")
+
+	traversals := []string{
+		resolved + "/../etc/shadow",
+		resolved + "/./../../etc/passwd",
+		resolved + "/../../../root/.bashrc",
+	}
+	for _, p := range traversals {
+		env := makeSandboxEnv(t, "read_file", map[string]any{"path": p})
+		v, err := pre.Check(context.Background(), env)
+		if err != nil {
+			t.Fatalf("unexpected error for %q: %v", p, err)
+		}
+		if v.Passed() {
+			t.Errorf("expected deny for traversal %q via YAML-compiled sandbox", p)
+		}
+	}
+}
+
+// TestSecurityYAMLSandboxCommandInjection verifies that command injection
+// patterns through YAML-compiled sandbox contracts are denied.
+func TestSecurityYAMLSandboxCommandInjection(t *testing.T) {
+	raw := map[string]any{
+		"id":   "cmd-sandbox",
+		"tool": "Bash",
+		"allows": map[string]any{
+			"commands": []any{"ls"},
+		},
+	}
+	pre := compileSandbox(raw, "enforce")
+
+	injections := []string{
+		"rm -rf /",
+		"ls; rm -rf /",
+		"cat /etc/shadow",
+	}
+	for _, cmd := range injections {
+		env := makeSandboxEnv(t, "Bash", map[string]any{"command": cmd})
+		v, err := pre.Check(context.Background(), env)
+		if err != nil {
+			t.Fatalf("unexpected error for %q: %v", cmd, err)
+		}
+		if v.Passed() {
+			t.Errorf("expected deny for command %q via YAML-compiled sandbox", cmd)
+		}
+	}
+}
+
+// TestSecurityYAMLSandboxDomainBypass verifies that domain bypass
+// attempts through YAML-compiled sandbox contracts are denied.
+func TestSecurityYAMLSandboxDomainBypass(t *testing.T) {
+	raw := map[string]any{
+		"id":   "domain-sandbox",
+		"tool": "fetch",
+		"allows": map[string]any{
+			"domains": []any{"*.example.com"},
+		},
+		"not_allows": map[string]any{
+			"domains": []any{"evil.example.com"},
+		},
+	}
+	pre := compileSandbox(raw, "enforce")
+
+	bypasses := []struct {
+		url  string
+		deny bool
+	}{
+		{"https://evil.example.com/data", true},
+		{"https://attacker.com/payload", true},
+		{"https://safe.example.com/api", false},
+	}
+	for _, tc := range bypasses {
+		env := makeSandboxEnv(t, "fetch", map[string]any{"url": tc.url})
+		v, err := pre.Check(context.Background(), env)
+		if err != nil {
+			t.Fatalf("unexpected error for %q: %v", tc.url, err)
+		}
+		if tc.deny && v.Passed() {
+			t.Errorf("expected deny for %q via YAML-compiled sandbox", tc.url)
+		}
+		if !tc.deny && !v.Passed() {
+			t.Errorf("expected pass for %q via YAML-compiled sandbox, got: %s", tc.url, v.Message())
+		}
 	}
 }

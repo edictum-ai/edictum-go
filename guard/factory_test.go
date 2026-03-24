@@ -3,6 +3,7 @@ package guard
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -453,17 +454,21 @@ contracts:
 
 // --- YAML sandbox integration tests (issue #35) ---
 
-const sandboxWithinBundle = `apiVersion: edictum/v1
+func sandboxWithinYAML(dir string) string {
+	return fmt.Sprintf(`apiVersion: edictum/v1
 kind: ContractBundle
 contracts:
   - id: safe-file-paths
     type: sandbox
     tool: read_file
-    within: ["/home/", "/tmp/", "/var/log/"]
-    message: "read_file is restricted to /home/, /tmp/, and /var/log/"`
+    within: ["%s"]
+    message: "read_file restricted"`, dir)
+}
 
 func TestFromYAMLString_SandboxWithinAllows(t *testing.T) {
-	g, err := FromYAMLString(sandboxWithinBundle)
+	dir := t.TempDir()
+	resolved, _ := filepath.EvalSymlinks(dir)
+	g, err := FromYAMLString(sandboxWithinYAML(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -472,7 +477,7 @@ func TestFromYAMLString_SandboxWithinAllows(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	result, err := g.Run(ctx, "read_file", map[string]any{"path": "/home/user/notes.txt"}, func(_ map[string]any) (any, error) {
+	result, err := g.Run(ctx, "read_file", map[string]any{"path": resolved + "/notes.txt"}, func(_ map[string]any) (any, error) {
 		return "file contents", nil
 	})
 	if err != nil {
@@ -484,7 +489,8 @@ func TestFromYAMLString_SandboxWithinAllows(t *testing.T) {
 }
 
 func TestFromYAMLString_SandboxWithinDenies(t *testing.T) {
-	g, err := FromYAMLString(sandboxWithinBundle)
+	dir := t.TempDir()
+	g, err := FromYAMLString(sandboxWithinYAML(dir))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -500,25 +506,33 @@ func TestFromYAMLString_SandboxWithinDenies(t *testing.T) {
 	}
 }
 
-const sandboxNotWithinBundle = `apiVersion: edictum/v1
+func TestFromYAMLString_SandboxNotWithinDenies(t *testing.T) {
+	dir := t.TempDir()
+	excluded := filepath.Join(dir, "secret")
+	if err := os.MkdirAll(excluded, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	resolvedDir, _ := filepath.EvalSymlinks(dir)
+	resolvedExcluded, _ := filepath.EvalSymlinks(excluded)
+
+	yamlStr := fmt.Sprintf(`apiVersion: edictum/v1
 kind: ContractBundle
 contracts:
-  - id: safe-but-no-ssh
+  - id: safe-but-no-secret
     type: sandbox
     tool: read_file
-    within: ["/home/user"]
-    not_within: ["/home/user/.ssh"]
-    message: "SSH keys are off limits"`
+    within: ["%s"]
+    not_within: ["%s"]
+    message: "secret dir is off limits"`, dir, excluded)
 
-func TestFromYAMLString_SandboxNotWithinDenies(t *testing.T) {
-	g, err := FromYAMLString(sandboxNotWithinBundle)
+	g, err := FromYAMLString(yamlStr)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	ctx := context.Background()
-	// Path within /home/user but excluded by not_within
-	_, err = g.Run(ctx, "read_file", map[string]any{"path": "/home/user/.ssh/id_rsa"}, func(_ map[string]any) (any, error) {
+	// Path within dir but excluded by not_within
+	_, err = g.Run(ctx, "read_file", map[string]any{"path": resolvedExcluded + "/id_rsa"}, func(_ map[string]any) (any, error) {
 		t.Fatal("callable should not be invoked on deny")
 		return nil, nil
 	})
@@ -527,8 +541,8 @@ func TestFromYAMLString_SandboxNotWithinDenies(t *testing.T) {
 		t.Fatalf("expected DeniedError for path in not_within, got %T: %v", err, err)
 	}
 
-	// Path within /home/user and not excluded
-	result, err := g.Run(ctx, "read_file", map[string]any{"path": "/home/user/docs/readme.txt"}, func(_ map[string]any) (any, error) {
+	// Path within dir and not excluded
+	result, err := g.Run(ctx, "read_file", map[string]any{"path": resolvedDir + "/readme.txt"}, func(_ map[string]any) (any, error) {
 		return "ok", nil
 	})
 	if err != nil {
@@ -580,6 +594,8 @@ func TestFromYAMLString_SandboxCommandAllowDeny(t *testing.T) {
 }
 
 func TestReloadFromYAML_SandboxContractsWired(t *testing.T) {
+	dir := t.TempDir()
+
 	// Start with no sandbox contracts.
 	g, err := FromYAMLString(validBundle)
 	if err != nil {
@@ -590,7 +606,7 @@ func TestReloadFromYAML_SandboxContractsWired(t *testing.T) {
 	}
 
 	// Reload with sandbox contracts — they must be wired with real Check logic.
-	if err := g.ReloadFromYAML([]byte(sandboxWithinBundle)); err != nil {
+	if err := g.ReloadFromYAML([]byte(sandboxWithinYAML(dir))); err != nil {
 		t.Fatalf("reload: %v", err)
 	}
 	if len(g.state.sandboxContracts) != 1 {

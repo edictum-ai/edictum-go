@@ -2,6 +2,7 @@ package yaml
 
 import (
 	"context"
+	"path/filepath"
 
 	"github.com/edictum-ai/edictum-go/contract"
 	"github.com/edictum-ai/edictum-go/envelope"
@@ -40,10 +41,12 @@ func compileSandbox(raw map[string]any, mode string) contract.Precondition {
 }
 
 // parseSandboxConfig extracts sandbox boundaries from a raw YAML contract map.
+// Path prefixes (within/not_within) are resolved via filepath.EvalSymlinks to
+// match the resolution performed by sandbox.ExtractPaths on incoming tool calls.
 func parseSandboxConfig(raw map[string]any) sandbox.Config {
 	cfg := sandbox.Config{
-		Within:    toStringSlice(raw["within"]),
-		NotWithin: toStringSlice(raw["not_within"]),
+		Within:    resolvePaths(toStringSlice(raw["within"])),
+		NotWithin: resolvePaths(toStringSlice(raw["not_within"])),
 	}
 	if msg, ok := raw["message"].(string); ok {
 		cfg.Message = msg
@@ -56,6 +59,25 @@ func parseSandboxConfig(raw map[string]any) sandbox.Config {
 		cfg.BlockedDomains = toStringSlice(notAllows["domains"])
 	}
 	return cfg
+}
+
+// resolvePaths resolves each path via filepath.EvalSymlinks. If resolution
+// fails (e.g. the path doesn't exist yet), filepath.Clean is used instead.
+// This ensures sandbox boundary paths match the resolved paths from
+// sandbox.ExtractPaths on incoming tool calls.
+func resolvePaths(paths []string) []string {
+	if len(paths) == 0 {
+		return paths
+	}
+	out := make([]string, len(paths))
+	for i, p := range paths {
+		if resolved, err := filepath.EvalSymlinks(p); err == nil {
+			out[i] = resolved
+		} else {
+			out[i] = filepath.Clean(p)
+		}
+	}
+	return out
 }
 
 // toStringSlice converts an []any of strings to []string. Returns nil if
