@@ -293,6 +293,81 @@ func TestBundleVerificationError(t *testing.T) {
 	}
 }
 
+// --- SSE timeout regression ---
+
+// TestSSENotKilledByClientTimeout verifies that the SSE watcher uses a
+// dedicated HTTP client without the request-level timeout. The main Client
+// has a short timeout (e.g., 30s by default). Without the fix, the SSE
+// connection would be killed after that timeout because http.Client.Timeout
+// applies to the entire request lifetime including body reads.
+//
+// Regression test for edictum-ai/edictum#133.
+func TestSSENotKilledByClientTimeout(t *testing.T) {
+	const clientTimeout = 500 * time.Millisecond // very short — would kill SSE without fix
+	const streamDuration = 2 * time.Second       // stream lives well beyond client timeout
+
+	eventsSent := make(chan struct{})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			return
+		}
+
+		// Send first event immediately.
+		bundleJSON, _ := json.Marshal(map[string]string{"yaml": "apiVersion: edictum/v1\nkind: ContractBundle\n# event-1"})
+		_, _ = fmt.Fprintf(w, "event: contract_update\ndata: %s\n\n", bundleJSON)
+		flusher.Flush()
+
+		// Wait well beyond the client timeout, then send a second event.
+		// Without the fix the connection would be dead by now.
+		time.Sleep(clientTimeout * 3)
+
+		bundleJSON2, _ := json.Marshal(map[string]string{"yaml": "apiVersion: edictum/v1\nkind: ContractBundle\n# event-2"})
+		_, _ = fmt.Fprintf(w, "event: contract_update\ndata: %s\n\n", bundleJSON2)
+		flusher.Flush()
+		close(eventsSent)
+
+		// Keep stream open until test context ends.
+		time.Sleep(streamDuration)
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(ClientConfig{
+		BaseURL: srv.URL,
+		APIKey:  "key",
+		Timeout: clientTimeout, // very short — proves SSE uses a separate client
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reloader := &mockReloader{}
+	watcher := NewSSEWatcher(client, reloader)
+	defer watcher.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() { _ = watcher.Watch(ctx) }()
+
+	// Wait for server to send both events.
+	select {
+	case <-eventsSent:
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for server to send both events")
+	}
+
+	// Give the watcher time to process the second event.
+	time.Sleep(200 * time.Millisecond)
+
+	if n := reloader.callCount(); n < 2 {
+		t.Fatalf("expected at least 2 reload calls (proving SSE survived beyond client timeout), got %d", n)
+	}
+}
+
 // --- Security bypass tests ---
 
 func TestSecuritySSEBundleNameInjection(t *testing.T) {

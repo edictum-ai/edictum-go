@@ -36,6 +36,7 @@ type SSEWatcher struct {
 	publicKeyHex      string // optional: Ed25519 public key for verification
 	reconnectDelay    time.Duration
 	maxReconnectDelay time.Duration
+	sseClient         *http.Client // separate client without request timeout for long-lived SSE
 
 	mu     sync.Mutex
 	closed bool
@@ -60,12 +61,16 @@ func WithMaxReconnectDelay(d time.Duration) SSEWatcherOption {
 }
 
 // NewSSEWatcher creates a watcher that listens for contract updates via SSE.
+// It creates a dedicated HTTP client for SSE that shares the main client's
+// transport (TLS config, proxy, etc.) but has no request-level timeout,
+// since SSE connections are long-lived streams.
 func NewSSEWatcher(client *Client, reloader Reloader, opts ...SSEWatcherOption) *SSEWatcher {
 	w := &SSEWatcher{
 		client:            client,
 		reloader:          reloader,
 		reconnectDelay:    1 * time.Second,
 		maxReconnectDelay: 60 * time.Second,
+		sseClient:         &http.Client{Transport: client.httpClient.Transport},
 	}
 	for _, opt := range opts {
 		opt(w)
@@ -150,10 +155,7 @@ func (w *SSEWatcher) connectAndListen(ctx context.Context) error {
 	}
 	req.Header.Set("Accept", "text/event-stream")
 
-	// Reuse the client's transport (TLS config, proxy, etc.) but without
-	// the request timeout — SSE connections are long-lived.
-	sseHTTP := &http.Client{Transport: w.client.httpClient.Transport}
-	resp, err := sseHTTP.Do(req)
+	resp, err := w.sseClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("SSE connect: %w", err)
 	}
