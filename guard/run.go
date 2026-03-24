@@ -92,7 +92,8 @@ func (g *Guard) Run(
 	// very long names from polluting trace backend indexes.
 	spanTool := env2.ToolName()
 	if len(spanTool) > 64 {
-		spanTool = spanTool[:64]
+		// Truncate at a rune boundary to avoid splitting multi-byte chars.
+		spanTool = string([]rune(spanTool)[:64])
 	}
 	ctx, span := g.telemetry.Tracer().Start(ctx, "edictum.governance "+spanTool,
 		trace.WithAttributes(telemetry.ToolSpanAttrs(

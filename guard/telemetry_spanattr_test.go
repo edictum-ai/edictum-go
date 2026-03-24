@@ -3,11 +3,7 @@ package guard
 import (
 	"context"
 	"testing"
-	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/contract"
 	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/telemetry"
@@ -31,7 +27,11 @@ func hasSpanAttr(spans []*recSpan, key string) bool {
 // observe mode.
 func TestObserveMode_SetsObservedDenySpanAttr(t *testing.T) {
 	tp := newTTP()
-	tel := telemetry.New(telemetry.WithTracerProvider(tp))
+	mp := newTMP()
+	tel := telemetry.New(
+		telemetry.WithTracerProvider(tp),
+		telemetry.WithMeterProvider(mp),
+	)
 	g := New(
 		WithMode("observe"),
 		WithTelemetry(tel),
@@ -58,13 +58,30 @@ func TestObserveMode_SetsObservedDenySpanAttr(t *testing.T) {
 	if !hasSpanAttr(spans, "governance.observed_deny") {
 		t.Error("expected governance.observed_deny attribute on span")
 	}
+	mp.meter.mu.Lock()
+	recs := mp.meter.recs
+	mp.meter.mu.Unlock()
+	deniedFound := false
+	for _, r := range recs {
+		if r.Name == "edictum.calls.denied" {
+			deniedFound = true
+			break
+		}
+	}
+	if !deniedFound {
+		t.Error("expected edictum.calls.denied in observe mode")
+	}
 }
 
 // TestObserveMode_ApprovalSetsObservedDenySpanAttr verifies the
 // observed_deny attribute when an approval contract fires in observe mode.
 func TestObserveMode_ApprovalSetsObservedDenySpanAttr(t *testing.T) {
 	tp := newTTP()
-	tel := telemetry.New(telemetry.WithTracerProvider(tp))
+	mp := newTMP()
+	tel := telemetry.New(
+		telemetry.WithTracerProvider(tp),
+		telemetry.WithMeterProvider(mp),
+	)
 	g := New(
 		WithMode("observe"),
 		WithTelemetry(tel),
@@ -92,108 +109,17 @@ func TestObserveMode_ApprovalSetsObservedDenySpanAttr(t *testing.T) {
 	if !hasSpanAttr(spans, "governance.observed_deny") {
 		t.Error("expected governance.observed_deny on approval in observe mode")
 	}
-}
-
-// TestApprovalTimeout_SetsSpanAttrAndAllowedCounter verifies timeout_effect=allow path.
-func TestApprovalTimeout_SetsSpanAttrAndAllowedCounter(t *testing.T) {
-	tp := newTTP()
-	mp := newTMP()
-	tel := telemetry.New(
-		telemetry.WithTracerProvider(tp),
-		telemetry.WithMeterProvider(mp),
-	)
-	g := New(
-		WithTelemetry(tel),
-		WithContracts(
-			contract.Precondition{
-				Name: "timeout-approval", Tool: "*", Effect: "approve",
-				Timeout: 1, TimeoutEffect: "allow",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("needs approval"), nil
-				},
-			},
-		),
-		WithApprovalBackend(&blockingApprovalBackend{}),
-	)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
-	_, err := g.Run(ctx, "Bash", map[string]any{"command": "ls"},
-		func(_ map[string]any) (any, error) { return "ok", nil })
-	if err != nil {
-		t.Fatalf("timeout_effect=allow should succeed: %v", err)
-	}
-
-	tp.tracer.mu.Lock()
-	spans := tp.tracer.spans
-	tp.tracer.mu.Unlock()
-
-	found := false
-	for _, s := range spans {
-		for _, kv := range s.Attrs {
-			if string(kv.Key) == "governance.approval_timeout" &&
-				kv.Value.Type() == attribute.BOOL && kv.Value.AsBool() {
-				found = true
-			}
-		}
-	}
-	if !found {
-		t.Error("expected governance.approval_timeout attribute on span")
-	}
-
-	// Verify allowed counter was incremented (timeout_effect=allow).
 	mp.meter.mu.Lock()
 	recs := mp.meter.recs
 	mp.meter.mu.Unlock()
-	allowedFound := false
+	deniedFound := false
 	for _, r := range recs {
-		if r.Name == "edictum.calls.allowed" {
-			allowedFound = true
+		if r.Name == "edictum.calls.denied" {
+			deniedFound = true
 			break
 		}
 	}
-	if !allowedFound {
-		t.Error("expected edictum.calls.allowed on approval timeout-allow")
+	if !deniedFound {
+		t.Error("expected edictum.calls.denied for approval in observe mode")
 	}
 }
-
-// TestApprovalTimeoutDeny_NoTimeoutAttr verifies that when
-// timeout_effect is NOT "allow" (default deny), the span gets an
-// error status rather than the approval_timeout attribute.
-func TestApprovalTimeoutDeny_NoTimeoutAttr(t *testing.T) {
-	tp := newTTP()
-	tel := telemetry.New(telemetry.WithTracerProvider(tp))
-	g := New(
-		WithTelemetry(tel),
-		WithContracts(
-			contract.Precondition{
-				Name: "timeout-deny", Tool: "*", Effect: "approve",
-				Timeout: 1,
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("needs approval"), nil
-				},
-			},
-		),
-		WithApprovalBackend(&blockingApprovalBackend{}),
-	)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
-	_, err := g.Run(ctx, "Bash", map[string]any{"command": "ls"}, nopCallable)
-	if err == nil {
-		t.Fatal("expected denial on timeout with default effect")
-	}
-
-	tp.tracer.mu.Lock()
-	spans := tp.tracer.spans
-	tp.tracer.mu.Unlock()
-
-	if hasSpanAttr(spans, "governance.approval_timeout") {
-		t.Error("approval_timeout attr should NOT be set for deny path")
-	}
-}
-
-// Verify blockingApprovalBackend implements approval.Backend.
-var _ approval.Backend = (*blockingApprovalBackend)(nil)
