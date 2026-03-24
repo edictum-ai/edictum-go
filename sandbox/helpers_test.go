@@ -51,6 +51,7 @@ func TestExtractCommand(t *testing.T) {
 		{"semicolon chaining", "Bash", map[string]any{"command": "ls; rm -rf /"}, "\x00"},
 		{"logical and chaining", "Bash", map[string]any{"command": "ls && cat /etc/shadow"}, "\x00"},
 		{"command substitution", "Bash", map[string]any{"command": "ls $(rm -rf /)"}, "\x00"},
+		{"environment variable expansion allowed", "Bash", map[string]any{"command": "echo $HOME"}, "echo"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
