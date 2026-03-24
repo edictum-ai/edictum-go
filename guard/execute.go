@@ -71,7 +71,8 @@ func (g *Guard) executeAndPost(
 		telemetry.SetSpanError(trace.SpanFromContext(ctx), "tool failed: "+msg)
 		return nil, &edictum.ToolError{Message: fmt.Sprintf("%v", result)}
 	}
-	telemetry.SetSpanOK(trace.SpanFromContext(ctx))
+	// Span status left as Unset (success) — explicitly setting OK would
+	// overwrite observed-deny status set earlier in observe mode.
 	if post.RedactedResponse != nil {
 		return post.RedactedResponse, nil
 	}

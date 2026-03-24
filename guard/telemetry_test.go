@@ -30,8 +30,10 @@ func TestWithTracerProvider_DirectOption(t *testing.T) {
 	if spans[0].Name != "edictum.governance Bash" {
 		t.Errorf("span name: got %q", spans[0].Name)
 	}
-	if spans[0].StatusCode != codes.Ok {
-		t.Errorf("expected Ok status, got %v", spans[0].StatusCode)
+	// Successful spans keep Unset status (OTel default = success).
+	// Explicitly setting OK would overwrite observed-deny in observe mode.
+	if spans[0].StatusCode != codes.Unset {
+		t.Errorf("expected Unset status, got %v", spans[0].StatusCode)
 	}
 }
 
