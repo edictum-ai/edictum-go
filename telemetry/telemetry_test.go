@@ -132,22 +132,6 @@ func TestSetSpanError_SetsErrorStatus(t *testing.T) {
 	}
 }
 
-func TestSetSpanOK_SetsOKStatus(t *testing.T) {
-	tp := newTestTracerProvider()
-	_, span := tp.tracer.Start(context.Background(), "ok-span")
-	telemetry.SetSpanOK(span)
-	span.End()
-
-	spans := tp.tracer.getSpans()
-	if len(spans) != 1 {
-		t.Fatalf("expected 1 span, got %d", len(spans))
-	}
-	s := spans[0]
-	if s.StatusCode != codes.Ok {
-		t.Errorf("expected status code Ok, got %v", s.StatusCode)
-	}
-}
-
 func TestSetSpanError_ViaSpanFromContext(t *testing.T) {
 	tp := newTestTracerProvider()
 	ctx, span := tp.tracer.Start(context.Background(), "ctx-span")

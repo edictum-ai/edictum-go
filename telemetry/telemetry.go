@@ -133,8 +133,3 @@ func (t *GovernanceTelemetry) RecordAllowed(ctx context.Context, toolName string
 func SetSpanError(span trace.Span, reason string) {
 	span.SetStatus(codes.Error, reason)
 }
-
-// SetSpanOK sets the span status to OK.
-func SetSpanOK(span trace.Span) {
-	span.SetStatus(codes.Ok, "")
-}

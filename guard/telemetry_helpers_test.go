@@ -39,6 +39,12 @@ func (s *tSpan) SetStatus(c codes.Code, d string) {
 	s.rec.StatusDesc = d
 }
 
+func (s *tSpan) SetAttributes(attrs ...attribute.KeyValue) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rec.Attrs = append(s.rec.Attrs, attrs...)
+}
+
 func (s *tSpan) End(...trace.SpanEndOption) {}
 
 type tTracer struct {
@@ -123,4 +129,15 @@ func (b *autoApproveBackend) RequestApproval(_ context.Context, toolName string,
 
 func (b *autoApproveBackend) PollApprovalStatus(_ context.Context, _ string) (approval.Decision, error) {
 	return approval.Decision{Approved: true, Timestamp: time.Now()}, nil
+}
+
+// autoDenyBackend immediately denies approval requests.
+type autoDenyBackend struct{}
+
+func (b *autoDenyBackend) RequestApproval(_ context.Context, toolName string, _ map[string]any, msg string, _ ...approval.RequestOption) (approval.Request, error) {
+	return approval.NewRequest("deny-1", toolName, nil, msg), nil
+}
+
+func (b *autoDenyBackend) PollApprovalStatus(_ context.Context, _ string) (approval.Decision, error) {
+	return approval.Decision{Approved: false, Reason: "human denied", Timestamp: time.Now()}, nil
 }
