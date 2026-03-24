@@ -39,7 +39,7 @@ func TestObserveMode_SetsObservedDenySpanAttr(t *testing.T) {
 			contract.Precondition{
 				Name: "deny-all",
 				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("blocked"), nil
+					return contract.Fail("denied by contract"), nil
 				},
 			},
 		),

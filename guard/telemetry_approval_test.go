@@ -3,6 +3,7 @@ package guard
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/edictum-ai/edictum-go/contract"
 	"github.com/edictum-ai/edictum-go/envelope"
@@ -129,5 +130,50 @@ func TestApprovalDenied_RecordsDenialCounter(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected edictum.calls.denied after approval denied")
+	}
+}
+
+func TestApprovalTimeoutDeny_RecordsDenialCounter(t *testing.T) {
+	mp := newTMP()
+	tp := newTTP()
+	tel := telemetry.New(
+		telemetry.WithTracerProvider(tp),
+		telemetry.WithMeterProvider(mp),
+	)
+	pre := contract.Precondition{
+		Name:          "needs-approval",
+		Effect:        "approve",
+		Timeout:       1,
+		TimeoutEffect: "deny",
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+			return contract.Fail("needs approval"), nil
+		},
+	}
+	g := New(
+		WithTelemetry(tel),
+		WithContracts(pre),
+		WithApprovalBackend(&blockingApprovalBackend{}),
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	_, err := g.Run(ctx, "Bash",
+		map[string]any{"command": "ls"}, nopCallable)
+	if err == nil {
+		t.Fatal("expected denial error on approval timeout")
+	}
+
+	mp.meter.mu.Lock()
+	recs := mp.meter.recs
+	mp.meter.mu.Unlock()
+	found := false
+	for _, r := range recs {
+		if r.Name == "edictum.calls.denied" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected edictum.calls.denied on approval timeout-deny")
 	}
 }
