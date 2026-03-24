@@ -275,7 +275,7 @@ func TestRun_ObserveMode_ApprovalUsesBackend(t *testing.T) {
 		t.Fatalf("approval backend calls = request:%d poll:%d, want 1 each", requested, polled)
 	}
 	events := g.LocalSink().Events()
-	var actions []audit.Action
+	actions := make([]audit.Action, 0, len(events))
 	for _, e := range events {
 		actions = append(actions, e.Action)
 	}
