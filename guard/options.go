@@ -178,9 +178,7 @@ func WithTools(tools map[string]map[string]any) Option {
 // spans when no OTel SDK is configured.
 func WithTracerProvider(tp trace.TracerProvider) Option {
 	return func(g *Guard) {
-		if g.telemetry == nil {
-			g.telemetry = telemetry.New(telemetry.WithTracerProvider(tp))
-		}
+		g.telemetry = telemetry.New(telemetry.WithTracerProvider(tp))
 	}
 }
 

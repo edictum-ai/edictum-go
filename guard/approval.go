@@ -93,6 +93,7 @@ func (g *Guard) handleApproval(
 	}
 
 	telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval denied or timed out")
+	g.telemetry.RecordDenial(ctx, env2.ToolName())
 	reason := decision.Reason
 	if reason == "" {
 		reason = pre.Reason
