@@ -323,6 +323,57 @@ func TestRun_ApprovalTimeoutPropagated(t *testing.T) {
 	}
 }
 
+func TestRun_DenialAuditIncludesPythonStyleFields(t *testing.T) {
+	g := New(
+		WithContracts(contract.Precondition{
+			Name: "deny-all",
+			Tool: "*",
+			Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+				return contract.Fail("blocked"), nil
+			},
+		}),
+	)
+
+	principal := envelope.NewPrincipal(
+		envelope.WithUserID("u-123"),
+		envelope.WithClaims(map[string]any{"team": "security"}),
+	)
+
+	_, err := g.Run(context.Background(), "Bash", map[string]any{"command": "ls"}, nopCallable,
+		WithRunPrincipal(&principal))
+	if err == nil {
+		t.Fatal("expected denial")
+	}
+
+	events := g.LocalSink().Events()
+	if len(events) == 0 {
+		t.Fatal("expected audit events")
+	}
+	event := events[0]
+	if event.Action != audit.ActionCallDenied {
+		t.Fatalf("Action = %q, want %q", event.Action, audit.ActionCallDenied)
+	}
+	if event.Mode != "enforce" {
+		t.Fatalf("Mode = %q, want enforce", event.Mode)
+	}
+	if len(event.ContractsEvaluated) != 1 {
+		t.Fatalf("ContractsEvaluated len = %d, want 1", len(event.ContractsEvaluated))
+	}
+	if len(event.HooksEvaluated) != 0 {
+		t.Fatalf("HooksEvaluated len = %d, want 0", len(event.HooksEvaluated))
+	}
+	if event.Principal == nil {
+		t.Fatal("expected principal in audit event")
+	}
+	principalMap, ok := event.Principal.(map[string]any)
+	if !ok {
+		t.Fatalf("principal type = %T, want map[string]any", event.Principal)
+	}
+	if principalMap["user_id"] != "u-123" {
+		t.Fatalf("principal.user_id = %v", principalMap["user_id"])
+	}
+}
+
 // mockApprovalBackend is a test double that records RequestApproval calls.
 type mockApprovalBackend struct {
 	onRequest func(ctx context.Context, toolName string, toolArgs map[string]any, message string, opts ...approval.RequestOption) (approval.Request, error)

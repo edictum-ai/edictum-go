@@ -334,6 +334,22 @@ func TestPolicy_RedactArgs_LongStringTruncation(t *testing.T) {
 	}
 }
 
+func TestPolicy_RedactArgs_StringArgPasswordFlag(t *testing.T) {
+	p := NewPolicy()
+	got := p.RedactArgs(map[string]any{"command": "mysql --password hunter2"})
+	if got["command"] != "mysql --password [REDACTED]" {
+		t.Fatalf("command = %q", got["command"])
+	}
+}
+
+func TestPolicy_RedactArgs_StringArgURLCredentials(t *testing.T) {
+	p := NewPolicy()
+	got := p.RedactArgs(map[string]any{"url": "https://admin:secret123@db.example.com"})
+	if got["url"] != "https://admin:[REDACTED]@db.example.com" {
+		t.Fatalf("url = %q", got["url"])
+	}
+}
+
 func TestPolicy_RedactArgs_ExactlyMaxLength(t *testing.T) {
 	p := NewPolicy()
 	exact := strings.Repeat("x", 1000)

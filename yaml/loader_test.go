@@ -108,15 +108,25 @@ func TestLoadBundleString_InvalidMode(t *testing.T) {
 func TestLoadBundleString_ContractMissingID(t *testing.T) {
 	y := `apiVersion: edictum/v1
 kind: ContractBundle
+metadata:
+  name: test-bundle
+defaults:
+  mode: enforce
 contracts:
   - type: pre
     tool: Bash
+    when:
+      "args.command":
+        contains: "rm"
+    then:
+      effect: deny
+      message: "Denied"
 `
 	_, _, err := LoadBundleString(y)
 	if err == nil {
 		t.Fatal("expected error for missing contract id")
 	}
-	if !strings.Contains(err.Error(), "missing required field 'id'") {
+	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "id is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -125,6 +135,10 @@ contracts:
 func TestLoadBundleString_ContractInvalidType(t *testing.T) {
 	y := `apiVersion: edictum/v1
 kind: ContractBundle
+metadata:
+  name: test-bundle
+defaults:
+  mode: enforce
 contracts:
   - id: bad
     type: invalid
@@ -134,7 +148,7 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for invalid contract type")
 	}
-	if !strings.Contains(err.Error(), "invalid type") {
+	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "type") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -143,15 +157,25 @@ contracts:
 func TestLoadBundleString_ContractMissingTool(t *testing.T) {
 	y := `apiVersion: edictum/v1
 kind: ContractBundle
+metadata:
+  name: test-bundle
+defaults:
+  mode: enforce
 contracts:
   - id: no-tool
     type: pre
+    when:
+      "args.command":
+        contains: "rm"
+    then:
+      effect: deny
+      message: "Denied"
 `
 	_, _, err := LoadBundleString(y)
 	if err == nil {
 		t.Fatal("expected error for missing tool")
 	}
-	if !strings.Contains(err.Error(), "missing required field 'tool'") {
+	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "tool is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -160,9 +184,18 @@ contracts:
 func TestLoadBundleString_SessionNoTool(t *testing.T) {
 	y := `apiVersion: edictum/v1
 kind: ContractBundle
+metadata:
+  name: test-bundle
+defaults:
+  mode: enforce
 contracts:
   - id: sess-limit
     type: session
+    limits:
+      max_tool_calls: 10
+    then:
+      effect: deny
+      message: "limit hit"
 `
 	data, _, err := LoadBundleString(y)
 	if err != nil {
@@ -177,13 +210,29 @@ contracts:
 func TestLoadBundleString_DuplicateID(t *testing.T) {
 	y := `apiVersion: edictum/v1
 kind: ContractBundle
+metadata:
+  name: test-bundle
+defaults:
+  mode: enforce
 contracts:
   - id: same-id
     type: pre
     tool: Bash
+    when:
+      "args.command":
+        contains: "rm"
+    then:
+      effect: deny
+      message: "Denied"
   - id: same-id
     type: post
     tool: Bash
+    when:
+      "output.text":
+        contains: "secret"
+    then:
+      effect: warn
+      message: "Warn"
 `
 	_, _, err := LoadBundleString(y)
 	if err == nil {
@@ -336,8 +385,7 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for not_within without within")
 	}
-	// Rejected by the primary constraint check (no within or allows).
-	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
+	if !strings.Contains(err.Error(), "schema validation failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -358,8 +406,7 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for not_allows without allows")
 	}
-	// Rejected by the primary constraint check (no within or allows).
-	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
+	if !strings.Contains(err.Error(), "schema validation failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -407,7 +454,7 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for not_allows.commands")
 	}
-	if !strings.Contains(err.Error(), "not_allows.commands is not supported") {
+	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "not_allows") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -427,7 +474,7 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for non-string within entry")
 	}
-	if !strings.Contains(err.Error(), "within[0] must be a string") {
+	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "within.0") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -464,7 +511,7 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for sandbox with no constraints")
 	}
-	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
+	if !strings.Contains(err.Error(), "schema validation failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -483,7 +530,7 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for sandbox with empty within list")
 	}
-	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
+	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "within") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -587,7 +634,7 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for non-string allows.commands entry")
 	}
-	if !strings.Contains(err.Error(), "allows.commands[0] must be a string") {
+	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "allows.commands.0") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -608,7 +655,7 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for non-string allows.domains entry")
 	}
-	if !strings.Contains(err.Error(), "allows.domains[0] must be a string") {
+	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "allows.domains.0") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -632,7 +679,7 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for non-string not_allows.domains entry")
 	}
-	if !strings.Contains(err.Error(), "not_allows.domains[0] must be a string") {
+	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "not_allows.domains.0") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

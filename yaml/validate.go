@@ -1,54 +1,35 @@
 package yaml
 
 import (
+	_ "embed"
 	"fmt"
 	"regexp"
+	"strings"
+
+	"github.com/xeipuuv/gojsonschema"
 )
 
-// validateSchema checks required top-level fields and basic contract structure.
-// Full JSON Schema validation is deferred until the jsonschema library is integrated.
+//go:embed edictum-v1.schema.json
+var bundleSchema string
+
+var schemaLoader = gojsonschema.NewStringLoader(bundleSchema)
+
+// validateSchema applies the canonical Python JSON Schema first, then
+// preserves Go-specific reserved-key checks.
 func validateSchema(data map[string]any) error {
-	if v, _ := data["apiVersion"].(string); v != "edictum/v1" {
-		return fmt.Errorf("yaml: apiVersion must be 'edictum/v1', got %q", data["apiVersion"])
+	result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(data))
+	if err != nil {
+		return fmt.Errorf("yaml: schema validation failed: %w", err)
 	}
-	if v, _ := data["kind"].(string); v != "ContractBundle" {
-		return fmt.Errorf("yaml: kind must be 'ContractBundle', got %q", data["kind"])
+	if !result.Valid() {
+		return fmt.Errorf("yaml: schema validation failed: %s", schemaErrors(result.Errors()))
 	}
-	if defaults, ok := data["defaults"].(map[string]any); ok {
-		if mode, exists := defaults["mode"]; exists {
-			m, _ := mode.(string)
-			if m != "enforce" && m != "observe" {
-				return fmt.Errorf("yaml: defaults.mode must be 'enforce' or 'observe', got %q", mode)
-			}
-		}
-	}
+
 	contracts, _ := data["contracts"].([]any)
 	for i, c := range contracts {
 		cm, ok := c.(map[string]any)
 		if !ok {
 			return fmt.Errorf("yaml: contract at index %d must be a mapping", i)
-		}
-		if _, ok := cm["id"].(string); !ok {
-			return fmt.Errorf("yaml: contract at index %d missing required field 'id'", i)
-		}
-		ctype, _ := cm["type"].(string)
-		switch ctype {
-		case "pre", "post", "session", "sandbox":
-			// valid
-		default:
-			return fmt.Errorf("yaml: contract %q has invalid type %q", cm["id"], ctype)
-		}
-		if ctype != "session" {
-			if _, ok := cm["tool"].(string); !ok {
-				return fmt.Errorf("yaml: contract %q of type %q missing required field 'tool'", cm["id"], ctype)
-			}
-		}
-		// Validate per-contract mode if present.
-		if modeVal, exists := cm["mode"]; exists {
-			modeStr, _ := modeVal.(string)
-			if modeStr != "enforce" && modeStr != "observe" {
-				return fmt.Errorf("yaml: contract %q has invalid mode %q (must be 'enforce' or 'observe')", cm["id"], modeVal)
-			}
 		}
 		// Reject _observe in user-supplied YAML. This is an internal key
 		// added by the composer for observe_alongside — if a user sets it
@@ -58,6 +39,17 @@ func validateSchema(data map[string]any) error {
 		}
 	}
 	return nil
+}
+
+func schemaErrors(errs []gojsonschema.ResultError) string {
+	if len(errs) == 0 {
+		return "unknown schema error"
+	}
+	msgs := make([]string, 0, len(errs))
+	for _, err := range errs {
+		msgs = append(msgs, err.String())
+	}
+	return strings.Join(msgs, "; ")
 }
 
 func validateUniqueIDs(data map[string]any) error {

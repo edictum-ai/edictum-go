@@ -13,16 +13,16 @@ type Action string
 
 // Audit action types. 10 canonical actions matching Python parity.
 const (
-	ActionCallDenied            Action = "CALL_DENIED"
-	ActionCallWouldDeny         Action = "CALL_WOULD_DENY"
-	ActionCallAllowed           Action = "CALL_ALLOWED"
-	ActionCallExecuted          Action = "CALL_EXECUTED"
-	ActionCallFailed            Action = "CALL_FAILED"
-	ActionPostconditionWarning  Action = "POSTCONDITION_WARNING"
-	ActionCallApprovalRequested Action = "CALL_APPROVAL_REQUESTED"
-	ActionCallApprovalGranted   Action = "CALL_APPROVAL_GRANTED"
-	ActionCallApprovalDenied    Action = "CALL_APPROVAL_DENIED"
-	ActionCallApprovalTimeout   Action = "CALL_APPROVAL_TIMEOUT"
+	ActionCallDenied            Action = "call_denied"
+	ActionCallWouldDeny         Action = "call_would_deny"
+	ActionCallAllowed           Action = "call_allowed"
+	ActionCallExecuted          Action = "call_executed"
+	ActionCallFailed            Action = "call_failed"
+	ActionPostconditionWarning  Action = "postcondition_warning"
+	ActionCallApprovalRequested Action = "call_approval_requested"
+	ActionCallApprovalGranted   Action = "call_approval_granted"
+	ActionCallApprovalDenied    Action = "call_approval_denied"
+	ActionCallApprovalTimeout   Action = "call_approval_timeout"
 )
 
 // AllActions returns all 10 canonical audit actions.
@@ -43,33 +43,33 @@ func AllActions() []Action {
 
 // Event represents a structured audit event.
 type Event struct {
-	SchemaVersion         string         `json:"schema_version"`
-	Timestamp             time.Time      `json:"timestamp"`
-	RunID                 string         `json:"run_id"`
-	CallID                string         `json:"call_id"`
-	CallIndex             int            `json:"call_index"`
-	ParentCallID          string         `json:"parent_call_id,omitempty"`
-	ToolName              string         `json:"tool_name"`
-	ToolArgs              map[string]any `json:"tool_args,omitempty"`
-	SideEffect            string         `json:"side_effect"`
-	Environment           string         `json:"environment"`
-	Principal             any            `json:"principal,omitempty"`
-	Action                Action         `json:"action"`
-	DecisionSource        string         `json:"decision_source,omitempty"`
-	DecisionName          string         `json:"decision_name,omitempty"`
-	Reason                string         `json:"reason,omitempty"`
-	HooksEvaluated        int            `json:"hooks_evaluated"`
-	ContractsEvaluated    int            `json:"contracts_evaluated"`
-	ToolSuccess           *bool          `json:"tool_success,omitempty"`
-	PostconditionsPassed  *bool          `json:"postconditions_passed,omitempty"`
-	DurationMs            *float64       `json:"duration_ms,omitempty"`
-	Error                 string         `json:"error,omitempty"`
-	ResultSummary         string         `json:"result_summary,omitempty"`
-	SessionAttemptCount   *int           `json:"session_attempt_count,omitempty"`
-	SessionExecutionCount *int           `json:"session_execution_count,omitempty"`
-	Mode                  string         `json:"mode"`
-	PolicyVersion         string         `json:"policy_version,omitempty"`
-	PolicyError           bool           `json:"policy_error"`
+	SchemaVersion         string           `json:"schema_version"`
+	Timestamp             time.Time        `json:"timestamp"`
+	RunID                 string           `json:"run_id"`
+	CallID                string           `json:"call_id"`
+	CallIndex             int              `json:"call_index"`
+	ParentCallID          string           `json:"parent_call_id,omitempty"`
+	ToolName              string           `json:"tool_name"`
+	ToolArgs              map[string]any   `json:"tool_args"`
+	SideEffect            string           `json:"side_effect"`
+	Environment           string           `json:"environment"`
+	Principal             any              `json:"principal,omitempty"`
+	Action                Action           `json:"action"`
+	DecisionSource        string           `json:"decision_source,omitempty"`
+	DecisionName          string           `json:"decision_name,omitempty"`
+	Reason                string           `json:"reason,omitempty"`
+	HooksEvaluated        []map[string]any `json:"hooks_evaluated"`
+	ContractsEvaluated    []map[string]any `json:"contracts_evaluated"`
+	ToolSuccess           *bool            `json:"tool_success,omitempty"`
+	PostconditionsPassed  *bool            `json:"postconditions_passed,omitempty"`
+	DurationMs            int              `json:"duration_ms"`
+	Error                 string           `json:"error,omitempty"`
+	ResultSummary         string           `json:"result_summary,omitempty"`
+	SessionAttemptCount   *int             `json:"session_attempt_count,omitempty"`
+	SessionExecutionCount *int             `json:"session_execution_count,omitempty"`
+	Mode                  string           `json:"mode"`
+	PolicyVersion         string           `json:"policy_version,omitempty"`
+	PolicyError           bool             `json:"policy_error"`
 }
 
 const schemaVersion = "0.3.0"
@@ -77,8 +77,13 @@ const schemaVersion = "0.3.0"
 // NewEvent creates a new Event with defaults.
 func NewEvent() Event {
 	return Event{
-		SchemaVersion: schemaVersion,
-		Timestamp:     time.Now().UTC(),
+		SchemaVersion:      schemaVersion,
+		Timestamp:          time.Now().UTC(),
+		ToolArgs:           map[string]any{},
+		HooksEvaluated:     []map[string]any{},
+		ContractsEvaluated: []map[string]any{},
+		Mode:               "enforce",
+		Action:             ActionCallDenied,
 	}
 }
 

@@ -24,16 +24,19 @@ func (g *Guard) emitPreAudit(
 	event := audit.NewEvent()
 	event.RunID = env2.RunID()
 	event.CallID = env2.CallID()
+	event.CallIndex = env2.CallIndex()
+	event.ParentCallID = env2.ParentCallID()
 	event.ToolName = env2.ToolName()
 	event.ToolArgs = g.redactionPolicy.RedactArgs(env2.Args())
 	event.SideEffect = string(env2.SideEffect())
 	event.Environment = env2.Environment()
+	event.Principal = principalMap(env2.Principal())
 	event.Action = action
 	event.DecisionSource = pre.DecisionSource
 	event.DecisionName = pre.DecisionName
 	event.Reason = pre.Reason
-	event.HooksEvaluated = len(pre.HooksEvaluated)
-	event.ContractsEvaluated = len(pre.ContractsEvaluated)
+	event.HooksEvaluated = deepCopyRecords(pre.HooksEvaluated)
+	event.ContractsEvaluated = deepCopyRecords(pre.ContractsEvaluated)
 	event.SessionAttemptCount = &attempts
 	event.SessionExecutionCount = &execs
 	event.Mode = mode
@@ -59,14 +62,17 @@ func (g *Guard) emitPostAudit(
 	event := audit.NewEvent()
 	event.RunID = env2.RunID()
 	event.CallID = env2.CallID()
+	event.CallIndex = env2.CallIndex()
+	event.ParentCallID = env2.ParentCallID()
 	event.ToolName = env2.ToolName()
 	event.ToolArgs = g.redactionPolicy.RedactArgs(env2.Args())
 	event.SideEffect = string(env2.SideEffect())
 	event.Environment = env2.Environment()
+	event.Principal = principalMap(env2.Principal())
 	event.Action = action
 	event.ToolSuccess = &post.ToolSuccess
 	event.PostconditionsPassed = &post.PostconditionsPassed
-	event.ContractsEvaluated = len(post.ContractsEvaluated)
+	event.ContractsEvaluated = deepCopyRecords(post.ContractsEvaluated)
 	event.SessionAttemptCount = &attempts
 	event.SessionExecutionCount = &execs
 	event.Mode = mode
@@ -92,10 +98,13 @@ func (g *Guard) emitObservedDenials(
 			event := audit.NewEvent()
 			event.RunID = env2.RunID()
 			event.CallID = env2.CallID()
+			event.CallIndex = env2.CallIndex()
+			event.ParentCallID = env2.ParentCallID()
 			event.ToolName = env2.ToolName()
 			event.ToolArgs = g.redactionPolicy.RedactArgs(env2.Args())
 			event.SideEffect = string(env2.SideEffect())
 			event.Environment = env2.Environment()
+			event.Principal = principalMap(env2.Principal())
 			event.Action = audit.ActionCallWouldDeny
 			event.DecisionSource = "precondition"
 			if name, ok := cr["name"].(string); ok {
@@ -130,10 +139,13 @@ func (g *Guard) emitObserveResults(
 		event := audit.NewEvent()
 		event.RunID = env2.RunID()
 		event.CallID = env2.CallID()
+		event.CallIndex = env2.CallIndex()
+		event.ParentCallID = env2.ParentCallID()
 		event.ToolName = env2.ToolName()
 		event.ToolArgs = g.redactionPolicy.RedactArgs(env2.Args())
 		event.SideEffect = string(env2.SideEffect())
 		event.Environment = env2.Environment()
+		event.Principal = principalMap(env2.Principal())
 		event.Action = action
 		if src, ok := sr["source"].(string); ok {
 			event.DecisionSource = src
@@ -150,6 +162,50 @@ func (g *Guard) emitObserveResults(
 			log.Printf("audit emit error: %v", err)
 		}
 	}
+}
+
+func principalMap(p *envelope.Principal) map[string]any {
+	if p == nil {
+		return nil
+	}
+	result := map[string]any{}
+	if v := p.UserID(); v != "" {
+		result["user_id"] = v
+	}
+	if v := p.ServiceID(); v != "" {
+		result["service_id"] = v
+	}
+	if v := p.OrgID(); v != "" {
+		result["org_id"] = v
+	}
+	if v := p.Role(); v != "" {
+		result["role"] = v
+	}
+	if v := p.TicketRef(); v != "" {
+		result["ticket_ref"] = v
+	}
+	if claims := p.Claims(); claims != nil {
+		result["claims"] = claims
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+func deepCopyRecords(records []map[string]any) []map[string]any {
+	if records == nil {
+		return nil
+	}
+	out := make([]map[string]any, len(records))
+	for i, record := range records {
+		cp := make(map[string]any, len(record))
+		for k, v := range record {
+			cp[k] = v
+		}
+		out[i] = cp
+	}
+	return out
 }
 
 // fireOnDeny invokes the on_deny callback, swallowing panics.

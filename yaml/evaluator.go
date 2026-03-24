@@ -33,6 +33,7 @@ type EvalOption func(*evalCtx)
 type evalCtx struct {
 	customOperators map[string]func(any, any) bool
 	customSelectors map[string]func(envelope.ToolEnvelope) map[string]any
+	outputPresent   bool
 }
 
 // WithCustomOperators registers custom operator functions.
@@ -47,11 +48,15 @@ func WithCustomSelectors(sels map[string]func(envelope.ToolEnvelope) map[string]
 
 // EvaluateExpression evaluates a boolean expression tree against an envelope.
 func EvaluateExpression(expr map[string]any, env envelope.ToolEnvelope, outputText string, opts ...EvalOption) EvalResult {
-	var ec evalCtx
+	ec := evalCtx{outputPresent: true}
 	for _, o := range opts {
 		o(&ec)
 	}
 	return evalExpr(expr, env, outputText, &ec)
+}
+
+func withOutputPresent(present bool) EvalOption {
+	return func(ctx *evalCtx) { ctx.outputPresent = present }
 }
 
 func evalExpr(expr map[string]any, env envelope.ToolEnvelope, outputText string, ec *evalCtx) EvalResult {

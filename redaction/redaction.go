@@ -10,6 +10,7 @@ import (
 // Policy configures how sensitive data is redacted from audit events.
 type Policy struct {
 	sensitiveKeys  map[string]bool
+	safeKeys       map[string]bool
 	bashPatterns   []compiledPattern
 	secretPatterns []*regexp.Regexp
 	detectSecrets  bool
@@ -28,7 +29,7 @@ type Option func(*Policy)
 func WithSensitiveKeys(keys []string) Option {
 	return func(p *Policy) {
 		for _, k := range keys {
-			p.sensitiveKeys[strings.ToLower(k)] = true
+			p.sensitiveKeys[normalizeKey(k)] = true
 		}
 	}
 }
@@ -42,10 +43,14 @@ func WithDetectSecrets(detect bool) Option {
 func NewPolicy(opts ...Option) *Policy {
 	p := &Policy{
 		sensitiveKeys: make(map[string]bool, len(defaultSensitiveKeys)),
+		safeKeys:      make(map[string]bool, len(safeCompoundKeys)),
 		detectSecrets: true,
 	}
 	for _, k := range defaultSensitiveKeys {
-		p.sensitiveKeys[k] = true
+		p.sensitiveKeys[normalizeKey(k)] = true
+	}
+	for _, k := range safeCompoundKeys {
+		p.safeKeys[normalizeKey(k)] = true
 	}
 
 	// Compile bash redaction patterns.
@@ -76,9 +81,12 @@ func NewPolicy(opts ...Option) *Policy {
 // against sensitive terms. This means "monkey" does NOT match "key",
 // "bucket" does NOT match (no segment matches any term).
 func (p *Policy) IsSensitiveKey(key string) bool {
-	k := strings.ToLower(key)
+	k := normalizeKey(key)
 	if p.sensitiveKeys[k] {
 		return true
+	}
+	if p.safeKeys[k] {
+		return false
 	}
 	// Word-boundary matching: split on separators, check segments.
 	segments := splitKeySegments(k)
@@ -97,6 +105,10 @@ func splitKeySegments(key string) []string {
 	return strings.FieldsFunc(key, func(r rune) bool {
 		return r == '_' || r == '-'
 	})
+}
+
+func normalizeKey(key string) string {
+	return strings.ToLower(strings.ReplaceAll(key, "-", "_"))
 }
 
 // DetectSecretValue reports whether value matches a known secret pattern.
@@ -145,6 +157,11 @@ func (p *Policy) redactValue(v any) any {
 	case string:
 		if p.detectSecrets && p.DetectSecretValue(val) {
 			return redacted
+		}
+		if p.detectSecrets {
+			for _, bp := range p.bashPatterns {
+				val = bp.re.ReplaceAllString(val, bp.replacement)
+			}
 		}
 		if len(val) > maxStringLength {
 			return val[:maxStringLength-3] + "..."

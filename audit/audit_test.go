@@ -22,11 +22,17 @@ func TestEvent_Defaults(t *testing.T) {
 	if e.Timestamp.IsZero() {
 		t.Fatal("Timestamp is zero")
 	}
-	if e.Mode != "" {
-		t.Fatalf("Mode = %q, want empty string (zero value)", e.Mode)
+	if e.Mode != "enforce" {
+		t.Fatalf("Mode = %q, want %q", e.Mode, "enforce")
 	}
 	if e.ToolSuccess != nil {
 		t.Fatalf("ToolSuccess = %v, want nil", e.ToolSuccess)
+	}
+	if e.ToolArgs == nil {
+		t.Fatal("ToolArgs should default to an empty map")
+	}
+	if e.HooksEvaluated == nil || e.ContractsEvaluated == nil {
+		t.Fatal("evaluated lists should default to non-nil slices")
 	}
 	if e.PolicyError {
 		t.Fatal("PolicyError should be false by default")
@@ -65,16 +71,16 @@ func TestAllActions_StringValues(t *testing.T) {
 		action Action
 		want   string
 	}{
-		{ActionCallDenied, "CALL_DENIED"},
-		{ActionCallWouldDeny, "CALL_WOULD_DENY"},
-		{ActionCallAllowed, "CALL_ALLOWED"},
-		{ActionCallExecuted, "CALL_EXECUTED"},
-		{ActionCallFailed, "CALL_FAILED"},
-		{ActionPostconditionWarning, "POSTCONDITION_WARNING"},
-		{ActionCallApprovalRequested, "CALL_APPROVAL_REQUESTED"},
-		{ActionCallApprovalGranted, "CALL_APPROVAL_GRANTED"},
-		{ActionCallApprovalDenied, "CALL_APPROVAL_DENIED"},
-		{ActionCallApprovalTimeout, "CALL_APPROVAL_TIMEOUT"},
+		{ActionCallDenied, "call_denied"},
+		{ActionCallWouldDeny, "call_would_deny"},
+		{ActionCallAllowed, "call_allowed"},
+		{ActionCallExecuted, "call_executed"},
+		{ActionCallFailed, "call_failed"},
+		{ActionPostconditionWarning, "postcondition_warning"},
+		{ActionCallApprovalRequested, "call_approval_requested"},
+		{ActionCallApprovalGranted, "call_approval_granted"},
+		{ActionCallApprovalDenied, "call_approval_denied"},
+		{ActionCallApprovalTimeout, "call_approval_timeout"},
 	}
 	for _, tc := range cases {
 		if string(tc.action) != tc.want {

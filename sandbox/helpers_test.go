@@ -1,6 +1,8 @@
 package sandbox
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -46,6 +48,9 @@ func TestExtractCommand(t *testing.T) {
 		{"git with args", "Bash", map[string]any{"command": "git clone https://github.com/repo"}, "git"},
 		{"redirect prefix", "Bash", map[string]any{"command": "> /tmp/out echo hi"}, "\x00"},
 		{"fd redirect prefix", "Bash", map[string]any{"command": "2>/tmp/err cmd"}, "\x00"},
+		{"semicolon chaining", "Bash", map[string]any{"command": "ls; rm -rf /"}, "\x00"},
+		{"logical and chaining", "Bash", map[string]any{"command": "ls && cat /etc/shadow"}, "\x00"},
+		{"command substitution", "Bash", map[string]any{"command": "ls $(rm -rf /)"}, "\x00"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -164,5 +169,29 @@ func TestExtractPathsDeduplication(t *testing.T) {
 			t.Errorf("duplicate path %q in extracted paths", p)
 		}
 		seen[p] = true
+	}
+}
+
+func TestResolvePath_ResolvesSymlinkedParentForMissingLeaf(t *testing.T) {
+	root := t.TempDir()
+	realDir := filepath.Join(root, "real")
+	if err := os.Mkdir(realDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	linkDir := filepath.Join(root, "link")
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Fatal(err)
+	}
+
+	target := filepath.Join(linkDir, "new", "file.txt")
+	got := resolvePath(target)
+	wantBase, err := filepath.EvalSymlinks(realDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(wantBase, "new", "file.txt")
+	if got != want {
+		t.Fatalf("resolvePath(%q) = %q, want %q", target, got, want)
 	}
 }
