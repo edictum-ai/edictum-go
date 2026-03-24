@@ -94,12 +94,14 @@ func TestObserveMode_ApprovalSetsObservedDenySpanAttr(t *testing.T) {
 	}
 }
 
-// TestApprovalTimeout_SetsSpanAttr verifies that
-// governance.approval_timeout is set when an approval times out with
-// timeout_effect=allow.
-func TestApprovalTimeout_SetsSpanAttr(t *testing.T) {
+// TestApprovalTimeout_SetsSpanAttrAndAllowedCounter verifies timeout_effect=allow path.
+func TestApprovalTimeout_SetsSpanAttrAndAllowedCounter(t *testing.T) {
 	tp := newTTP()
-	tel := telemetry.New(telemetry.WithTracerProvider(tp))
+	mp := newTMP()
+	tel := telemetry.New(
+		telemetry.WithTracerProvider(tp),
+		telemetry.WithMeterProvider(mp),
+	)
 	g := New(
 		WithTelemetry(tel),
 		WithContracts(
@@ -138,6 +140,21 @@ func TestApprovalTimeout_SetsSpanAttr(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected governance.approval_timeout attribute on span")
+	}
+
+	// Verify allowed counter was incremented (timeout_effect=allow).
+	mp.meter.mu.Lock()
+	recs := mp.meter.recs
+	mp.meter.mu.Unlock()
+	allowedFound := false
+	for _, r := range recs {
+		if r.Name == "edictum.calls.allowed" {
+			allowedFound = true
+			break
+		}
+	}
+	if !allowedFound {
+		t.Error("expected edictum.calls.allowed on approval timeout-allow")
 	}
 }
 
