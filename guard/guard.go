@@ -111,7 +111,7 @@ func New(opts ...Option) *Guard {
 	if g.telemetry == nil {
 		g.telemetry = telemetry.New(g.telOpts...)
 	}
-	g.telOpts = nil // release after construction
+	g.telOpts = nil
 	g.redactionPolicy = ensureRedaction(g.redactionPolicy)
 	classifyContracts(g)
 	return g
