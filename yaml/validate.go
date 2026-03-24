@@ -220,7 +220,14 @@ func validateSandboxContracts(data map[string]any) error {
 		if !hasConstraint {
 			return fmt.Errorf("yaml: contract %q: sandbox contract must have at least one primary constraint (within or allows with non-empty values)", cid)
 		}
-		if _, ok := cm["not_within"]; ok {
+		if nw, ok := cm["not_within"].([]any); ok && len(nw) > 0 {
+			if _, ok := cm["within"]; !ok {
+				return fmt.Errorf("yaml: contract %q: not_within requires within to also be set", cid)
+			}
+			if err := validateStringList(cid, "not_within", nw); err != nil {
+				return err
+			}
+		} else if _, ok := cm["not_within"]; ok {
 			if _, ok := cm["within"]; !ok {
 				return fmt.Errorf("yaml: contract %q: not_within requires within to also be set", cid)
 			}
@@ -237,7 +244,15 @@ func validateSandboxContracts(data map[string]any) error {
 					return fmt.Errorf("yaml: contract %q: not_allows.%s is not supported (only not_allows.domains is valid)", cid, key)
 				}
 			}
-			if _, ok := na["domains"]; ok {
+			if doms, ok := na["domains"].([]any); ok && len(doms) > 0 {
+				if err := validateStringList(cid, "not_allows.domains", doms); err != nil {
+					return err
+				}
+				allows, _ := cm["allows"].(map[string]any)
+				if _, ok := allows["domains"]; !ok {
+					return fmt.Errorf("yaml: contract %q: not_allows.domains requires allows.domains to also be set", cid)
+				}
+			} else if _, ok := na["domains"]; ok {
 				allows, _ := cm["allows"].(map[string]any)
 				if _, ok := allows["domains"]; !ok {
 					return fmt.Errorf("yaml: contract %q: not_allows.domains requires allows.domains to also be set", cid)
