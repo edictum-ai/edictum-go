@@ -45,20 +45,23 @@ func compilePost(
 		RedactPatterns: redactPatterns,
 		Check: func(_ context.Context, env envelope.ToolEnvelope, response any) (contract.Verdict, error) {
 			outputText := ""
+			outputPresent := response != nil
 			if response != nil {
 				outputText = fmt.Sprintf("%v", response)
 			}
 			result := EvaluateExpression(compiled, env, outputText,
 				WithCustomOperators(cc.customOperators),
 				WithCustomSelectors(cc.customSelectors),
+				withOutputPresent(outputPresent),
 			)
+			msg := expandMessage(msgTemplate, env, outputText, cc.customSelectors, outputPresent)
 			if result.PolicyError {
-				return contract.Fail(msgTemplate, map[string]any{
+				return contract.Fail(msg, map[string]any{
 					"policy_error": true,
 				}), nil
 			}
 			if result.Matched {
-				return contract.Fail(msgTemplate), nil
+				return contract.Fail(msg), nil
 			}
 			return contract.Pass(), nil
 		},

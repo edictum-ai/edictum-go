@@ -22,6 +22,12 @@ var defaultSensitiveKeys = []string{
 	"db_password",
 	"ssh_key",
 	"passphrase",
+	"api_tokens",
+	"db_passwords",
+	"user_credentials",
+	"oauth_secrets",
+	"encryption_keys",
+	"jwt_tokens",
 }
 
 // partialTerms are terms matched against word segments of a key.
@@ -29,7 +35,24 @@ var defaultSensitiveKeys = []string{
 // matches, so it is redacted. "monkey" splits into ["monkey"] and
 // no segment matches any term, so it is NOT redacted.
 var partialTerms = []string{
-	"token", "key", "secret", "password", "credential",
+	"token", "tokens", "key", "keys", "secret", "secrets",
+	"password", "passwords", "credential", "credentials",
+}
+
+var safeCompoundKeys = []string{
+	"max_tokens",
+	"num_tokens",
+	"input_tokens",
+	"output_tokens",
+	"total_tokens",
+	"completion_tokens",
+	"prompt_tokens",
+	"cached_tokens",
+	"reasoning_tokens",
+	"audio_tokens",
+	"cache_tokens",
+	"sort_keys",
+	"index_keys",
 }
 
 // bashRedactionPatterns are regex patterns for bash command redaction.

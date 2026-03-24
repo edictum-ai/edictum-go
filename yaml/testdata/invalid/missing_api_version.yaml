@@ -1,0 +1,15 @@
+kind: ContractBundle
+metadata:
+  name: missing-api
+defaults:
+  mode: enforce
+contracts:
+  - id: c1
+    type: pre
+    tool: Bash
+    when:
+      "args.command":
+        contains: "rm"
+    then:
+      effect: deny
+      message: "Denied"

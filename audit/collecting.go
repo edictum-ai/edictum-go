@@ -56,6 +56,15 @@ func (c *CollectingSink) Emit(_ context.Context, event *Event) error {
 	if event.ToolArgs != nil {
 		cp.ToolArgs = deepCopyMap(event.ToolArgs)
 	}
+	if pm, ok := event.Principal.(map[string]any); ok {
+		cp.Principal = deepCopyMap(pm)
+	}
+	if event.HooksEvaluated != nil {
+		cp.HooksEvaluated = deepCopyRecordSlice(event.HooksEvaluated)
+	}
+	if event.ContractsEvaluated != nil {
+		cp.ContractsEvaluated = deepCopyRecordSlice(event.ContractsEvaluated)
+	}
 
 	c.events = append(c.events, cp)
 	c.totalEmitted++
@@ -155,7 +164,24 @@ func deepCopyEvent(e Event) Event {
 	if e.ToolArgs != nil {
 		e.ToolArgs = deepCopyMap(e.ToolArgs)
 	}
+	if pm, ok := e.Principal.(map[string]any); ok {
+		e.Principal = deepCopyMap(pm)
+	}
+	if e.HooksEvaluated != nil {
+		e.HooksEvaluated = deepCopyRecordSlice(e.HooksEvaluated)
+	}
+	if e.ContractsEvaluated != nil {
+		e.ContractsEvaluated = deepCopyRecordSlice(e.ContractsEvaluated)
+	}
 	return e
+}
+
+func deepCopyRecordSlice(src []map[string]any) []map[string]any {
+	dst := make([]map[string]any, len(src))
+	for i, item := range src {
+		dst[i] = deepCopyMap(item)
+	}
+	return dst
 }
 
 // deepCopyMap recursively copies a map[string]any.

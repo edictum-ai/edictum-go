@@ -51,7 +51,7 @@ func resolveSelector(selector string, env envelope.ToolEnvelope, outputText stri
 	}
 
 	if selector == "output.text" {
-		if outputText == "" {
+		if ec != nil && !ec.outputPresent {
 			return missing
 		}
 		return outputText

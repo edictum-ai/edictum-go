@@ -1,0 +1,16 @@
+apiVersion: edictum/v1
+kind: ContractBundle
+metadata:
+  name: basic-bundle
+defaults:
+  mode: enforce
+contracts:
+  - id: no-rm
+    type: pre
+    tool: Bash
+    when:
+      "args.command":
+        contains: "rm -rf"
+    then:
+      effect: deny
+      message: "Cannot run rm -rf"

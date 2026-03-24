@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -12,6 +13,21 @@ import (
 // redirectPrefixRe matches shell redirection operators at the start of a token.
 // Matches: >>, >, <<, <, or fd-prefixed variants like 2>, 2>>.
 var redirectPrefixRe = regexp.MustCompile(`^(?:\d*>>|>>|\d*>|>|<<|<)`)
+
+// shellOperators lists separators/metacharacters that make the first command
+// token unsafe to trust for allowlist extraction. Bare "$" is intentionally
+// omitted here: sandbox allowlists should still accept commands like
+// "echo $HOME", even though envelope-side side-effect classification remains
+// conservative and treats "$"-containing shell as irreversible.
+//
+// Python is the canonical reference: redirects are not treated as command
+// separators here because they do not start a second command. Redirect safety
+// is enforced by path extraction/path constraints, while redirect-prefixed
+// commands still fail closed below.
+var shellOperators = []string{
+	"\n", "\r", ";", "|", "&", "`",
+	"$(", "${", "$'", "<(", ">(", "<<<", "<<",
+}
 
 // pathArgKeys are argument keys that conventionally hold file paths.
 var pathArgKeys = map[string]bool{
@@ -121,6 +137,10 @@ func ExtractCommand(env envelope.ToolEnvelope) string {
 		return ""
 	}
 
+	if hasShellOperator(stripped) {
+		return "\x00"
+	}
+
 	// If the raw first whitespace-token starts with a redirect operator,
 	// the "command" is actually a redirect target. Fail closed.
 	rawFirst := strings.Fields(stripped)[0]
@@ -153,10 +173,61 @@ func tokenizeCommand(cmd string) []string {
 // resolvePath resolves a path via filepath.EvalSymlinks. Falls back to
 // filepath.Clean for non-existent paths (still handles ".." traversals).
 func resolvePath(p string) string {
-	resolved, err := filepath.EvalSymlinks(p)
-	if err != nil {
-		// Non-existent path: filepath.Clean still normalizes ".." and "."
-		return filepath.Clean(p)
+	if p == "" {
+		return ""
 	}
-	return resolved
+
+	cleaned := filepath.Clean(p)
+	if abs, err := filepath.Abs(cleaned); err == nil {
+		cleaned = abs
+	}
+
+	if resolved, err := filepath.EvalSymlinks(cleaned); err == nil {
+		return resolved
+	}
+
+	parts := make([]string, 0, 4)
+	current := cleaned
+	existingPrefix := deepestExistingPrefix(cleaned)
+	for current != existingPrefix {
+		parts = append(parts, filepath.Base(current))
+		current = filepath.Dir(current)
+	}
+
+	if resolved, err := filepath.EvalSymlinks(existingPrefix); err == nil {
+		for i := len(parts) - 1; i >= 0; i-- {
+			resolved = filepath.Join(resolved, parts[i])
+		}
+		return filepath.Clean(resolved)
+	}
+
+	return filepath.Clean(cleaned)
+}
+
+func hasShellOperator(command string) bool {
+	for _, op := range shellOperators {
+		if strings.Contains(command, op) {
+			return true
+		}
+	}
+	return false
+}
+
+func pathExists(p string) bool {
+	_, err := os.Lstat(p)
+	return err == nil
+}
+
+func deepestExistingPrefix(p string) string {
+	current := p
+	for {
+		if pathExists(current) {
+			return current
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return current
+		}
+		current = parent
+	}
 }

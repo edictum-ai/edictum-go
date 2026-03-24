@@ -224,11 +224,23 @@ func TestRunPostconditionRedact(t *testing.T) {
 	}
 }
 
-// TestRun_ObserveMode_ApprovalFallsThrough proves that in observe mode,
-// a precondition with Effect="approve" does NOT block on approval.
-// Instead it emits CALL_WOULD_DENY and executes the tool.
-func TestRun_ObserveMode_ApprovalFallsThrough(t *testing.T) {
+// TestRun_ObserveMode_ApprovalUsesBackend proves that observe mode still
+// honors pending_approval instead of bypassing it.
+func TestRun_ObserveMode_ApprovalUsesBackend(t *testing.T) {
+	requested := 0
+	polled := 0
 	toolExecuted := false
+	mock := &mockApprovalBackend{
+		onRequest: func(_ context.Context, _ string, _ map[string]any, _ string, _ ...approval.RequestOption) (approval.Request, error) {
+			requested++
+			return approval.NewRequest("observe-approval", "Bash", nil, "needs approval"), nil
+		},
+		onPoll: func(_ context.Context, _ string) (approval.Decision, error) {
+			polled++
+			return approval.Decision{Approved: true, Status: approval.StatusApproved}, nil
+		},
+	}
+
 	g := New(
 		WithMode("observe"),
 		WithContracts(
@@ -241,8 +253,7 @@ func TestRun_ObserveMode_ApprovalFallsThrough(t *testing.T) {
 				},
 			},
 		),
-		// Deliberately NO approval backend -- in enforce mode this would
-		// error. In observe mode it must not reach the backend at all.
+		WithApprovalBackend(mock),
 	)
 
 	ctx := context.Background()
@@ -260,18 +271,16 @@ func TestRun_ObserveMode_ApprovalFallsThrough(t *testing.T) {
 	if result != "executed" {
 		t.Errorf("result: got %v, want 'executed'", result)
 	}
-
-	// Verify CALL_WOULD_DENY was emitted
-	events := g.LocalSink().Events()
-	hasWouldDeny := false
-	for _, e := range events {
-		if e.Action == audit.ActionCallWouldDeny {
-			hasWouldDeny = true
-			break
-		}
+	if requested != 1 || polled != 1 {
+		t.Fatalf("approval backend calls = request:%d poll:%d, want 1 each", requested, polled)
 	}
-	if !hasWouldDeny {
-		t.Error("expected CALL_WOULD_DENY audit event for approval in observe mode")
+	events := g.LocalSink().Events()
+	actions := make([]audit.Action, 0, len(events))
+	for _, e := range events {
+		actions = append(actions, e.Action)
+	}
+	if len(actions) < 2 || actions[0] != audit.ActionCallApprovalRequested || actions[1] != audit.ActionCallApprovalGranted {
+		t.Fatalf("unexpected leading audit actions: %v", actions)
 	}
 }
 
@@ -320,6 +329,57 @@ func TestRun_ApprovalTimeoutPropagated(t *testing.T) {
 	}
 	if capturedReq.TimeoutEffect() != "allow" {
 		t.Errorf("timeout_effect: got %q, want 'allow'", capturedReq.TimeoutEffect())
+	}
+}
+
+func TestRun_DenialAuditIncludesPythonStyleFields(t *testing.T) {
+	g := New(
+		WithContracts(contract.Precondition{
+			Name: "deny-all",
+			Tool: "*",
+			Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+				return contract.Fail("blocked"), nil
+			},
+		}),
+	)
+
+	principal := envelope.NewPrincipal(
+		envelope.WithUserID("u-123"),
+		envelope.WithClaims(map[string]any{"team": "security"}),
+	)
+
+	_, err := g.Run(context.Background(), "Bash", map[string]any{"command": "ls"}, nopCallable,
+		WithRunPrincipal(&principal))
+	if err == nil {
+		t.Fatal("expected denial")
+	}
+
+	events := g.LocalSink().Events()
+	if len(events) == 0 {
+		t.Fatal("expected audit events")
+	}
+	event := events[0]
+	if event.Action != audit.ActionCallDenied {
+		t.Fatalf("Action = %q, want %q", event.Action, audit.ActionCallDenied)
+	}
+	if event.Mode != "enforce" {
+		t.Fatalf("Mode = %q, want enforce", event.Mode)
+	}
+	if len(event.ContractsEvaluated) != 1 {
+		t.Fatalf("ContractsEvaluated len = %d, want 1", len(event.ContractsEvaluated))
+	}
+	if len(event.HooksEvaluated) != 0 {
+		t.Fatalf("HooksEvaluated len = %d, want 0", len(event.HooksEvaluated))
+	}
+	if event.Principal == nil {
+		t.Fatal("expected principal in audit event")
+	}
+	principalMap, ok := event.Principal.(map[string]any)
+	if !ok {
+		t.Fatalf("principal type = %T, want map[string]any", event.Principal)
+	}
+	if principalMap["user_id"] != "u-123" {
+		t.Fatalf("principal.user_id = %v", principalMap["user_id"])
 	}
 }
 

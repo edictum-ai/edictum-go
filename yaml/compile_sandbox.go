@@ -35,7 +35,15 @@ func compileSandbox(raw map[string]any, mode string) (contract.Precondition, err
 		Mode:   mode,
 		Source: "yaml_sandbox",
 		Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
-			return sandbox.Check(env, cfg)
+			verdict, err := sandbox.Check(env, cfg)
+			if err != nil || verdict.Passed() {
+				return verdict, err
+			}
+			template := cfg.Message
+			if template == "" {
+				template = verdict.Message()
+			}
+			return contract.Fail(expandMessage(template, env, "", nil, false)), nil
 		},
 	}
 	if isObserve {

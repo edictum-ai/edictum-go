@@ -49,14 +49,16 @@ func compilePre(
 			result := EvaluateExpression(compiled, env, "",
 				WithCustomOperators(cc.customOperators),
 				WithCustomSelectors(cc.customSelectors),
+				withOutputPresent(false),
 			)
+			msg := expandMessage(msgTemplate, env, "", cc.customSelectors, false)
 			if result.PolicyError {
-				return contract.Fail(msgTemplate, map[string]any{
+				return contract.Fail(msg, map[string]any{
 					"policy_error": true,
 				}), nil
 			}
 			if result.Matched {
-				return contract.Fail(msgTemplate), nil
+				return contract.Fail(msg), nil
 			}
 			return contract.Pass(), nil
 		},

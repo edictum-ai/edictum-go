@@ -22,11 +22,20 @@ func TestEvent_Defaults(t *testing.T) {
 	if e.Timestamp.IsZero() {
 		t.Fatal("Timestamp is zero")
 	}
-	if e.Mode != "" {
-		t.Fatalf("Mode = %q, want empty string (zero value)", e.Mode)
+	if e.Mode != "enforce" {
+		t.Fatalf("Mode = %q, want %q", e.Mode, "enforce")
 	}
 	if e.ToolSuccess != nil {
 		t.Fatalf("ToolSuccess = %v, want nil", e.ToolSuccess)
+	}
+	if e.DurationMs != nil {
+		t.Fatalf("DurationMs = %v, want nil", e.DurationMs)
+	}
+	if e.ToolArgs == nil {
+		t.Fatal("ToolArgs should default to an empty map")
+	}
+	if e.HooksEvaluated == nil || e.ContractsEvaluated == nil {
+		t.Fatal("evaluated lists should default to non-nil slices")
 	}
 	if e.PolicyError {
 		t.Fatal("PolicyError should be false by default")
@@ -65,16 +74,16 @@ func TestAllActions_StringValues(t *testing.T) {
 		action Action
 		want   string
 	}{
-		{ActionCallDenied, "CALL_DENIED"},
-		{ActionCallWouldDeny, "CALL_WOULD_DENY"},
-		{ActionCallAllowed, "CALL_ALLOWED"},
-		{ActionCallExecuted, "CALL_EXECUTED"},
-		{ActionCallFailed, "CALL_FAILED"},
-		{ActionPostconditionWarning, "POSTCONDITION_WARNING"},
-		{ActionCallApprovalRequested, "CALL_APPROVAL_REQUESTED"},
-		{ActionCallApprovalGranted, "CALL_APPROVAL_GRANTED"},
-		{ActionCallApprovalDenied, "CALL_APPROVAL_DENIED"},
-		{ActionCallApprovalTimeout, "CALL_APPROVAL_TIMEOUT"},
+		{ActionCallDenied, "call_denied"},
+		{ActionCallWouldDeny, "call_would_deny"},
+		{ActionCallAllowed, "call_allowed"},
+		{ActionCallExecuted, "call_executed"},
+		{ActionCallFailed, "call_failed"},
+		{ActionPostconditionWarning, "postcondition_warning"},
+		{ActionCallApprovalRequested, "call_approval_requested"},
+		{ActionCallApprovalGranted, "call_approval_granted"},
+		{ActionCallApprovalDenied, "call_approval_denied"},
+		{ActionCallApprovalTimeout, "call_approval_timeout"},
 	}
 	for _, tc := range cases {
 		if string(tc.action) != tc.want {
@@ -111,6 +120,26 @@ type failingSink struct {
 
 func (s *failingSink) Emit(_ context.Context, _ *Event) error {
 	return s.err
+}
+
+type mutatingSink struct {
+	mutate func(*Event)
+}
+
+func (s *mutatingSink) Emit(_ context.Context, event *Event) error {
+	if s.mutate != nil {
+		s.mutate(event)
+	}
+	return nil
+}
+
+type captureSink struct {
+	last Event
+}
+
+func (s *captureSink) Emit(_ context.Context, event *Event) error {
+	s.last = deepCopyEvent(*event)
+	return nil
 }
 
 func TestCompositeSink_FanOut(t *testing.T) {
@@ -188,6 +217,54 @@ func TestCompositeSink_PanicsOnEmpty(t *testing.T) {
 		}
 	}()
 	NewCompositeSink()
+}
+
+func TestCompositeSink_DeepCopiesEvaluatedRecords(t *testing.T) {
+	first := &mutatingSink{
+		mutate: func(event *Event) {
+			event.HooksEvaluated[0]["status"] = "mutated"
+			event.ContractsEvaluated[0]["details"].(map[string]any)["value"] = "changed"
+		},
+	}
+	second := &captureSink{}
+	comp := NewCompositeSink(first, second)
+
+	event := NewEvent()
+	event.HooksEvaluated = []map[string]any{{"status": "original"}}
+	event.ContractsEvaluated = []map[string]any{{
+		"details": map[string]any{"value": "kept"},
+	}}
+
+	if err := comp.Emit(context.Background(), &event); err != nil {
+		t.Fatalf("Emit error: %v", err)
+	}
+	if got := second.last.HooksEvaluated[0]["status"]; got != "original" {
+		t.Fatalf("HooksEvaluated leaked mutation: got %v, want original", got)
+	}
+	details := second.last.ContractsEvaluated[0]["details"].(map[string]any)
+	if got := details["value"]; got != "kept" {
+		t.Fatalf("ContractsEvaluated leaked mutation: got %v, want kept", got)
+	}
+}
+
+func TestCompositeSink_DeepCopiesPrincipal(t *testing.T) {
+	first := &mutatingSink{
+		mutate: func(event *Event) {
+			event.Principal.(map[string]any)["user_id"] = "mutated"
+		},
+	}
+	second := &captureSink{}
+	comp := NewCompositeSink(first, second)
+
+	event := NewEvent()
+	event.Principal = map[string]any{"user_id": "original"}
+
+	if err := comp.Emit(context.Background(), &event); err != nil {
+		t.Fatalf("Emit error: %v", err)
+	}
+	if got := second.last.Principal.(map[string]any)["user_id"]; got != "original" {
+		t.Fatalf("Principal leaked mutation: got %v, want original", got)
+	}
 }
 
 // --- CollectingSink ---
