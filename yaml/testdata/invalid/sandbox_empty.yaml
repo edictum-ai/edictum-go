@@ -1,0 +1,11 @@
+apiVersion: edictum/v1
+kind: ContractBundle
+metadata:
+  name: empty-sandbox
+defaults:
+  mode: enforce
+contracts:
+  - id: c1
+    type: sandbox
+    tool: Bash
+    message: "Denied"

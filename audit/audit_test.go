@@ -28,6 +28,9 @@ func TestEvent_Defaults(t *testing.T) {
 	if e.ToolSuccess != nil {
 		t.Fatalf("ToolSuccess = %v, want nil", e.ToolSuccess)
 	}
+	if e.DurationMs != nil {
+		t.Fatalf("DurationMs = %v, want nil", e.DurationMs)
+	}
 	if e.ToolArgs == nil {
 		t.Fatal("ToolArgs should default to an empty map")
 	}

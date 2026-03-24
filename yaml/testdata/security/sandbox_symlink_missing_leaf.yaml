@@ -1,0 +1,13 @@
+apiVersion: edictum/v1
+kind: ContractBundle
+metadata:
+  name: security-symlink-leaf
+defaults:
+  mode: enforce
+contracts:
+  - id: within-link
+    type: sandbox
+    tool: ReadFile
+    within:
+      - __LINK_ROOT__
+    message: "Read must stay inside linked root"

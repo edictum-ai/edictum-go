@@ -62,7 +62,7 @@ type Event struct {
 	ContractsEvaluated    []map[string]any `json:"contracts_evaluated"`
 	ToolSuccess           *bool            `json:"tool_success,omitempty"`
 	PostconditionsPassed  *bool            `json:"postconditions_passed,omitempty"`
-	DurationMs            int              `json:"duration_ms"`
+	DurationMs            *float64         `json:"duration_ms,omitempty"`
 	Error                 string           `json:"error,omitempty"`
 	ResultSummary         string           `json:"result_summary,omitempty"`
 	SessionAttemptCount   *int             `json:"session_attempt_count,omitempty"`

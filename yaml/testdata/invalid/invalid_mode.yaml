@@ -1,0 +1,16 @@
+apiVersion: edictum/v1
+kind: ContractBundle
+metadata:
+  name: invalid-mode
+defaults:
+  mode: shadow
+contracts:
+  - id: c1
+    type: pre
+    tool: Bash
+    when:
+      "args.command":
+        contains: "rm"
+    then:
+      effect: deny
+      message: "Denied"

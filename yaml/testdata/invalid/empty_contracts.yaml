@@ -1,0 +1,7 @@
+apiVersion: edictum/v1
+kind: ContractBundle
+metadata:
+  name: empty-contracts
+defaults:
+  mode: enforce
+contracts: []

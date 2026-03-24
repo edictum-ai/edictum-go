@@ -1,0 +1,19 @@
+apiVersion: edictum/v1
+kind: ContractBundle
+metadata:
+  name: bad-tools
+defaults:
+  mode: enforce
+tools:
+  Bash:
+    side_effect: destructive
+contracts:
+  - id: c1
+    type: pre
+    tool: Bash
+    when:
+      "args.command":
+        contains: "rm"
+    then:
+      effect: deny
+      message: "Denied"

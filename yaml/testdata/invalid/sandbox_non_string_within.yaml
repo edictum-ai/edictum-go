@@ -1,0 +1,13 @@
+apiVersion: edictum/v1
+kind: ContractBundle
+metadata:
+  name: sandbox-non-string
+defaults:
+  mode: enforce
+contracts:
+  - id: c1
+    type: sandbox
+    tool: Bash
+    within:
+      - 42
+    message: "Denied"

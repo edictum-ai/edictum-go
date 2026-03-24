@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	placeholderRe  = regexp.MustCompile(`\{([^}]+)\}`)
-	placeholderCap = 200
+	placeholderRe          = regexp.MustCompile(`\{([^}]+)\}`)
+	placeholderCap         = 200
+	messageRedactionPolicy = redaction.NewPolicy()
 )
 
 func expandMessage(
@@ -20,8 +21,6 @@ func expandMessage(
 	customSelectors map[string]func(envelope.ToolEnvelope) map[string]any,
 	outputPresent bool,
 ) string {
-	policy := redaction.NewPolicy()
-
 	return placeholderRe.ReplaceAllStringFunc(template, func(match string) string {
 		submatches := placeholderRe.FindStringSubmatch(match)
 		if len(submatches) != 2 {
@@ -45,7 +44,7 @@ func expandMessage(
 		}
 
 		text := fmt.Sprint(value)
-		if policy.DetectSecretValue(text) {
+		if messageRedactionPolicy.DetectSecretValue(text) {
 			text = "[REDACTED]"
 		}
 		if len(text) > placeholderCap {

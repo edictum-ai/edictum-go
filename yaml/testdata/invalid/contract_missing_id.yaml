@@ -1,0 +1,15 @@
+apiVersion: edictum/v1
+kind: ContractBundle
+metadata:
+  name: missing-contract-id
+defaults:
+  mode: enforce
+contracts:
+  - type: pre
+    tool: Bash
+    when:
+      "args.command":
+        contains: "rm"
+    then:
+      effect: deny
+      message: "Denied"

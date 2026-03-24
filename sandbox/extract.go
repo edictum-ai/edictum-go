@@ -14,6 +14,11 @@ import (
 // Matches: >>, >, <<, <, or fd-prefixed variants like 2>, 2>>.
 var redirectPrefixRe = regexp.MustCompile(`^(?:\d*>>|>>|\d*>|>|<<|<)`)
 
+// shellOperators lists separators/metacharacters that make the first command
+// token unsafe to trust for allowlist extraction. Bare "$" is intentionally
+// omitted here: sandbox allowlists should still accept commands like
+// "echo $HOME", even though envelope-side side-effect classification remains
+// conservative and treats "$"-containing shell as irreversible.
 var shellOperators = []string{
 	"\n", "\r", "<(", "<<", "${", ">", ">>", "|", ";", "&&", "||",
 	"$(", "`", "#{",

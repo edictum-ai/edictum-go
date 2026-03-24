@@ -1,0 +1,14 @@
+apiVersion: edictum/v1
+kind: ContractBundle
+metadata:
+  name: sandbox-bundle
+defaults:
+  mode: enforce
+contracts:
+  - id: allow-echo
+    type: sandbox
+    tool: Bash
+    allows:
+      commands:
+        - echo
+    message: "Only echo is allowed"
