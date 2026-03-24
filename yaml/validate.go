@@ -191,17 +191,23 @@ func validateSandboxContracts(data map[string]any) error {
 			continue
 		}
 		cid, _ := cm["id"].(string)
-		// Require at least one constraint — a sandbox contract with no
-		// boundaries would silently allow all calls.
+		// Require at least one non-empty primary constraint — a sandbox
+		// contract with no effective boundaries would silently allow all calls.
+		// Empty lists (within: []) and empty maps (allows: {}) do not count.
 		hasConstraint := false
-		for _, field := range []string{"within", "not_within", "allows", "not_allows"} {
-			if _, ok := cm[field]; ok {
+		if within, ok := cm["within"].([]any); ok && len(within) > 0 {
+			hasConstraint = true
+		}
+		if allows, ok := cm["allows"].(map[string]any); ok {
+			if cmds, ok := allows["commands"].([]any); ok && len(cmds) > 0 {
 				hasConstraint = true
-				break
+			}
+			if doms, ok := allows["domains"].([]any); ok && len(doms) > 0 {
+				hasConstraint = true
 			}
 		}
 		if !hasConstraint {
-			return fmt.Errorf("yaml: contract %q: sandbox contract must have at least one constraint (within, not_within, or allows)", cid)
+			return fmt.Errorf("yaml: contract %q: sandbox contract must have at least one primary constraint (within or allows with non-empty values)", cid)
 		}
 		if _, ok := cm["not_within"]; ok {
 			if _, ok := cm["within"]; !ok {

@@ -321,7 +321,7 @@ contracts:
 	}
 }
 
-// Cat 3.6 — Sandbox: not_within requires within
+// Cat 3.6 — Sandbox: not_within without within (no primary constraint)
 func TestLoadBundleString_SandboxNotWithinRequiresWithin(t *testing.T) {
 	y := `apiVersion: edictum/v1
 kind: ContractBundle
@@ -336,12 +336,13 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for not_within without within")
 	}
-	if !strings.Contains(err.Error(), "not_within requires within") {
+	// Rejected by the primary constraint check (no within or allows).
+	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-// Cat 3.6 — Sandbox: not_allows requires allows
+// Cat 3.6 — Sandbox: not_allows without allows (no primary constraint)
 func TestLoadBundleString_SandboxNotAllowsRequiresAllows(t *testing.T) {
 	y := `apiVersion: edictum/v1
 kind: ContractBundle
@@ -350,14 +351,15 @@ contracts:
     type: sandbox
     tool: Bash
     not_allows:
-      commands:
-        - rm
+      domains:
+        - evil.com
 `
 	_, _, err := LoadBundleString(y)
 	if err == nil {
 		t.Fatal("expected error for not_allows without allows")
 	}
-	if !strings.Contains(err.Error(), "not_allows requires allows") {
+	// Rejected by the primary constraint check (no within or allows).
+	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -442,7 +444,45 @@ contracts:
 	if err == nil {
 		t.Fatal("expected error for sandbox with no constraints")
 	}
-	if !strings.Contains(err.Error(), "must have at least one constraint") {
+	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Cat 3.6 — Sandbox: within: [] (empty list) is rejected
+func TestLoadBundleString_SandboxEmptyWithinRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: empty-within
+    type: sandbox
+    tool: read_file
+    within: []
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for sandbox with empty within list")
+	}
+	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// Cat 3.6 — Sandbox: allows: {} (empty map) is rejected
+func TestLoadBundleString_SandboxEmptyAllowsRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: empty-allows
+    type: sandbox
+    tool: Bash
+    allows: {}
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for sandbox with empty allows")
+	}
+	if !strings.Contains(err.Error(), "must have at least one primary constraint") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
