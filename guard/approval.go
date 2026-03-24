@@ -30,6 +30,8 @@ func (g *Guard) handleApproval(
 	args map[string]any,
 ) (any, error) {
 	if g.approvalBackend == nil {
+		telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval backend not configured")
+		g.telemetry.RecordDenial(ctx, env2.ToolName())
 		return nil, &edictum.DeniedError{
 			Reason:         fmt.Sprintf("Approval required but no approval backend configured: %s", pre.Reason),
 			DecisionSource: pre.DecisionSource,
