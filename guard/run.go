@@ -88,7 +88,7 @@ func (g *Guard) Run(
 	}
 
 	// Start governance span
-	ctx, span := g.telemetry.Tracer().Start(ctx, "edictum.governance "+toolName,
+	ctx, span := g.telemetry.Tracer().Start(ctx, "edictum.governance "+env2.ToolName(),
 		trace.WithAttributes(telemetry.ToolSpanAttrs(
 			env2.ToolName(),
 			string(env2.SideEffect()),
@@ -106,12 +106,14 @@ func (g *Guard) Run(
 	// the limit, so it is allowed; the second call sees attempt_count=2
 	// which exceeds the limit, so it is denied.
 	if _, err := sess.IncrementAttempts(ctx); err != nil {
+		telemetry.SetSpanError(span, fmt.Sprintf("increment attempts: %v", err))
 		return nil, fmt.Errorf("increment attempts: %w", err)
 	}
 
 	pipe := pipeline.New(g)
 	pre, err := pipe.PreExecute(ctx, env2, sess)
 	if err != nil {
+		telemetry.SetSpanError(span, fmt.Sprintf("pre-execute: %v", err))
 		return nil, fmt.Errorf("pre-execute: %w", err)
 	}
 
@@ -120,6 +122,7 @@ func (g *Guard) Run(
 	// through to execution, consistent with how ordinary denies behave.
 	if pre.Action == "pending_approval" {
 		if mode == "observe" {
+			g.telemetry.RecordDenial(ctx, env2.ToolName())
 			g.emitPreAudit(ctx, env2, sess, audit.ActionCallWouldDeny, pre, mode, policyVersion)
 			return g.executeAndPost(ctx, env2, sess, pipe, mode, policyVersion, toolCallable, args)
 		}

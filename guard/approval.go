@@ -96,7 +96,11 @@ func (g *Guard) handleApproval(
 		return g.executeAndPost(ctx, env2, sess, pipe, mode, policyVersion, toolCallable, args)
 	}
 
-	telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval denied or timed out")
+	// For timeout: span error was already set before ctx was replaced
+	// (line 69). This call is a no-op on the timeout path (ctx is
+	// Background(), SpanFromContext returns no-op) but correctly marks
+	// the span on the human-denial path where ctx still carries it.
+	telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval denied")
 	g.telemetry.RecordDenial(ctx, env2.ToolName())
 	reason := decision.Reason
 	if reason == "" {

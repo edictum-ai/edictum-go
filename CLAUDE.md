@@ -55,7 +55,7 @@ edictum-go/
 
 1. **Full feature parity with Python.** 147 features across 12 categories. Every feature has a parity test ID. If Python passes and Go fails, it's a bug.
 2. **Security is non-negotiable.** This is a security product. No shortcuts, no "good enough", no deferred fixes for vulnerabilities. Fail closed on every error path.
-3. **Zero runtime deps in core.** Optional: `gopkg.in/yaml.v3`, `github.com/santhosh-tekuri/jsonschema`, `go.opentelemetry.io/otel`. Core runs with stdlib only.
+3. **Zero runtime deps in core.** Optional: `gopkg.in/yaml.v3`, `github.com/santhosh-tekuri/jsonschema`. The `go.opentelemetry.io/otel` API packages (trace, metric) are module-level deps imported by `guard` via `telemetry/` — they are lightweight interfaces with no-op defaults and zero overhead when no SDK is configured. The OTel SDK is NOT a dependency (test-only).
 4. **Struct literals for contracts.** Interfaces define protocols. Structs define data. Functional options for optional config. No reflection magic.
 5. **`context.Context` everywhere.** Every pipeline, session, and audit sink method takes `ctx context.Context` as first parameter.
 6. **Immutability by API design.** Unexported fields + getter methods + value receivers. No `Object.freeze()` in Go — enforce via encapsulation.
