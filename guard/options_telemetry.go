@@ -33,7 +33,12 @@ func WithMeterProvider(mp metric.MeterProvider) Option {
 
 // WithTelemetry sets a pre-configured GovernanceTelemetry instance.
 // Overrides any prior WithTracerProvider/WithMeterProvider (last writer wins).
+// Panics if t is nil (construction-time programmer error, consistent with
+// WithMode and WithContracts).
 func WithTelemetry(t *telemetry.GovernanceTelemetry) Option {
+	if t == nil {
+		panic("WithTelemetry: nil GovernanceTelemetry")
+	}
 	return func(g *Guard) {
 		g.telemetry = t
 		g.telOpts = nil // clear provider options

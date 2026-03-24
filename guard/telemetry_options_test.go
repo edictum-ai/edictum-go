@@ -35,6 +35,23 @@ func TestWithTelemetry_OverridesProviderOptions(t *testing.T) {
 	}
 }
 
+func TestWithTelemetry_NilPanics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic from WithTelemetry(nil)")
+		}
+		msg, ok := r.(string)
+		if !ok {
+			t.Fatalf("panic value: got %T, want string", r)
+		}
+		if msg != "WithTelemetry: nil GovernanceTelemetry" {
+			t.Errorf("panic message: got %q", msg)
+		}
+	}()
+	WithTelemetry(nil)
+}
+
 func TestWithTracerProvider_OverridesWithTelemetry(t *testing.T) {
 	tp1 := newTTP()
 	tp2 := newTTP()

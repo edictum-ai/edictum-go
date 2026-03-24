@@ -38,6 +38,12 @@ func (s *testSpan) SetStatus(code codes.Code, desc string) {
 	s.recorded.StatusDesc = desc
 }
 
+func (s *testSpan) SetAttributes(attrs ...attribute.KeyValue) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recorded.Attrs = append(s.recorded.Attrs, attrs...)
+}
+
 func (s *testSpan) End(...trace.SpanEndOption) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

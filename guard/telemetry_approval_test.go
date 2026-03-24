@@ -50,6 +50,47 @@ func TestApprovalGranted_RecordsAllowedCounter(t *testing.T) {
 	}
 }
 
+func TestApprovalNilBackend_RecordsDenialCounter(t *testing.T) {
+	mp := newTMP()
+	tp := newTTP()
+	tel := telemetry.New(
+		telemetry.WithTracerProvider(tp),
+		telemetry.WithMeterProvider(mp),
+	)
+	pre := contract.Precondition{
+		Name:   "needs-approval",
+		Effect: "approve",
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+			return contract.Fail("needs approval"), nil
+		},
+	}
+	// No approval backend — should deny immediately.
+	g := New(
+		WithTelemetry(tel),
+		WithContracts(pre),
+	)
+
+	_, err := g.Run(context.Background(), "Bash",
+		map[string]any{"command": "ls"}, nopCallable)
+	if err == nil {
+		t.Fatal("expected denial error when no approval backend configured")
+	}
+
+	mp.meter.mu.Lock()
+	recs := mp.meter.recs
+	mp.meter.mu.Unlock()
+	found := false
+	for _, r := range recs {
+		if r.Name == "edictum.calls.denied" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected edictum.calls.denied when approval backend is nil")
+	}
+}
+
 func TestApprovalDenied_RecordsDenialCounter(t *testing.T) {
 	mp := newTMP()
 	tp := newTTP()
