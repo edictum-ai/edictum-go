@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	edictum "github.com/edictum-ai/edictum-go"
@@ -64,9 +65,15 @@ func (g *Guard) handleApproval(
 		// since the original context is expired.
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			// Mark the span BEFORE dropping the context that carries it.
-			// After ctx is replaced with Background(), SpanFromContext
-			// returns a no-op and the timeout would be invisible in traces.
-			telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval timeout")
+			// Set ERROR only when timeout results in deny (default).
+			// For timeout_effect=allow, the span status should match
+			// the governance outcome (allowed), so use an attribute.
+			if pre.ApprovalTimeoutEff != "allow" {
+				telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval timeout")
+			} else {
+				trace.SpanFromContext(ctx).SetAttributes(
+					attribute.Bool("governance.approval_timeout", true))
+			}
 			decision = approval.Decision{
 				Status:    approval.StatusTimeout,
 				Timestamp: time.Now().UTC(),
