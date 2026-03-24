@@ -5,41 +5,74 @@ import (
 
 	"github.com/edictum-ai/edictum-go/contract"
 	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/sandbox"
 )
 
-// compileSandbox creates a stub Precondition for sandbox contracts.
-// Sandbox contracts use within/not_within/allows/not_allows — not when/then —
-// so they cannot go through compilePre. The actual sandbox evaluation is wired
-// by the guard through the sandbox package at runtime.
+// compileSandbox creates a Precondition for sandbox contracts with the
+// sandbox evaluation logic baked into the Check closure.
 //
-// Check is a pass-through stub. The guard package replaces this with
-// actual sandbox evaluation at runtime via the sandbox package. The YAML
-// compiler's role is to produce routing metadata (Name, Tool, Source, Mode)
-// — the security-critical sandbox checks (path/command/domain) are wired
-// when the guard processes SandboxContracts from the compiled bundle.
+// Sandbox contracts use within/not_within/allows/not_allows — not when/then —
+// so they cannot go through compilePre. The YAML fields are parsed into a
+// sandbox.Config and the Check function calls sandbox.Check directly.
 func compileSandbox(raw map[string]any, mode string) contract.Precondition {
 	cid, _ := raw["id"].(string)
-	// Sandbox contracts use "tools" (list) not "tool" (single).
 	tool := "*"
 	if t, ok := raw["tool"].(string); ok {
 		tool = t
 	}
 	isObserve, _ := raw["_observe"].(bool)
 
+	cfg := parseSandboxConfig(raw)
+
 	pre := contract.Precondition{
 		Name:   cid,
 		Tool:   tool,
 		Mode:   mode,
 		Source: "yaml_sandbox",
-		// Fail-closed stub: if the guard does not replace this Check
-		// with actual sandbox evaluation, the contract denies all calls.
-		// This ensures uninitialized sandbox contracts never silently pass.
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("sandbox contract not initialized — guard must wire sandbox.Check"), nil
+		Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+			return sandbox.Check(env, cfg)
 		},
 	}
 	if isObserve {
 		pre.Mode = "observe"
 	}
 	return pre
+}
+
+// parseSandboxConfig extracts sandbox boundaries from a raw YAML contract map.
+func parseSandboxConfig(raw map[string]any) sandbox.Config {
+	cfg := sandbox.Config{
+		Within:    toStringSlice(raw["within"]),
+		NotWithin: toStringSlice(raw["not_within"]),
+	}
+	if msg, ok := raw["message"].(string); ok {
+		cfg.Message = msg
+	}
+	if allows, ok := raw["allows"].(map[string]any); ok {
+		cfg.AllowedCommands = toStringSlice(allows["commands"])
+		cfg.AllowedDomains = toStringSlice(allows["domains"])
+	}
+	if notAllows, ok := raw["not_allows"].(map[string]any); ok {
+		cfg.BlockedDomains = toStringSlice(notAllows["domains"])
+	}
+	return cfg
+}
+
+// toStringSlice converts an []any of strings to []string. Returns nil if
+// v is nil or not a slice.
+func toStringSlice(v any) []string {
+	items, ok := v.([]any)
+	if !ok || len(items) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

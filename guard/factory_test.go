@@ -1,9 +1,13 @@
 package guard
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	edictum "github.com/edictum-ai/edictum-go"
 )
 
 const validBundle = `apiVersion: edictum/v1
@@ -444,6 +448,163 @@ contracts:
 	se2, idem2 := g.toolRegistry.Classify("OldTool")
 	if se2 == "read" || idem2 {
 		t.Error("OldTool should have been cleared after reload without tools section")
+	}
+}
+
+// --- YAML sandbox integration tests (issue #35) ---
+
+const sandboxWithinBundle = `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: safe-file-paths
+    type: sandbox
+    tool: read_file
+    within: ["/home/", "/tmp/", "/var/log/"]
+    message: "read_file is restricted to /home/, /tmp/, and /var/log/"`
+
+func TestFromYAMLString_SandboxWithinAllows(t *testing.T) {
+	g, err := FromYAMLString(sandboxWithinBundle)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(g.state.sandboxContracts) != 1 {
+		t.Fatalf("sandbox contracts: got %d, want 1", len(g.state.sandboxContracts))
+	}
+
+	ctx := context.Background()
+	result, err := g.Run(ctx, "read_file", map[string]any{"path": "/home/user/notes.txt"}, func(_ map[string]any) (any, error) {
+		return "file contents", nil
+	})
+	if err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+	if result != "file contents" {
+		t.Errorf("expected tool result, got %v", result)
+	}
+}
+
+func TestFromYAMLString_SandboxWithinDenies(t *testing.T) {
+	g, err := FromYAMLString(sandboxWithinBundle)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ctx := context.Background()
+	_, err = g.Run(ctx, "read_file", map[string]any{"path": "/etc/passwd"}, func(_ map[string]any) (any, error) {
+		t.Fatal("callable should not be invoked on deny")
+		return nil, nil
+	})
+	var denied *edictum.DeniedError
+	if !errors.As(err, &denied) {
+		t.Fatalf("expected DeniedError for path outside boundary, got %T: %v", err, err)
+	}
+}
+
+const sandboxNotWithinBundle = `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: safe-but-no-ssh
+    type: sandbox
+    tool: read_file
+    within: ["/home/user"]
+    not_within: ["/home/user/.ssh"]
+    message: "SSH keys are off limits"`
+
+func TestFromYAMLString_SandboxNotWithinDenies(t *testing.T) {
+	g, err := FromYAMLString(sandboxNotWithinBundle)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ctx := context.Background()
+	// Path within /home/user but excluded by not_within
+	_, err = g.Run(ctx, "read_file", map[string]any{"path": "/home/user/.ssh/id_rsa"}, func(_ map[string]any) (any, error) {
+		t.Fatal("callable should not be invoked on deny")
+		return nil, nil
+	})
+	var denied *edictum.DeniedError
+	if !errors.As(err, &denied) {
+		t.Fatalf("expected DeniedError for path in not_within, got %T: %v", err, err)
+	}
+
+	// Path within /home/user and not excluded
+	result, err := g.Run(ctx, "read_file", map[string]any{"path": "/home/user/docs/readme.txt"}, func(_ map[string]any) (any, error) {
+		return "ok", nil
+	})
+	if err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+	if result != "ok" {
+		t.Errorf("expected 'ok', got %v", result)
+	}
+}
+
+const sandboxCommandsBundle = `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: safe-commands
+    type: sandbox
+    tool: Bash
+    allows:
+      commands: ["ls", "cat", "grep"]
+    message: "Only ls, cat, grep allowed"`
+
+func TestFromYAMLString_SandboxCommandAllowDeny(t *testing.T) {
+	g, err := FromYAMLString(sandboxCommandsBundle)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Allowed command
+	result, err := g.Run(ctx, "Bash", map[string]any{"command": "ls -la /tmp"}, func(_ map[string]any) (any, error) {
+		return "output", nil
+	})
+	if err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+	if result != "output" {
+		t.Errorf("expected 'output', got %v", result)
+	}
+
+	// Denied command
+	_, err = g.Run(ctx, "Bash", map[string]any{"command": "rm -rf /tmp"}, func(_ map[string]any) (any, error) {
+		t.Fatal("callable should not be invoked on deny")
+		return nil, nil
+	})
+	var denied *edictum.DeniedError
+	if !errors.As(err, &denied) {
+		t.Fatalf("expected DeniedError for 'rm', got %T: %v", err, err)
+	}
+}
+
+func TestReloadFromYAML_SandboxContractsWired(t *testing.T) {
+	// Start with no sandbox contracts.
+	g, err := FromYAMLString(validBundle)
+	if err != nil {
+		t.Fatalf("initial load: %v", err)
+	}
+	if len(g.state.sandboxContracts) != 0 {
+		t.Fatalf("initial sandbox: got %d, want 0", len(g.state.sandboxContracts))
+	}
+
+	// Reload with sandbox contracts — they must be wired with real Check logic.
+	if err := g.ReloadFromYAML([]byte(sandboxWithinBundle)); err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if len(g.state.sandboxContracts) != 1 {
+		t.Fatalf("reloaded sandbox: got %d, want 1", len(g.state.sandboxContracts))
+	}
+
+	ctx := context.Background()
+	_, err = g.Run(ctx, "read_file", map[string]any{"path": "/etc/shadow"}, func(_ map[string]any) (any, error) {
+		t.Fatal("callable should not be invoked on deny")
+		return nil, nil
+	})
+	var denied *edictum.DeniedError
+	if !errors.As(err, &denied) {
+		t.Fatalf("expected DeniedError after reload, got %T: %v", err, err)
 	}
 }
 

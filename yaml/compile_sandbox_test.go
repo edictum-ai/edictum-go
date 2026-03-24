@@ -1,0 +1,213 @@
+package yaml
+
+import (
+	"context"
+	"testing"
+
+	"github.com/edictum-ai/edictum-go/envelope"
+)
+
+func makeSandboxEnv(t *testing.T, tool string, args map[string]any) envelope.ToolEnvelope {
+	t.Helper()
+	env, err := envelope.CreateEnvelope(context.Background(), envelope.CreateEnvelopeOptions{
+		ToolName: tool,
+		Args:     args,
+	})
+	if err != nil {
+		t.Fatalf("CreateEnvelope: %v", err)
+	}
+	return env
+}
+
+// TestCompileSandbox_WithinAllows verifies that a sandbox contract with
+// "within" paths produces a Check that allows paths inside the boundary.
+func TestCompileSandbox_WithinAllows(t *testing.T) {
+	raw := map[string]any{
+		"id":   "safe-paths",
+		"tool": "read_file",
+		"within": []any{
+			"/home/",
+			"/tmp/",
+		},
+	}
+	pre := compileSandbox(raw, "enforce")
+
+	if pre.Name != "safe-paths" {
+		t.Errorf("Name: got %q, want %q", pre.Name, "safe-paths")
+	}
+	if pre.Source != "yaml_sandbox" {
+		t.Errorf("Source: got %q, want %q", pre.Source, "yaml_sandbox")
+	}
+
+	env := makeSandboxEnv(t, "read_file", map[string]any{"path": "/home/user/notes.txt"})
+	v, err := pre.Check(context.Background(), env)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !v.Passed() {
+		t.Errorf("expected pass for path within /home/, got fail: %s", v.Message())
+	}
+}
+
+// TestCompileSandbox_WithinDenies verifies that a path outside the boundary
+// is denied.
+func TestCompileSandbox_WithinDenies(t *testing.T) {
+	raw := map[string]any{
+		"id":   "safe-paths",
+		"tool": "read_file",
+		"within": []any{
+			"/home/",
+			"/tmp/",
+		},
+		"message": "restricted to /home/ and /tmp/",
+	}
+	pre := compileSandbox(raw, "enforce")
+
+	env := makeSandboxEnv(t, "read_file", map[string]any{"path": "/etc/passwd"})
+	v, err := pre.Check(context.Background(), env)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v.Passed() {
+		t.Error("expected fail for path outside boundary, got pass")
+	}
+	if v.Message() != "restricted to /home/ and /tmp/" {
+		t.Errorf("message: got %q, want custom message", v.Message())
+	}
+}
+
+// TestCompileSandbox_NotWithinDenies verifies that not_within exclusions
+// deny paths even within allowed prefixes.
+func TestCompileSandbox_NotWithinDenies(t *testing.T) {
+	raw := map[string]any{
+		"id":   "safe-paths",
+		"tool": "read_file",
+		"within": []any{
+			"/home/user",
+		},
+		"not_within": []any{
+			"/home/user/.ssh",
+		},
+	}
+	pre := compileSandbox(raw, "enforce")
+
+	env := makeSandboxEnv(t, "read_file", map[string]any{"path": "/home/user/.ssh/id_rsa"})
+	v, err := pre.Check(context.Background(), env)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v.Passed() {
+		t.Error("expected fail for path in not_within, got pass")
+	}
+}
+
+// TestCompileSandbox_AllowedCommands verifies command allowlist.
+func TestCompileSandbox_AllowedCommands(t *testing.T) {
+	raw := map[string]any{
+		"id":   "cmd-sandbox",
+		"tool": "Bash",
+		"allows": map[string]any{
+			"commands": []any{"ls", "cat", "grep"},
+		},
+	}
+	pre := compileSandbox(raw, "enforce")
+
+	// Allowed command
+	env := makeSandboxEnv(t, "Bash", map[string]any{"command": "ls -la /tmp"})
+	v, err := pre.Check(context.Background(), env)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !v.Passed() {
+		t.Errorf("expected pass for 'ls', got fail: %s", v.Message())
+	}
+
+	// Denied command
+	env = makeSandboxEnv(t, "Bash", map[string]any{"command": "rm -rf /tmp"})
+	v, err = pre.Check(context.Background(), env)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v.Passed() {
+		t.Error("expected fail for 'rm', got pass")
+	}
+}
+
+// TestCompileSandbox_ObserveMode verifies _observe flag sets mode correctly.
+func TestCompileSandbox_ObserveMode(t *testing.T) {
+	raw := map[string]any{
+		"id":       "obs-sandbox",
+		"tool":     "Bash",
+		"_observe": true,
+		"within":   []any{"/home/"},
+	}
+	pre := compileSandbox(raw, "enforce")
+	if pre.Mode != "observe" {
+		t.Errorf("Mode: got %q, want %q", pre.Mode, "observe")
+	}
+}
+
+// TestCompileSandbox_DefaultTool verifies wildcard tool when not specified.
+func TestCompileSandbox_DefaultTool(t *testing.T) {
+	raw := map[string]any{
+		"id":     "no-tool",
+		"within": []any{"/safe/"},
+	}
+	pre := compileSandbox(raw, "enforce")
+	if pre.Tool != "*" {
+		t.Errorf("Tool: got %q, want %q", pre.Tool, "*")
+	}
+}
+
+// TestParseSandboxConfig verifies full config extraction.
+func TestParseSandboxConfig(t *testing.T) {
+	raw := map[string]any{
+		"within":     []any{"/home/", "/tmp/"},
+		"not_within": []any{"/home/.ssh"},
+		"message":    "sandbox violation",
+		"allows": map[string]any{
+			"commands": []any{"ls", "cat"},
+			"domains":  []any{"*.example.com"},
+		},
+		"not_allows": map[string]any{
+			"domains": []any{"evil.com"},
+		},
+	}
+	cfg := parseSandboxConfig(raw)
+
+	if len(cfg.Within) != 2 || cfg.Within[0] != "/home/" || cfg.Within[1] != "/tmp/" {
+		t.Errorf("Within: got %v", cfg.Within)
+	}
+	if len(cfg.NotWithin) != 1 || cfg.NotWithin[0] != "/home/.ssh" {
+		t.Errorf("NotWithin: got %v", cfg.NotWithin)
+	}
+	if cfg.Message != "sandbox violation" {
+		t.Errorf("Message: got %q", cfg.Message)
+	}
+	if len(cfg.AllowedCommands) != 2 || cfg.AllowedCommands[0] != "ls" {
+		t.Errorf("AllowedCommands: got %v", cfg.AllowedCommands)
+	}
+	if len(cfg.AllowedDomains) != 1 || cfg.AllowedDomains[0] != "*.example.com" {
+		t.Errorf("AllowedDomains: got %v", cfg.AllowedDomains)
+	}
+	if len(cfg.BlockedDomains) != 1 || cfg.BlockedDomains[0] != "evil.com" {
+		t.Errorf("BlockedDomains: got %v", cfg.BlockedDomains)
+	}
+}
+
+// TestToStringSlice covers edge cases.
+func TestToStringSlice(t *testing.T) {
+	if got := toStringSlice(nil); got != nil {
+		t.Errorf("nil input: got %v, want nil", got)
+	}
+	if got := toStringSlice("not a slice"); got != nil {
+		t.Errorf("string input: got %v, want nil", got)
+	}
+	if got := toStringSlice([]any{42, true}); got != nil {
+		t.Errorf("non-string items: got %v, want nil", got)
+	}
+	got := toStringSlice([]any{"a", "b"})
+	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
+		t.Errorf("valid input: got %v, want [a b]", got)
+	}
+}
