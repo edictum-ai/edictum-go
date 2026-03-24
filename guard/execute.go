@@ -64,11 +64,7 @@ func (g *Guard) executeAndPost(
 	g.emitPostAudit(ctx, env2, sess, postAction, post, mode, policyVersion)
 
 	if !toolSuccess {
-		msg := fmt.Sprintf("%v", result)
-		if len(msg) > 256 {
-			msg = msg[:256] + "..."
-		}
-		telemetry.SetSpanError(trace.SpanFromContext(ctx), "tool failed: "+msg)
+		telemetry.SetSpanError(trace.SpanFromContext(ctx), "tool failed")
 		return nil, &edictum.ToolError{Message: fmt.Sprintf("%v", result)}
 	}
 	// Span status left as Unset (success) — explicitly setting OK would

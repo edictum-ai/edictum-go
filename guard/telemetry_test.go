@@ -125,6 +125,28 @@ func TestWithMeterProvider_DirectOption(t *testing.T) {
 	}
 }
 
+func TestWithTelemetry_PanicsAfterWithTracerProvider(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when WithTelemetry follows WithTracerProvider")
+		}
+	}()
+	tp := newTTP()
+	tel := telemetry.New(telemetry.WithTracerProvider(tp))
+	New(WithTracerProvider(tp), WithTelemetry(tel))
+}
+
+func TestWithTracerProvider_PanicsAfterWithTelemetry(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when WithTracerProvider follows WithTelemetry")
+		}
+	}()
+	tp := newTTP()
+	tel := telemetry.New(telemetry.WithTracerProvider(tp))
+	New(WithTelemetry(tel), WithTracerProvider(tp))
+}
+
 func TestWithTelemetry_MetricsRecorded(t *testing.T) {
 	mp := newTMP()
 	tp := newTTP()

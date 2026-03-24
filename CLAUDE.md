@@ -34,6 +34,7 @@ edictum-go/
 │   ├── eino/              # Eino/CloudWeGo adapter
 │   ├── anthropic/         # Anthropic SDK Go adapter
 │   └── genkit/            # Genkit Go adapter
+├── telemetry/             # OpenTelemetry integration (spans + metrics)
 ├── server/                # Server SDK (HTTP client, SSE, audit sink)
 └── internal/
     ├── shlex/             # Shell tokenizer (security-critical)
