@@ -78,14 +78,18 @@ func New(opts ...Option) *GovernanceTelemetry {
 	noopMeter := noop.NewMeterProvider().Meter(MeterName)
 	denied, err := meter.Int64Counter("edictum.calls.denied",
 		metric.WithDescription("Number of denied tool calls"))
-	if err != nil || denied == nil {
+	if err != nil {
 		otel.Handle(err)
+	}
+	if denied == nil {
 		denied, _ = noopMeter.Int64Counter("edictum.calls.denied")
 	}
 	allowed, err := meter.Int64Counter("edictum.calls.allowed",
 		metric.WithDescription("Number of allowed tool calls"))
-	if err != nil || allowed == nil {
+	if err != nil {
 		otel.Handle(err)
+	}
+	if allowed == nil {
 		allowed, _ = noopMeter.Int64Counter("edictum.calls.allowed")
 	}
 

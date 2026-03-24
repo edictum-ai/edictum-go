@@ -62,7 +62,7 @@ func (g *Guard) handleApproval(
 		// Apply timeout_effect rather than propagating the raw error.
 		// Use a fresh context for post-timeout operations (audit, execution)
 		// since the original context is expired.
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			// Mark the span BEFORE dropping the context that carries it.
 			// After ctx is replaced with Background(), SpanFromContext
 			// returns a no-op and the timeout would be invisible in traces.
