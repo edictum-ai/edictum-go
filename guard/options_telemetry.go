@@ -11,9 +11,10 @@ import (
 // Falls back to the global TracerProvider if not set, which returns no-op
 // spans when no OTel SDK is configured.
 // Safe to combine with WithMeterProvider — both are applied together.
-// Mutually exclusive with WithTelemetry.
+// Overrides any prior WithTelemetry (last writer wins).
 func WithTracerProvider(tp trace.TracerProvider) Option {
 	return func(g *Guard) {
+		g.telemetry = nil // clear WithTelemetry if set
 		g.telOpts = append(g.telOpts, telemetry.WithTracerProvider(tp))
 	}
 }
@@ -22,17 +23,19 @@ func WithTracerProvider(tp trace.TracerProvider) Option {
 // metrics (denied/allowed counters). Falls back to the global
 // MeterProvider if not set.
 // Safe to combine with WithTracerProvider — both are applied together.
-// Mutually exclusive with WithTelemetry.
+// Overrides any prior WithTelemetry (last writer wins).
 func WithMeterProvider(mp metric.MeterProvider) Option {
 	return func(g *Guard) {
+		g.telemetry = nil // clear WithTelemetry if set
 		g.telOpts = append(g.telOpts, telemetry.WithMeterProvider(mp))
 	}
 }
 
 // WithTelemetry sets a pre-configured GovernanceTelemetry instance.
-// Mutually exclusive with WithTracerProvider/WithMeterProvider.
+// Overrides any prior WithTracerProvider/WithMeterProvider (last writer wins).
 func WithTelemetry(t *telemetry.GovernanceTelemetry) Option {
 	return func(g *Guard) {
 		g.telemetry = t
+		g.telOpts = nil // clear provider options
 	}
 }
