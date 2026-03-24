@@ -98,6 +98,31 @@ func TestWithTracerProviderAndMeterProvider_BothWork(t *testing.T) {
 	}
 }
 
+func TestWithMeterProvider_DirectOption(t *testing.T) {
+	mp := newTMP()
+	g := New(WithMeterProvider(mp))
+
+	_, err := g.Run(context.Background(), "Bash",
+		map[string]any{"command": "ls"}, nopCallable)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	mp.meter.mu.Lock()
+	recs := mp.meter.recs
+	mp.meter.mu.Unlock()
+	found := false
+	for _, r := range recs {
+		if r.Name == "edictum.calls.allowed" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected edictum.calls.allowed via WithMeterProvider")
+	}
+}
+
 func TestWithTelemetry_MetricsRecorded(t *testing.T) {
 	mp := newTMP()
 	tp := newTTP()
