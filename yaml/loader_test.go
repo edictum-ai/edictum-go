@@ -386,6 +386,30 @@ contracts:
 	}
 }
 
+// Cat 3.6 — Sandbox: not_allows.commands is rejected (only domains valid)
+func TestLoadBundleString_SandboxNotAllowsCommandsRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: sb4
+    type: sandbox
+    tool: Bash
+    allows:
+      commands:
+        - ls
+    not_allows:
+      commands:
+        - rm
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for not_allows.commands")
+	}
+	if !strings.Contains(err.Error(), "not_allows.commands is not supported") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 // Cat 3.6 — Sandbox: valid with both within and not_within
 func TestLoadBundleString_SandboxValidWithBothWithin(t *testing.T) {
 	y := `apiVersion: edictum/v1

@@ -287,6 +287,40 @@ func TestSecurityYAMLSandboxCommandInjection(t *testing.T) {
 	}
 }
 
+// TestSecurityYAMLSandboxCommandChaining documents the known bypass:
+// space-separated chaining operators (||, &&, |) pass through the
+// command allowlist because only the first token is checked.
+// If this test starts failing, that is a security improvement.
+func TestSecurityYAMLSandboxCommandChaining(t *testing.T) {
+	raw := map[string]any{
+		"id":   "cmd-sandbox",
+		"tool": "Bash",
+		"allows": map[string]any{
+			"commands": []any{"ls"},
+		},
+	}
+	pre := compileSandbox(raw, "enforce")
+
+	// These bypass the sandbox because first token "ls" is in the allowlist.
+	// Fixing this requires OS-level enforcement or multi-token command analysis.
+	bypasses := []string{
+		"ls || rm -rf /",
+		"ls && cat /etc/shadow",
+		"ls | tee /etc/cron.d/evil",
+	}
+	for _, cmd := range bypasses {
+		env := makeSandboxEnv(t, "Bash", map[string]any{"command": cmd})
+		v, err := pre.Check(context.Background(), env)
+		if err != nil {
+			t.Fatalf("unexpected error for %q: %v", cmd, err)
+		}
+		if !v.Passed() {
+			// If this fires, the sandbox now catches chaining — update docs.
+			t.Logf("bypass %q is now caught — security improvement", cmd)
+		}
+	}
+}
+
 // TestSecurityYAMLSandboxDomainBypass verifies that domain bypass
 // attempts through YAML-compiled sandbox contracts are denied.
 func TestSecurityYAMLSandboxDomainBypass(t *testing.T) {

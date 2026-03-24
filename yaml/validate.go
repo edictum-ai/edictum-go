@@ -214,6 +214,12 @@ func validateSandboxContracts(data map[string]any) error {
 			}
 		}
 		if na, ok := cm["not_allows"].(map[string]any); ok {
+			// Only "domains" is a valid key in not_allows.
+			for key := range na {
+				if key != "domains" {
+					return fmt.Errorf("yaml: contract %q: not_allows.%s is not supported (only not_allows.domains is valid)", cid, key)
+				}
+			}
 			if _, ok := na["domains"]; ok {
 				allows, _ := cm["allows"].(map[string]any)
 				if _, ok := allows["domains"]; !ok {
