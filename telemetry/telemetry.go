@@ -8,6 +8,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -72,12 +73,21 @@ func New(opts ...Option) *GovernanceTelemetry {
 	tracer := tp.Tracer(TracerName)
 	meter := mp.Meter(MeterName)
 
-	// OTel API guarantees valid (possibly no-op) instruments for
-	// well-formed counter names. Errors are logged via otel.Handle.
-	denied, _ := meter.Int64Counter("edictum.calls.denied",
+	// OTel API guarantees valid instruments for well-formed names.
+	// Guard against buggy custom MeterProviders that return nil.
+	noopMeter := noop.NewMeterProvider().Meter(MeterName)
+	denied, err := meter.Int64Counter("edictum.calls.denied",
 		metric.WithDescription("Number of denied tool calls"))
-	allowed, _ := meter.Int64Counter("edictum.calls.allowed",
+	if err != nil || denied == nil {
+		otel.Handle(err)
+		denied, _ = noopMeter.Int64Counter("edictum.calls.denied")
+	}
+	allowed, err := meter.Int64Counter("edictum.calls.allowed",
 		metric.WithDescription("Number of allowed tool calls"))
+	if err != nil || allowed == nil {
+		otel.Handle(err)
+		allowed, _ = noopMeter.Int64Counter("edictum.calls.allowed")
+	}
 
 	return &GovernanceTelemetry{
 		tracer:         tracer,

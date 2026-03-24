@@ -155,7 +155,7 @@ func (g *Guard) handlePreDecision(
 		g.emitPreAudit(ctx, env2, sess, action, pre, mode, policyVersion)
 
 		if mode == "enforce" {
-			telemetry.SetSpanError(trace.SpanFromContext(ctx), pre.Reason)
+			telemetry.SetSpanError(trace.SpanFromContext(ctx), "contract denied: "+pre.DecisionName)
 			g.telemetry.RecordDenial(ctx, env2.ToolName())
 			g.fireOnDeny(env2, pre.Reason, pre.DecisionName)
 			return nil, &edictum.DeniedError{
