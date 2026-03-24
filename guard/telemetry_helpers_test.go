@@ -3,6 +3,7 @@ package guard
 import (
 	"context"
 	"sync"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -12,6 +13,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	traceembedded "go.opentelemetry.io/otel/trace/embedded"
 	tracenoop "go.opentelemetry.io/otel/trace/noop"
+
+	"github.com/edictum-ai/edictum-go/approval"
 )
 
 // --- test tracer infrastructure ---
@@ -108,4 +111,16 @@ func newTMP() *tMP { return &tMP{meter: &tMeter{}} }
 
 func (p *tMP) Meter(string, ...metric.MeterOption) metric.Meter {
 	return p.meter
+}
+
+// --- test approval backend ---
+
+type autoApproveBackend struct{}
+
+func (b *autoApproveBackend) RequestApproval(_ context.Context, toolName string, _ map[string]any, msg string, _ ...approval.RequestOption) (approval.Request, error) {
+	return approval.NewRequest("auto-1", toolName, nil, msg), nil
+}
+
+func (b *autoApproveBackend) PollApprovalStatus(_ context.Context, _ string) (approval.Decision, error) {
+	return approval.Decision{Approved: true, Timestamp: time.Now()}, nil
 }

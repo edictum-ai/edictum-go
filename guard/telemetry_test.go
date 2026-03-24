@@ -153,3 +153,44 @@ func TestWithTelemetry_MetricsRecorded(t *testing.T) {
 		t.Error("expected edictum.calls.allowed counter increment")
 	}
 }
+
+func TestApprovalGranted_RecordsAllowedCounter(t *testing.T) {
+	mp := newTMP()
+	tp := newTTP()
+	tel := telemetry.New(
+		telemetry.WithTracerProvider(tp),
+		telemetry.WithMeterProvider(mp),
+	)
+	pre := contract.Precondition{
+		Name:   "needs-approval",
+		Effect: "approve",
+		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+			return contract.Fail("needs approval"), nil
+		},
+	}
+	g := New(
+		WithTelemetry(tel),
+		WithContracts(pre),
+		WithApprovalBackend(&autoApproveBackend{}),
+	)
+
+	_, err := g.Run(context.Background(), "Bash",
+		map[string]any{"command": "ls"}, nopCallable)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	mp.meter.mu.Lock()
+	recs := mp.meter.recs
+	mp.meter.mu.Unlock()
+	found := false
+	for _, r := range recs {
+		if r.Name == "edictum.calls.allowed" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected edictum.calls.allowed after approval granted")
+	}
+}

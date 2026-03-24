@@ -32,6 +32,9 @@ func WithMeterProvider(mp metric.MeterProvider) Option {
 // option are cleared. Options applied after are ignored because
 // New() skips telOpts when telemetry is already set.
 func WithTelemetry(t *telemetry.GovernanceTelemetry) Option {
+	if t == nil {
+		panic("WithTelemetry: nil GovernanceTelemetry")
+	}
 	return func(g *Guard) {
 		g.telemetry = t
 		g.telOpts = nil
