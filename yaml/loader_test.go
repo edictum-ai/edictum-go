@@ -405,6 +405,24 @@ contracts:
 	}
 }
 
+// Cat 3.6 — Sandbox: empty sandbox (no constraints) is rejected
+func TestLoadBundleString_SandboxEmptyRejected(t *testing.T) {
+	y := `apiVersion: edictum/v1
+kind: ContractBundle
+contracts:
+  - id: empty-sb
+    type: sandbox
+    tool: Bash
+`
+	_, _, err := LoadBundleString(y)
+	if err == nil {
+		t.Fatal("expected error for sandbox with no constraints")
+	}
+	if !strings.Contains(err.Error(), "must have at least one constraint") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 // Cat 3.7 — SHA256 policy_version
 func TestLoadBundleString_SHA256Hash(t *testing.T) {
 	_, hash, err := LoadBundleString(validBundle)

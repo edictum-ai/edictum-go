@@ -191,6 +191,18 @@ func validateSandboxContracts(data map[string]any) error {
 			continue
 		}
 		cid, _ := cm["id"].(string)
+		// Require at least one constraint — a sandbox contract with no
+		// boundaries would silently allow all calls.
+		hasConstraint := false
+		for _, field := range []string{"within", "not_within", "allows", "not_allows"} {
+			if _, ok := cm[field]; ok {
+				hasConstraint = true
+				break
+			}
+		}
+		if !hasConstraint {
+			return fmt.Errorf("yaml: contract %q: sandbox contract must have at least one constraint (within, not_within, or allows)", cid)
+		}
 		if _, ok := cm["not_within"]; ok {
 			if _, ok := cm["within"]; !ok {
 				return fmt.Errorf("yaml: contract %q: not_within requires within to also be set", cid)

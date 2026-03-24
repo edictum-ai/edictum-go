@@ -270,6 +270,11 @@ func TestSecurityYAMLSandboxCommandInjection(t *testing.T) {
 		"ls; rm -rf /",
 		"cat /etc/shadow",
 	}
+	// NOTE: shell chaining patterns like "ls || rm -rf /" are a known
+	// limitation of first-token-only command classification in sandbox.Check.
+	// The first token "ls" is in the allowlist, so these pass. OS-level
+	// enforcement (seccomp, AppArmor) is required for full protection.
+	// See also: sandbox/check.go ExtractCommand, internal/shlex.
 	for _, cmd := range injections {
 		env := makeSandboxEnv(t, "Bash", map[string]any{"command": cmd})
 		v, err := pre.Check(context.Background(), env)
