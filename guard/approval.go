@@ -63,6 +63,10 @@ func (g *Guard) handleApproval(
 		// Use a fresh context for post-timeout operations (audit, execution)
 		// since the original context is expired.
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			// Mark the span BEFORE dropping the context that carries it.
+			// After ctx is replaced with Background(), SpanFromContext
+			// returns a no-op and the timeout would be invisible in traces.
+			telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval timeout")
 			decision = approval.Decision{
 				Status:    approval.StatusTimeout,
 				Timestamp: time.Now().UTC(),

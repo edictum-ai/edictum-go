@@ -3,6 +3,7 @@ package telemetry
 
 import (
 	"context"
+	"fmt"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -51,7 +52,7 @@ func WithMeterProvider(mp metric.MeterProvider) Option {
 // New creates a GovernanceTelemetry instance. Falls back to global
 // providers when none are supplied, which return no-ops if no OTel SDK
 // is configured.
-func New(opts ...Option) *GovernanceTelemetry {
+func New(opts ...Option) (*GovernanceTelemetry, error) {
 	cfg := &config{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -68,17 +69,23 @@ func New(opts ...Option) *GovernanceTelemetry {
 	tracer := tp.Tracer(TracerName)
 	meter := mp.Meter(MeterName)
 
-	denied, _ := meter.Int64Counter("edictum.calls.denied",
+	denied, err := meter.Int64Counter("edictum.calls.denied",
 		metric.WithDescription("Number of denied tool calls"))
-	allowed, _ := meter.Int64Counter("edictum.calls.allowed",
+	if err != nil {
+		return nil, fmt.Errorf("create denied counter: %w", err)
+	}
+	allowed, err := meter.Int64Counter("edictum.calls.allowed",
 		metric.WithDescription("Number of allowed tool calls"))
+	if err != nil {
+		return nil, fmt.Errorf("create allowed counter: %w", err)
+	}
 
 	return &GovernanceTelemetry{
 		tracer:         tracer,
 		meter:          meter,
 		deniedCounter:  denied,
 		allowedCounter: allowed,
-	}
+	}, nil
 }
 
 // Tracer returns the underlying OTel tracer.

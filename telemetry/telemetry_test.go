@@ -1,4 +1,4 @@
-package telemetry
+package telemetry_test
 
 import (
 	"context"
@@ -6,33 +6,34 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
 func TestNew_DefaultFallsBackToGlobal(t *testing.T) {
-	gt := New()
+	gt, err := telemetry.New()
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
 	if gt == nil {
 		t.Fatal("New() returned nil")
 	}
 	if gt.Tracer() == nil {
 		t.Fatal("Tracer() returned nil")
 	}
-	if gt.deniedCounter == nil {
-		t.Fatal("deniedCounter is nil")
-	}
-	if gt.allowedCounter == nil {
-		t.Fatal("allowedCounter is nil")
-	}
+	// Verify counters work via public API (no panic).
+	gt.RecordDenial(context.Background(), "test")
+	gt.RecordAllowed(context.Background(), "test")
 }
 
 func TestNew_WithCustomProvider(t *testing.T) {
-	exporter := tracetest.NewInMemoryExporter()
-	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
-	defer func() { _ = tp.Shutdown(context.Background()) }()
+	tp := newTestTracerProvider()
 
-	gt := New(WithTracerProvider(tp))
+	gt, err := telemetry.New(telemetry.WithTracerProvider(tp))
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
 	if gt == nil {
 		t.Fatal("New() returned nil")
 	}
@@ -47,7 +48,7 @@ func TestNew_WithCustomProvider(t *testing.T) {
 	_ = ctx
 	span.End()
 
-	spans := exporter.GetSpans()
+	spans := tp.tracer.getSpans()
 	if len(spans) != 1 {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
@@ -57,7 +58,7 @@ func TestNew_WithCustomProvider(t *testing.T) {
 }
 
 func TestToolSpanAttrs(t *testing.T) {
-	attrs := ToolSpanAttrs("Bash", "write", "production", "run-123", 5)
+	attrs := telemetry.ToolSpanAttrs("Bash", "write", "production", "run-123", 5)
 
 	expected := []attribute.KeyValue{
 		attribute.String("tool.name", "Bash"),
@@ -82,87 +83,97 @@ func TestToolSpanAttrs(t *testing.T) {
 }
 
 func TestRecordDenial_IncrementsDeniedCounter(t *testing.T) {
-	reader, mp := newMetricSetup(t)
-	gt := New(WithMeterProvider(mp))
+	mp := newTestMeterProvider()
+	gt, err := telemetry.New(telemetry.WithMeterProvider(mp))
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
 	ctx := context.Background()
 
 	gt.RecordDenial(ctx, "Bash")
 	gt.RecordDenial(ctx, "Bash")
 	gt.RecordDenial(ctx, "FileWrite")
 
-	var rm metricdata.ResourceMetrics
-	if err := reader.Collect(ctx, &rm); err != nil {
-		t.Fatalf("Collect failed: %v", err)
-	}
-
-	bashCount := findCounterValue(t, rm, "edictum.calls.denied", "Bash")
+	records := mp.meter.getRecords()
+	bashCount := findCounterSum(t, records, "edictum.calls.denied", "Bash")
 	if bashCount != 2 {
 		t.Errorf("expected Bash denied count 2, got %d", bashCount)
 	}
 
-	fwCount := findCounterValue(t, rm, "edictum.calls.denied", "FileWrite")
+	fwCount := findCounterSum(t, records, "edictum.calls.denied", "FileWrite")
 	if fwCount != 1 {
 		t.Errorf("expected FileWrite denied count 1, got %d", fwCount)
 	}
 }
 
 func TestRecordAllowed_IncrementsAllowedCounter(t *testing.T) {
-	reader, mp := newMetricSetup(t)
-	gt := New(WithMeterProvider(mp))
+	mp := newTestMeterProvider()
+	gt, err := telemetry.New(telemetry.WithMeterProvider(mp))
+	if err != nil {
+		t.Fatalf("New() returned error: %v", err)
+	}
 	ctx := context.Background()
 
 	gt.RecordAllowed(ctx, "Read")
 	gt.RecordAllowed(ctx, "Read")
 	gt.RecordAllowed(ctx, "Read")
 
-	var rm metricdata.ResourceMetrics
-	if err := reader.Collect(ctx, &rm); err != nil {
-		t.Fatalf("Collect failed: %v", err)
-	}
-
-	count := findCounterValue(t, rm, "edictum.calls.allowed", "Read")
+	records := mp.meter.getRecords()
+	count := findCounterSum(t, records, "edictum.calls.allowed", "Read")
 	if count != 3 {
 		t.Errorf("expected Read allowed count 3, got %d", count)
 	}
 }
 
 func TestSetSpanError_SetsErrorStatus(t *testing.T) {
-	exporter := tracetest.NewInMemoryExporter()
-	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
-	defer func() { _ = tp.Shutdown(context.Background()) }()
-
-	_, span := tp.Tracer("test").Start(context.Background(), "error-span")
-	SetSpanError(span, "contract denied")
+	tp := newTestTracerProvider()
+	_, span := tp.tracer.Start(context.Background(), "error-span")
+	telemetry.SetSpanError(span, "contract denied")
 	span.End()
 
-	spans := exporter.GetSpans()
+	spans := tp.tracer.getSpans()
 	if len(spans) != 1 {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	s := spans[0]
-	if s.Status.Code != codes.Error {
-		t.Errorf("expected status code Error, got %v", s.Status.Code)
+	if s.StatusCode != codes.Error {
+		t.Errorf("expected status code Error, got %v", s.StatusCode)
 	}
-	if s.Status.Description != "contract denied" {
-		t.Errorf("expected status description %q, got %q", "contract denied", s.Status.Description)
+	if s.StatusDesc != "contract denied" {
+		t.Errorf("expected status description %q, got %q", "contract denied", s.StatusDesc)
 	}
 }
 
 func TestSetSpanOK_SetsOKStatus(t *testing.T) {
-	exporter := tracetest.NewInMemoryExporter()
-	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
-	defer func() { _ = tp.Shutdown(context.Background()) }()
-
-	_, span := tp.Tracer("test").Start(context.Background(), "ok-span")
-	SetSpanOK(span)
+	tp := newTestTracerProvider()
+	_, span := tp.tracer.Start(context.Background(), "ok-span")
+	telemetry.SetSpanOK(span)
 	span.End()
 
-	spans := exporter.GetSpans()
+	spans := tp.tracer.getSpans()
 	if len(spans) != 1 {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
 	s := spans[0]
-	if s.Status.Code != codes.Ok {
-		t.Errorf("expected status code Ok, got %v", s.Status.Code)
+	if s.StatusCode != codes.Ok {
+		t.Errorf("expected status code Ok, got %v", s.StatusCode)
+	}
+}
+
+func TestSetSpanError_ViaSpanFromContext(t *testing.T) {
+	tp := newTestTracerProvider()
+	ctx, span := tp.tracer.Start(context.Background(), "ctx-span")
+
+	// Retrieve span from context (mirrors how guard code works).
+	retrieved := trace.SpanFromContext(ctx)
+	telemetry.SetSpanError(retrieved, "timeout")
+	span.End()
+
+	spans := tp.tracer.getSpans()
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(spans))
+	}
+	if spans[0].StatusCode != codes.Error {
+		t.Errorf("expected Error, got %v", spans[0].StatusCode)
 	}
 }

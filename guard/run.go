@@ -159,7 +159,8 @@ func (g *Guard) handlePreDecision(
 				DecisionName:   pre.DecisionName,
 			}
 		}
-		// observe mode: fall through to execute
+		// observe mode: record denial (contract fired) then fall through
+		g.telemetry.RecordDenial(ctx, env2.ToolName())
 	} else {
 		// Emit CALL_WOULD_DENY for per-contract observed denials
 		g.emitObservedDenials(ctx, env2, pre, policyVersion)

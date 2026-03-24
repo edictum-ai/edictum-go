@@ -3,8 +3,6 @@ package guard
 import (
 	"fmt"
 
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
 	"github.com/edictum-ai/edictum-go/contract"
@@ -12,7 +10,6 @@ import (
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/redaction"
 	"github.com/edictum-ai/edictum-go/session"
-	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
 // Option configures a Guard.
@@ -171,20 +168,6 @@ func WithTools(tools map[string]map[string]any) Option {
 			g.toolRegistry.Register(name, se, idem)
 		}
 	}
-}
-
-// WithTracerProvider sets an OpenTelemetry TracerProvider for governance spans.
-// Falls back to the global TracerProvider if not set, which returns no-op
-// spans when no OTel SDK is configured.
-func WithTracerProvider(tp trace.TracerProvider) Option {
-	return func(g *Guard) {
-		g.telemetry = telemetry.New(telemetry.WithTracerProvider(tp))
-	}
-}
-
-// WithTelemetry sets a pre-configured GovernanceTelemetry instance.
-func WithTelemetry(t *telemetry.GovernanceTelemetry) Option {
-	return func(g *Guard) { g.telemetry = t }
 }
 
 // WithSandboxContracts adds sandbox contracts (preconditions matched
