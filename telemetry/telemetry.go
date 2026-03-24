@@ -3,7 +3,6 @@ package telemetry
 
 import (
 	"context"
-	"fmt"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -24,7 +23,6 @@ const (
 // returns no-op spans when no SDK is installed -- making OTel fully optional.
 type GovernanceTelemetry struct {
 	tracer         trace.Tracer
-	meter          metric.Meter
 	deniedCounter  metric.Int64Counter
 	allowedCounter metric.Int64Counter
 }
@@ -52,7 +50,12 @@ func WithMeterProvider(mp metric.MeterProvider) Option {
 // New creates a GovernanceTelemetry instance. Falls back to global
 // providers when none are supplied, which return no-ops if no OTel SDK
 // is configured.
-func New(opts ...Option) (*GovernanceTelemetry, error) {
+//
+// The OTel API spec guarantees that Int64Counter always returns a valid
+// (possibly no-op) instrument for well-formed names, so errors from
+// counter creation are logged but not propagated — the counters degrade
+// to no-ops on failure.
+func New(opts ...Option) *GovernanceTelemetry {
 	cfg := &config{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -69,23 +72,18 @@ func New(opts ...Option) (*GovernanceTelemetry, error) {
 	tracer := tp.Tracer(TracerName)
 	meter := mp.Meter(MeterName)
 
-	denied, err := meter.Int64Counter("edictum.calls.denied",
+	// OTel API guarantees valid (possibly no-op) instruments for
+	// well-formed counter names. Errors are logged via otel.Handle.
+	denied, _ := meter.Int64Counter("edictum.calls.denied",
 		metric.WithDescription("Number of denied tool calls"))
-	if err != nil {
-		return nil, fmt.Errorf("create denied counter: %w", err)
-	}
-	allowed, err := meter.Int64Counter("edictum.calls.allowed",
+	allowed, _ := meter.Int64Counter("edictum.calls.allowed",
 		metric.WithDescription("Number of allowed tool calls"))
-	if err != nil {
-		return nil, fmt.Errorf("create allowed counter: %w", err)
-	}
 
 	return &GovernanceTelemetry{
 		tracer:         tracer,
-		meter:          meter,
 		deniedCounter:  denied,
 		allowedCounter: allowed,
-	}, nil
+	}
 }
 
 // Tracer returns the underlying OTel tracer.

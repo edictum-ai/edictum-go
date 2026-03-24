@@ -108,11 +108,7 @@ func New(opts ...Option) *Guard {
 		opt(g)
 	}
 	if g.telemetry == nil {
-		t, err := telemetry.New()
-		if err != nil {
-			panic(fmt.Sprintf("telemetry init: %v", err))
-		}
-		g.telemetry = t
+		g.telemetry = telemetry.New()
 	}
 	g.redactionPolicy = ensureRedaction(g.redactionPolicy)
 	classifyContracts(g)

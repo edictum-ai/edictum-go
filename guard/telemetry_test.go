@@ -11,17 +11,11 @@ import (
 	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
-func TestWithTracerProvider_SpanRecordedOnAllow(t *testing.T) {
+func TestWithTracerProvider_DirectOption(t *testing.T) {
 	tp := newTTP()
-	tel, err := telemetry.New(
-		telemetry.WithTracerProvider(tp),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	g := New(WithTelemetry(tel))
+	g := New(WithTracerProvider(tp))
 
-	_, err = g.Run(context.Background(), "Bash",
+	_, err := g.Run(context.Background(), "Bash",
 		map[string]any{"command": "ls"}, nopCallable)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -31,7 +25,7 @@ func TestWithTracerProvider_SpanRecordedOnAllow(t *testing.T) {
 	spans := tp.tracer.spans
 	tp.tracer.mu.Unlock()
 	if len(spans) != 1 {
-		t.Fatalf("expected 1 span, got %d", len(spans))
+		t.Fatalf("expected 1 span via WithTracerProvider, got %d", len(spans))
 	}
 	if spans[0].Name != "edictum.governance Bash" {
 		t.Errorf("span name: got %q", spans[0].Name)
@@ -41,14 +35,9 @@ func TestWithTracerProvider_SpanRecordedOnAllow(t *testing.T) {
 	}
 }
 
-func TestWithTracerProvider_SpanErrorOnDeny(t *testing.T) {
+func TestWithTelemetry_SpanErrorOnDeny(t *testing.T) {
 	tp := newTTP()
-	tel, err := telemetry.New(
-		telemetry.WithTracerProvider(tp),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tel := telemetry.New(telemetry.WithTracerProvider(tp))
 	deny := contract.Precondition{
 		Name: "block-all",
 		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
@@ -57,7 +46,7 @@ func TestWithTracerProvider_SpanErrorOnDeny(t *testing.T) {
 	}
 	g := New(WithTelemetry(tel), WithContracts(deny))
 
-	_, err = g.Run(context.Background(), "Bash",
+	_, err := g.Run(context.Background(), "Bash",
 		map[string]any{"command": "rm"}, nopCallable)
 	if err == nil {
 		t.Fatal("expected denial error")
@@ -77,16 +66,13 @@ func TestWithTracerProvider_SpanErrorOnDeny(t *testing.T) {
 func TestWithTelemetry_MetricsRecorded(t *testing.T) {
 	mp := newTMP()
 	tp := newTTP()
-	tel, err := telemetry.New(
+	tel := telemetry.New(
 		telemetry.WithTracerProvider(tp),
 		telemetry.WithMeterProvider(mp),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	g := New(WithTelemetry(tel))
 
-	_, err = g.Run(context.Background(), "Read",
+	_, err := g.Run(context.Background(), "Read",
 		map[string]any{}, nopCallable)
 	if err != nil {
 		t.Fatalf("Run: %v", err)

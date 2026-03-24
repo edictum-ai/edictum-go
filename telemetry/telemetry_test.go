@@ -12,10 +12,7 @@ import (
 )
 
 func TestNew_DefaultFallsBackToGlobal(t *testing.T) {
-	gt, err := telemetry.New()
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	gt := telemetry.New()
 	if gt == nil {
 		t.Fatal("New() returned nil")
 	}
@@ -30,10 +27,7 @@ func TestNew_DefaultFallsBackToGlobal(t *testing.T) {
 func TestNew_WithCustomProvider(t *testing.T) {
 	tp := newTestTracerProvider()
 
-	gt, err := telemetry.New(telemetry.WithTracerProvider(tp))
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	gt := telemetry.New(telemetry.WithTracerProvider(tp))
 	if gt == nil {
 		t.Fatal("New() returned nil")
 	}
@@ -84,10 +78,7 @@ func TestToolSpanAttrs(t *testing.T) {
 
 func TestRecordDenial_IncrementsDeniedCounter(t *testing.T) {
 	mp := newTestMeterProvider()
-	gt, err := telemetry.New(telemetry.WithMeterProvider(mp))
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	gt := telemetry.New(telemetry.WithMeterProvider(mp))
 	ctx := context.Background()
 
 	gt.RecordDenial(ctx, "Bash")
@@ -108,10 +99,7 @@ func TestRecordDenial_IncrementsDeniedCounter(t *testing.T) {
 
 func TestRecordAllowed_IncrementsAllowedCounter(t *testing.T) {
 	mp := newTestMeterProvider()
-	gt, err := telemetry.New(telemetry.WithMeterProvider(mp))
-	if err != nil {
-		t.Fatalf("New() returned error: %v", err)
-	}
+	gt := telemetry.New(telemetry.WithMeterProvider(mp))
 	ctx := context.Background()
 
 	gt.RecordAllowed(ctx, "Read")
