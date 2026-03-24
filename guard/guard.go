@@ -14,6 +14,7 @@ import (
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/redaction"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
 // serverClient is satisfied by *server.Client. Defined here to avoid
@@ -67,6 +68,9 @@ type Guard struct {
 	approvalBackend   approval.Backend
 	sessionID         string
 
+	telemetry *telemetry.GovernanceTelemetry
+	telOpts   []telemetry.Option // accumulated before New() builds telemetry
+
 	// factoryCfg is non-nil only during factory option extraction.
 	// Never present on a returned Guard.
 	factoryCfg *factoryCfg
@@ -104,6 +108,10 @@ func New(opts ...Option) *Guard {
 	for _, opt := range opts {
 		opt(g)
 	}
+	if g.telemetry == nil {
+		g.telemetry = telemetry.New(g.telOpts...)
+	}
+	g.telOpts = nil
 	g.redactionPolicy = ensureRedaction(g.redactionPolicy)
 	classifyContracts(g)
 	return g

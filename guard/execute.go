@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/otel/trace"
+
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/audit"
 	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
 // executeAndPost executes the tool callable and runs post-execution
@@ -61,8 +64,14 @@ func (g *Guard) executeAndPost(
 	g.emitPostAudit(ctx, env2, sess, postAction, post, mode, policyVersion)
 
 	if !toolSuccess {
+		// Tool execution failed — Error status reflects the tool outcome.
+		// This intentionally overwrites any prior governance status
+		// (e.g., approval timeout) because the tool itself failed.
+		telemetry.SetSpanError(trace.SpanFromContext(ctx), "tool failed")
 		return nil, &edictum.ToolError{Message: fmt.Sprintf("%v", result)}
 	}
+	// Span status left as Unset (success) — explicitly setting OK would
+	// overwrite observed-deny status set earlier in observe mode.
 	if post.RedactedResponse != nil {
 		return post.RedactedResponse, nil
 	}
