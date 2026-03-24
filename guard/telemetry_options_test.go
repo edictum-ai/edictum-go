@@ -52,6 +52,24 @@ func TestWithTelemetry_NilPanics(t *testing.T) {
 	WithTelemetry(nil)
 }
 
+func TestWithTracerProvider_NilPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic from WithTracerProvider(nil)")
+		}
+	}()
+	WithTracerProvider(nil)
+}
+
+func TestWithMeterProvider_NilPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic from WithMeterProvider(nil)")
+		}
+	}()
+	WithMeterProvider(nil)
+}
+
 func TestWithTracerProvider_OverridesWithTelemetry(t *testing.T) {
 	tp1 := newTTP()
 	tp2 := newTTP()
