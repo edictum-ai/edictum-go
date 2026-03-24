@@ -224,11 +224,23 @@ func TestRunPostconditionRedact(t *testing.T) {
 	}
 }
 
-// TestRun_ObserveMode_ApprovalFallsThrough proves that in observe mode,
-// a precondition with Effect="approve" does NOT block on approval.
-// Instead it emits CALL_WOULD_DENY and executes the tool.
-func TestRun_ObserveMode_ApprovalFallsThrough(t *testing.T) {
+// TestRun_ObserveMode_ApprovalUsesBackend proves that observe mode still
+// honors pending_approval instead of bypassing it.
+func TestRun_ObserveMode_ApprovalUsesBackend(t *testing.T) {
+	requested := 0
+	polled := 0
 	toolExecuted := false
+	mock := &mockApprovalBackend{
+		onRequest: func(_ context.Context, _ string, _ map[string]any, _ string, _ ...approval.RequestOption) (approval.Request, error) {
+			requested++
+			return approval.NewRequest("observe-approval", "Bash", nil, "needs approval"), nil
+		},
+		onPoll: func(_ context.Context, _ string) (approval.Decision, error) {
+			polled++
+			return approval.Decision{Approved: true, Status: approval.StatusApproved}, nil
+		},
+	}
+
 	g := New(
 		WithMode("observe"),
 		WithContracts(
@@ -241,8 +253,7 @@ func TestRun_ObserveMode_ApprovalFallsThrough(t *testing.T) {
 				},
 			},
 		),
-		// Deliberately NO approval backend -- in enforce mode this would
-		// error. In observe mode it must not reach the backend at all.
+		WithApprovalBackend(mock),
 	)
 
 	ctx := context.Background()
@@ -260,18 +271,16 @@ func TestRun_ObserveMode_ApprovalFallsThrough(t *testing.T) {
 	if result != "executed" {
 		t.Errorf("result: got %v, want 'executed'", result)
 	}
-
-	// Verify CALL_WOULD_DENY was emitted
-	events := g.LocalSink().Events()
-	hasWouldDeny := false
-	for _, e := range events {
-		if e.Action == audit.ActionCallWouldDeny {
-			hasWouldDeny = true
-			break
-		}
+	if requested != 1 || polled != 1 {
+		t.Fatalf("approval backend calls = request:%d poll:%d, want 1 each", requested, polled)
 	}
-	if !hasWouldDeny {
-		t.Error("expected CALL_WOULD_DENY audit event for approval in observe mode")
+	events := g.LocalSink().Events()
+	var actions []audit.Action
+	for _, e := range events {
+		actions = append(actions, e.Action)
+	}
+	if len(actions) < 2 || actions[0] != audit.ActionCallApprovalRequested || actions[1] != audit.ActionCallApprovalGranted {
+		t.Fatalf("unexpected leading audit actions: %v", actions)
 	}
 }
 

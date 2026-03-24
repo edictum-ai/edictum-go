@@ -73,9 +73,9 @@ func TestObserveMode_SetsObservedDenySpanAttr(t *testing.T) {
 	}
 }
 
-// TestObserveMode_ApprovalSetsObservedDenySpanAttr verifies the
-// observed_deny attribute when an approval contract fires in observe mode.
-func TestObserveMode_ApprovalSetsObservedDenySpanAttr(t *testing.T) {
+// TestObserveMode_ApprovalDoesNotSetObservedDenySpanAttr verifies that
+// observe mode does not treat pending approval as an observed deny.
+func TestObserveMode_ApprovalDoesNotSetObservedDenySpanAttr(t *testing.T) {
 	tp := newTTP()
 	mp := newTMP()
 	tel := telemetry.New(
@@ -94,32 +94,33 @@ func TestObserveMode_ApprovalSetsObservedDenySpanAttr(t *testing.T) {
 				},
 			},
 		),
+		WithApprovalBackend(&autoApproveBackend{}),
 	)
 
 	_, err := g.Run(context.Background(), "Bash",
 		map[string]any{"command": "ls"}, nopCallable)
 	if err != nil {
-		t.Fatalf("observe mode should not error: %v", err)
+		t.Fatalf("approval in observe mode should still succeed after approval: %v", err)
 	}
 
 	tp.tracer.mu.Lock()
 	spans := tp.tracer.spans
 	tp.tracer.mu.Unlock()
 
-	if !hasSpanAttr(spans, "governance.observed_deny") {
-		t.Error("expected governance.observed_deny on approval in observe mode")
+	if hasSpanAttr(spans, "governance.observed_deny") {
+		t.Error("did not expect governance.observed_deny on approval in observe mode")
 	}
 	mp.meter.mu.Lock()
 	recs := mp.meter.recs
 	mp.meter.mu.Unlock()
-	deniedFound := false
+	allowedFound := false
 	for _, r := range recs {
-		if r.Name == "edictum.calls.denied" {
-			deniedFound = true
+		if r.Name == "edictum.calls.allowed" {
+			allowedFound = true
 			break
 		}
 	}
-	if !deniedFound {
-		t.Error("expected edictum.calls.denied for approval in observe mode")
+	if !allowedFound {
+		t.Error("expected edictum.calls.allowed for approval in observe mode")
 	}
 }

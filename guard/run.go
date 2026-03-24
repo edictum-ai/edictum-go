@@ -127,16 +127,10 @@ func (g *Guard) Run(
 		return nil, fmt.Errorf("pre-execute: %w", err)
 	}
 
-	// Handle approval flow — only in enforce mode.
-	// In observe mode, approval contracts emit CALL_WOULD_DENY and fall
-	// through to execution, consistent with how ordinary denies behave.
+	// Handle approval flow regardless of guard mode. Python/TS only let
+	// ordinary denies fall through in observe mode; pending_approval still
+	// goes through the approval backend.
 	if pre.Action == "pending_approval" {
-		if mode == "observe" {
-			g.telemetry.RecordDenial(ctx, env2.ToolName())
-			span.SetAttributes(attribute.Bool("governance.observed_deny", true))
-			g.emitPreAudit(ctx, env2, sess, audit.ActionCallWouldDeny, pre, mode, policyVersion)
-			return g.executeAndPost(ctx, env2, sess, pipe, mode, policyVersion, toolCallable, args)
-		}
 		return g.handleApproval(ctx, env2, sess, pipe, pre, mode, policyVersion, toolCallable, args)
 	}
 

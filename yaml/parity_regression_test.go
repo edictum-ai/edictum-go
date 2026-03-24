@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/edictum-ai/edictum-go/envelope"
-	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
 func TestRegression_SchemaRejectsMalformedPostEffectLikePython(t *testing.T) {
@@ -35,7 +34,7 @@ contracts:
 	}
 }
 
-func TestRegression_ExplicitObserveSessionLimitDoesNotMergeButExplicitEnforceDoes(t *testing.T) {
+func TestRegression_ExplicitObserveSessionLimitMergesButInternalObserveShadowDoesNot(t *testing.T) {
 	bundle := map[string]any{
 		"apiVersion": "edictum/v1",
 		"kind":       "ContractBundle",
@@ -52,6 +51,19 @@ func TestRegression_ExplicitObserveSessionLimitDoesNotMergeButExplicitEnforceDoe
 				"then": map[string]any{
 					"effect":  "deny",
 					"message": "observe",
+				},
+			},
+			map[string]any{
+				"id":       "observe-shadow",
+				"type":     "session",
+				"mode":     "observe",
+				"_observe": true,
+				"limits": map[string]any{
+					"max_tool_calls": 3,
+				},
+				"then": map[string]any{
+					"effect":  "deny",
+					"message": "shadow",
 				},
 			},
 			map[string]any{
@@ -73,10 +85,8 @@ func TestRegression_ExplicitObserveSessionLimitDoesNotMergeButExplicitEnforceDoe
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
 	}
-
-	defaults := pipeline.DefaultLimits()
-	if compiled.Limits.MaxToolCalls != defaults.MaxToolCalls {
-		t.Fatalf("observe-mode session limit should not merge: got %d want %d", compiled.Limits.MaxToolCalls, defaults.MaxToolCalls)
+	if compiled.Limits.MaxToolCalls != 5 {
+		t.Fatalf("explicit observe-mode session limit should merge: got %d want 5", compiled.Limits.MaxToolCalls)
 	}
 	if compiled.Limits.MaxAttempts != 7 {
 		t.Fatalf("explicit enforce-mode session limit should merge: got %d want 7", compiled.Limits.MaxAttempts)
