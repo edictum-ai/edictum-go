@@ -74,7 +74,8 @@ func New(opts ...Option) *GovernanceTelemetry {
 	meter := mp.Meter(MeterName)
 
 	// OTel API guarantees valid instruments for well-formed names.
-	// Guard against buggy custom MeterProviders that return nil.
+	// Guard against buggy custom MeterProviders returning (nil, err):
+	// errors are reported via otel.Handle, nil counters fall back to noop.
 	noopMeter := noop.NewMeterProvider().Meter(MeterName)
 	denied, err := meter.Int64Counter("edictum.calls.denied",
 		metric.WithDescription("Number of denied tool calls"))

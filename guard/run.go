@@ -88,8 +88,13 @@ func (g *Guard) Run(
 		return nil, fmt.Errorf("envelope create: %w", err)
 	}
 
-	// Start governance span
-	ctx, span := g.telemetry.Tracer().Start(ctx, "edictum.governance "+env2.ToolName(),
+	// Start governance span. Truncate tool name in span name to prevent
+	// very long names from polluting trace backend indexes.
+	spanTool := env2.ToolName()
+	if len(spanTool) > 64 {
+		spanTool = spanTool[:64]
+	}
+	ctx, span := g.telemetry.Tracer().Start(ctx, "edictum.governance "+spanTool,
 		trace.WithAttributes(telemetry.ToolSpanAttrs(
 			env2.ToolName(),
 			string(env2.SideEffect()),
