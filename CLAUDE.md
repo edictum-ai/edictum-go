@@ -225,3 +225,21 @@ Edictum is five repos that work together:
 - **edictum-schemas** (shared): `edictum-ai/edictum-schemas` — Shared YAML contract schema.
 
 All three core libraries (Python, TS, and Go) work standalone. Console is an optional enhancement. Schema repo is the single source of truth for the contract format.
+
+## Cross-SDK Conformance Workflow
+
+When a change affects shared semantics, YAML validation, fixture behavior, audit/envelope wire format, or policy evaluation behavior, you MUST follow this workflow before merging:
+
+1. **Update shared fixtures** in `edictum-schemas` — add or modify `fixtures/rejection/*.rejection.yaml` files as needed
+2. **Update canonical Python behavior** in `edictum` if the change originates there
+3. **Ensure all three SDKs pass** — Python (`edictum`), Go (this repo), and TypeScript (`edictum-ts`) shared-fixture runners must all pass with `EDICTUM_CONFORMANCE_REQUIRED=1`
+4. **Do not merge** parity-affecting behavior without the Parity Check workflow passing in all affected repos
+
+The conformance runner in this repo lives at `yaml/shared_fixtures_test.go` and is executed in CI by:
+
+```bash
+EDICTUM_FIXTURES_DIR=edictum-schemas/fixtures/rejection EDICTUM_CONFORMANCE_REQUIRED=1 \
+  go test -v -run TestSharedRejectionFixtures ./yaml/...
+```
+
+The `Parity Check` workflow (`.github/workflows/parity-check.yml`) runs on PRs to main, pushes to main, and weekly. It is intended to be a required status check.
