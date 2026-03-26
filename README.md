@@ -10,7 +10,7 @@ Go SDK for runtime contract enforcement on AI agent tool calls.
 **Prompts are suggestions -- contracts are enforcement.**
 The LLM cannot talk its way past a contract.
 
-**55us overhead** | **Zero runtime deps** | **Fail-closed by default** | **485 tests, -race clean**
+**Zero runtime deps** | **Fail-closed by default** | **485 tests, -race clean**
 
 ## What it does
 
@@ -67,8 +67,13 @@ func main() {
         panic(err)
     }
 
+    myTool := func(args map[string]any) (any, error) {
+        // your tool implementation
+        return nil, nil
+    }
+
     result, err := g.Run(context.Background(), "Bash",
-        map[string]any{"command": "rm -rf /"}, myToolFunc)
+        map[string]any{"command": "rm -rf /"}, myTool)
 
     var denied *edictum.DeniedError
     if errors.As(err, &denied) {
