@@ -81,7 +81,7 @@ func parseFormatStdin(format string, raw []byte) (string, map[string]any, error)
 		return parseOpenCodeStdin(data)
 
 	default:
-		return parseStandardStdin(data, nil)
+		return "", nil, fmt.Errorf("unsupported format %q; supported: claude-code, cursor, copilot, gemini, opencode, raw", format)
 	}
 }
 

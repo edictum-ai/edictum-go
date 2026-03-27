@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -149,13 +150,11 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 	}
 
 	// Load config once for both contracts path and audit path.
-	var cfg *gateConfig
+	cfg, _ := loadGateConfigDefault() // nil if no config exists — audit is optional
 	cPath := contractsOverride
 	if cPath == "" {
-		var cfgErr error
-		cfg, cfgErr = loadGateConfigDefault()
-		if cfgErr != nil {
-			return gateCheckError(cmd, format, fmt.Sprintf("loading config: %s", cfgErr))
+		if cfg == nil {
+			return gateCheckError(cmd, format, "no gate config found — run 'edictum gate init'")
 		}
 		cPath = cfg.ContractsPath
 	}
@@ -175,19 +174,12 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 	}
 
 	// Append audit event with timestamp.
-	auditPath := ""
-	if cfg != nil {
-		auditPath = cfg.AuditPath
-	} else if acfg, acfgErr := loadGateConfigDefault(); acfgErr == nil {
-		auditPath = acfg.AuditPath
-	}
-	if auditPath != "" {
-		_ = appendWALEvent(auditPath, walEvent{
+	if cfg != nil && cfg.AuditPath != "" {
+		_ = appendWALEvent(cfg.AuditPath, walEvent{
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 			ToolName:  toolName,
 			Verdict:   result.Verdict,
 			User:      currentUser(),
-			Detail:    reason,
 			Reason:    reason,
 		})
 	}
@@ -207,7 +199,7 @@ func gateCheckError(cmd *cobra.Command, format, msg string) error {
 		_ = writeGateError(cmd, msg) //nolint:gosec // best-effort error output
 		return &exitError{code: 2}
 	}
-	return fmt.Errorf("%s", msg)
+	return errors.New(msg)
 }
 
 // writeGateError outputs a structured JSON error for gate check.

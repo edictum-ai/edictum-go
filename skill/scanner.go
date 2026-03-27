@@ -3,6 +3,7 @@ package skill
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -91,14 +92,20 @@ func resolvePaths(path string) (filePath, dirPath string, err error) {
 }
 
 // readBounded reads a file up to maxFileSize bytes.
-// Reads first then checks length to avoid TOCTOU between stat and read.
+// Uses io.LimitReader to enforce the limit at read time, avoiding
+// full memory allocation for oversized files.
 func readBounded(path string) ([]byte, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // path is caller-provided scan target
+	f, err := os.Open(path) //nolint:gosec // path is caller-provided scan target
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	data, err := io.ReadAll(io.LimitReader(f, maxFileSize+1))
 	if err != nil {
 		return nil, err
 	}
 	if len(data) > int(maxFileSize) {
-		return nil, fmt.Errorf("file size %d exceeds %d byte limit", len(data), maxFileSize)
+		return nil, fmt.Errorf("file size exceeds %d byte limit", maxFileSize)
 	}
 	return data, nil
 }

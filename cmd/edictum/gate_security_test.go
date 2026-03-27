@@ -67,7 +67,8 @@ func TestSecurityGateCheckMalformedStdin(t *testing.T) {
 	}
 
 	for _, tc := range inputs {
-		t.Run(tc.name, func(_ *testing.T) { //nolint:thelper // subtest body
+		t.Run(tc.name, func(t *testing.T) {
+			t.Helper()
 			cmd := newGateCheckCmd()
 			cmd.SetIn(strings.NewReader(tc.input))
 			var stdout bytes.Buffer
@@ -92,15 +93,10 @@ func TestSecurityGateCheckUnknownFormat(t *testing.T) {
 	cmd.SetErr(&stdout)
 	cmd.SetArgs([]string{"--format", "nonexistent-format", "--contracts", bundlePath})
 
-	// Must not panic. Unknown format falls through to parseStandardStdin.
+	// Must not panic. Unknown format should be rejected with an error.
 	err := cmd.Execute()
-	// Should succeed (unknown format is treated as standard).
-	if err != nil {
-		// exitError{code:1} from a deny is acceptable; a panic is not.
-		var ee *exitError
-		if ok := isExitError(err, &ee); !ok {
-			t.Fatalf("unexpected error for unknown format: %v", err)
-		}
+	if err == nil {
+		t.Fatal("expected error for unknown format, got nil")
 	}
 }
 
@@ -115,7 +111,8 @@ func TestSecurityGateCheckToolNameWithControlChars(t *testing.T) {
 	}
 
 	for i, input := range inputs {
-		t.Run(strings.ReplaceAll(input[:min(30, len(input))], "\n", "\\n"), func(_ *testing.T) { //nolint:thelper // subtest body
+		t.Run(strings.ReplaceAll(input[:min(30, len(input))], "\n", "\\n"), func(t *testing.T) {
+			t.Helper()
 			cmd := newGateCheckCmd()
 			cmd.SetIn(strings.NewReader(input))
 			var stdout bytes.Buffer
@@ -149,13 +146,4 @@ func TestSecurityUnsupportedAssistantUninstall(t *testing.T) {
 	if !strings.Contains(err.Error(), "unsupported assistant") {
 		t.Fatalf("expected 'unsupported assistant' error, got: %v", err)
 	}
-}
-
-// isExitError checks if err is an *exitError via type assertion.
-func isExitError(err error, target **exitError) bool {
-	if ee, ok := err.(*exitError); ok { //nolint:errorlint // Direct type check is intentional for test helper.
-		*target = ee
-		return true
-	}
-	return false
 }

@@ -188,7 +188,7 @@ func runGateAudit(cmd *cobra.Command, limit int, tool, verdict string, jsonFlag 
 			ts = ts[:19]
 		}
 		fmt.Fprintf(w, "%-20s %-10s %-8s %-15s %s\n",
-			ts, e.User, strings.ToUpper(e.Verdict), e.ToolName, e.Detail)
+			ts, e.User, strings.ToUpper(e.Verdict), e.ToolName, e.Reason)
 	}
 	return nil
 }

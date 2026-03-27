@@ -83,7 +83,7 @@ func updateInstalledAssistants(assistant string, add bool) error {
 		}
 		cfg.Installed = append(cfg.Installed, assistant)
 	} else {
-		filtered := cfg.Installed[:0]
+		filtered := make([]string, 0, len(cfg.Installed))
 		for _, a := range cfg.Installed {
 			if a != assistant {
 				filtered = append(filtered, a)
@@ -103,13 +103,28 @@ func atomicWrite(path string, data []byte) error {
 	if mkErr := os.MkdirAll(dir, 0o755); mkErr != nil {
 		return mkErr
 	}
-	tmp := path + ".tmp"
-	// Use 0o600: all callers write to ~/.edictum/ which may contain
-	// API keys or other sensitive data.
-	if wErr := os.WriteFile(tmp, data, 0o600); wErr != nil {
+	// Use a unique temp file to prevent concurrent write corruption.
+	tmp, err := os.CreateTemp(dir, ".edictum-tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	if _, wErr := tmp.Write(data); wErr != nil {
+		tmp.Close()
+		os.Remove(tmpName)
 		return wErr
 	}
-	return os.Rename(tmp, path)
+	if cErr := tmp.Close(); cErr != nil {
+		os.Remove(tmpName)
+		return cErr
+	}
+	// Set 0o600 before rename: all callers write to ~/.edictum/ which
+	// may contain API keys or other sensitive data.
+	if chErr := os.Chmod(tmpName, 0o600); chErr != nil {
+		os.Remove(tmpName)
+		return chErr
+	}
+	return os.Rename(tmpName, path)
 }
 
 func copyFile(src, dst string) error {
@@ -130,7 +145,6 @@ type walEvent struct {
 	Verdict   string `json:"verdict"`
 	Assistant string `json:"assistant,omitempty"`
 	User      string `json:"user,omitempty"`
-	Detail    string `json:"detail,omitempty"`
 	Reason    string `json:"reason,omitempty"`
 }
 
