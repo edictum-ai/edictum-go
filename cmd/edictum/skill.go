@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -164,9 +165,10 @@ func anyAtOrAbove(results []*skill.ScanResult, threshold skill.RiskTier) bool {
 	return false
 }
 
-func printSkillJSON(_ *cobra.Command, results []*skill.ScanResult, _ skill.RiskTier, batch bool) error {
+func printSkillJSON(cmd *cobra.Command, results []*skill.ScanResult, _ skill.RiskTier, batch bool) error {
+	w := cmd.OutOrStdout()
 	if !batch && len(results) == 1 {
-		return writeJSON(results[0])
+		return writeJSONTo(w, results[0])
 	}
 	type batchOutput struct {
 		TotalScanned int                 `json:"total_scanned"`
@@ -174,24 +176,25 @@ func printSkillJSON(_ *cobra.Command, results []*skill.ScanResult, _ skill.RiskT
 		Stats        map[string]int      `json:"stats"`
 	}
 	stats := countTiers(results)
-	return writeJSON(batchOutput{
+	return writeJSONTo(w, batchOutput{
 		TotalScanned: len(results),
 		Results:      results,
 		Stats:        stats,
 	})
 }
 
-func printSkillText(_ *cobra.Command, results []*skill.ScanResult, threshold skill.RiskTier, verbose, batch bool) error {
+func printSkillText(cmd *cobra.Command, results []*skill.ScanResult, threshold skill.RiskTier, verbose, batch bool) error {
+	w := cmd.OutOrStdout()
 	for _, r := range results {
 		if r.RiskTier == skill.RiskClean && !verbose {
 			continue
 		}
-		printSingleResult(r)
+		printSingleResult(w, r)
 	}
 
 	if batch {
 		stats := countTiers(results)
-		fmt.Printf("\nScanned %d skills: %d CRITICAL, %d HIGH, %d MEDIUM, %d CLEAN\n",
+		fmt.Fprintf(w, "\nScanned %d skills: %d CRITICAL, %d HIGH, %d MEDIUM, %d CLEAN\n",
 			len(results), stats["CRITICAL"], stats["HIGH"], stats["MEDIUM"], stats["CLEAN"])
 	}
 
@@ -201,32 +204,32 @@ func printSkillText(_ *cobra.Command, results []*skill.ScanResult, threshold ski
 	return nil
 }
 
-func printSingleResult(r *skill.ScanResult) {
+func printSingleResult(w io.Writer, r *skill.ScanResult) {
 	switch r.RiskTier {
 	case skill.RiskCritical:
-		fmt.Printf("\n\u26a0 CRITICAL: %s\n\n", r.SkillName)
+		fmt.Fprintf(w, "\n\u26a0 CRITICAL: %s\n\n", r.SkillName)
 	case skill.RiskHigh:
-		fmt.Printf("\n\u26a0 HIGH: %s\n\n", r.SkillName)
+		fmt.Fprintf(w, "\n\u26a0 HIGH: %s\n\n", r.SkillName)
 	case skill.RiskMedium:
-		fmt.Printf("\n\u26a0 MEDIUM: %s\n\n", r.SkillName)
+		fmt.Fprintf(w, "\n\u26a0 MEDIUM: %s\n\n", r.SkillName)
 	case skill.RiskClean:
-		fmt.Printf("\n\u2713 CLEAN: %s\n  No security findings detected.\n", r.SkillName)
+		fmt.Fprintf(w, "\n\u2713 CLEAN: %s\n  No security findings detected.\n", r.SkillName)
 		return
 	}
 
 	for _, f := range r.Findings {
 		if f.Line > 0 {
-			fmt.Printf("  [%s] %s (line %d)\n", f.Severity, f.Message, f.Line)
+			fmt.Fprintf(w, "  [%s] %s (line %d)\n", f.Severity, f.Message, f.Line)
 		} else {
-			fmt.Printf("  [%s] %s\n", f.Severity, f.Message)
+			fmt.Fprintf(w, "  [%s] %s\n", f.Severity, f.Message)
 		}
 	}
 	if !r.HasContracts {
-		fmt.Println("  [INFO] no contracts.yaml found")
+		fmt.Fprintln(w, "  [INFO] no contracts.yaml found")
 	}
 
 	if r.RiskTier == skill.RiskCritical || r.RiskTier == skill.RiskHigh {
-		fmt.Println("\n  Verdict: DO NOT INSTALL without review")
+		fmt.Fprintln(w, "\n  Verdict: DO NOT INSTALL without review")
 	}
 }
 

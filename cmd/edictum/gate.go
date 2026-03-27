@@ -423,6 +423,13 @@ func runGateSync(cmd *cobra.Command, jsonFlag bool) error {
 		return &exitError{code: 1}
 	}
 
+	// Snapshot WAL files before reading to avoid TOCTOU race:
+	// events written between read and delete would be lost.
+	walFiles, lErr := walFileList(cfg.AuditPath)
+	if lErr != nil {
+		return fmt.Errorf("listing WAL files: %w", lErr)
+	}
+
 	events, rErr := readWALEvents(cfg.AuditPath, 0, "", "")
 	if rErr != nil {
 		return fmt.Errorf("reading WAL: %w", rErr)
@@ -448,7 +455,8 @@ func runGateSync(cmd *cobra.Command, jsonFlag bool) error {
 		return fmt.Errorf("sync failed: %w", pErr)
 	}
 
-	if aErr := archiveWALFiles(cfg.AuditPath); aErr != nil {
+	// Only delete the files that were snapshotted, not any new ones.
+	if aErr := archiveWALFiles(walFiles); aErr != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: archiving WAL files: %s\n", aErr)
 	}
 

@@ -24,7 +24,7 @@ func newTestCmd() *cobra.Command {
 		Short: "Run contract test cases",
 		Long:  "Evaluate tool calls against a contract bundle using test cases or ad-hoc calls.",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if casesPath != "" && callsPath != "" {
 				return fmt.Errorf("--cases and --calls are mutually exclusive")
 			}
@@ -32,9 +32,9 @@ func newTestCmd() *cobra.Command {
 				return fmt.Errorf("one of --cases or --calls is required")
 			}
 			if casesPath != "" {
-				return runTestCases(args[0], casesPath, environment, jsonOutput)
+				return runTestCases(cmd, args[0], casesPath, environment, jsonOutput)
 			}
-			return runTestCalls(args[0], callsPath, environment, jsonOutput)
+			return runTestCalls(cmd, args[0], callsPath, environment, jsonOutput)
 		},
 	}
 
@@ -70,11 +70,12 @@ type toolCall struct {
 	Args map[string]any `json:"args"`
 }
 
-func runTestCases(bundlePath, casesPath, env string, jsonOut bool) error {
+func runTestCases(cmd *cobra.Command, bundlePath, casesPath, env string, jsonOut bool) error {
+	w := cmd.OutOrStdout()
 	g, err := buildGuard([]string{bundlePath}, env)
 	if err != nil {
 		if jsonOut {
-			writeErrorJSON(fmt.Sprintf("building guard: %s", err)) //nolint:errcheck // best-effort JSON error
+			writeErrorJSONTo(w, fmt.Sprintf("building guard: %s", err)) //nolint:errcheck // best-effort JSON error
 			return &exitError{code: 2}
 		}
 		return fmt.Errorf("building guard: %w", err)
@@ -83,7 +84,7 @@ func runTestCases(bundlePath, casesPath, env string, jsonOut bool) error {
 	raw, err := os.ReadFile(casesPath) //nolint:gosec // Path is caller-provided CLI arg.
 	if err != nil {
 		if jsonOut {
-			writeErrorJSON(fmt.Sprintf("reading cases file: %s", err)) //nolint:errcheck // best-effort JSON error
+			writeErrorJSONTo(w, fmt.Sprintf("reading cases file: %s", err)) //nolint:errcheck // best-effort JSON error
 			return &exitError{code: 2}
 		}
 		return fmt.Errorf("reading cases file: %w", err)
@@ -92,7 +93,7 @@ func runTestCases(bundlePath, casesPath, env string, jsonOut bool) error {
 	var cf testCaseFile
 	if err := yaml.Unmarshal(raw, &cf); err != nil {
 		if jsonOut {
-			writeErrorJSON(fmt.Sprintf("parsing cases file: %s", err)) //nolint:errcheck // best-effort JSON error
+			writeErrorJSONTo(w, fmt.Sprintf("parsing cases file: %s", err)) //nolint:errcheck // best-effort JSON error
 			return &exitError{code: 2}
 		}
 		return fmt.Errorf("parsing cases file: %w", err)
@@ -165,7 +166,7 @@ func runTestCases(bundlePath, casesPath, env string, jsonOut bool) error {
 	}
 
 	if jsonOut {
-		return writeJSON(results)
+		return writeJSONTo(w, results)
 	}
 
 	for _, cr := range results {
@@ -184,10 +185,10 @@ func runTestCases(bundlePath, casesPath, env string, jsonOut bool) error {
 		if !cr.Passed {
 			line += fmt.Sprintf(" (expected %s)", cr.Expected)
 		}
-		fmt.Println(line)
+		fmt.Fprintln(w, line)
 	}
 
-	fmt.Printf("\n%d/%d passed, %d failed\n", passed, len(cf.Cases), failed)
+	fmt.Fprintf(w, "\n%d/%d passed, %d failed\n", passed, len(cf.Cases), failed)
 
 	if failed > 0 {
 		return &exitError{code: 1}
@@ -195,11 +196,12 @@ func runTestCases(bundlePath, casesPath, env string, jsonOut bool) error {
 	return nil
 }
 
-func runTestCalls(bundlePath, callsPath, env string, jsonOut bool) error {
+func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut bool) error {
+	w := cmd.OutOrStdout()
 	g, err := buildGuard([]string{bundlePath}, env)
 	if err != nil {
 		if jsonOut {
-			writeErrorJSON(fmt.Sprintf("building guard: %s", err)) //nolint:errcheck // best-effort JSON error
+			writeErrorJSONTo(w, fmt.Sprintf("building guard: %s", err)) //nolint:errcheck // best-effort JSON error
 			return &exitError{code: 2}
 		}
 		return fmt.Errorf("building guard: %w", err)
@@ -208,7 +210,7 @@ func runTestCalls(bundlePath, callsPath, env string, jsonOut bool) error {
 	raw, err := os.ReadFile(callsPath) //nolint:gosec // Path is caller-provided CLI arg.
 	if err != nil {
 		if jsonOut {
-			writeErrorJSON(fmt.Sprintf("reading calls file: %s", err)) //nolint:errcheck // best-effort JSON error
+			writeErrorJSONTo(w, fmt.Sprintf("reading calls file: %s", err)) //nolint:errcheck // best-effort JSON error
 			return &exitError{code: 2}
 		}
 		return fmt.Errorf("reading calls file: %w", err)
@@ -217,7 +219,7 @@ func runTestCalls(bundlePath, callsPath, env string, jsonOut bool) error {
 	var calls []toolCall
 	if err := json.Unmarshal(raw, &calls); err != nil {
 		if jsonOut {
-			writeErrorJSON(fmt.Sprintf("parsing calls file: %s", err)) //nolint:errcheck // best-effort JSON error
+			writeErrorJSONTo(w, fmt.Sprintf("parsing calls file: %s", err)) //nolint:errcheck // best-effort JSON error
 			return &exitError{code: 2}
 		}
 		return fmt.Errorf("parsing calls file: %w", err)
@@ -253,16 +255,16 @@ func runTestCalls(bundlePath, callsPath, env string, jsonOut bool) error {
 	}
 
 	if jsonOut {
-		return writeJSON(results)
+		return writeJSONTo(w, results)
 	}
 
-	fmt.Printf("%-3s %-12s %-8s %-10s %s\n", "#", "Tool", "Verdict", "Contracts", "Details")
+	fmt.Fprintf(w, "%-3s %-12s %-8s %-10s %s\n", "#", "Tool", "Verdict", "Contracts", "Details")
 	for i, r := range results {
 		details := ""
 		if len(r.DenyReasons) > 0 {
 			details = strings.Join(r.DenyReasons, "; ")
 		}
-		fmt.Printf("%-3d %-12s %-8s %-10d %s\n",
+		fmt.Fprintf(w, "%-3d %-12s %-8s %-10d %s\n",
 			i+1, r.ToolName, strings.ToUpper(r.Verdict), r.ContractsEvaluated, details)
 	}
 

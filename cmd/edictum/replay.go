@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -22,11 +23,11 @@ func newReplayCmd() *cobra.Command {
 		Short: "Replay audit events against contracts",
 		Long:  "Re-evaluate historical audit log entries against a contract bundle to detect verdict changes.",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if auditLog == "" {
 				return fmt.Errorf("--audit-log is required")
 			}
-			return runReplay(args[0], auditLog, outputPath, jsonFlag)
+			return runReplay(cmd, args[0], auditLog, outputPath, jsonFlag)
 		},
 	}
 
@@ -59,7 +60,7 @@ type replayReport struct {
 	DenyReasons []string       `json:"deny_reasons,omitempty"`
 }
 
-func runReplay(bundlePath, auditLogPath, outputPath string, jsonFlag bool) error {
+func runReplay(cmd *cobra.Command, bundlePath, auditLogPath, outputPath string, jsonFlag bool) error {
 	g, err := buildGuard([]string{bundlePath}, "production")
 	if err != nil {
 		return fmt.Errorf("building guard: %w", err)
@@ -139,6 +140,7 @@ func runReplay(bundlePath, auditLogPath, outputPath string, jsonFlag bool) error
 		}
 	}
 
+	w := cmd.OutOrStdout()
 	if jsonFlag {
 		if changes == nil {
 			changes = []replayChange{}
@@ -148,7 +150,7 @@ func runReplay(bundlePath, auditLogPath, outputPath string, jsonFlag bool) error
 			"changes": len(changes),
 			"details": changes,
 		}
-		if jErr := writeJSON(out); jErr != nil {
+		if jErr := writeJSONTo(w, out); jErr != nil {
 			return fmt.Errorf("writing JSON output: %w", jErr)
 		}
 		if len(changes) > 0 {
@@ -157,7 +159,7 @@ func runReplay(bundlePath, auditLogPath, outputPath string, jsonFlag bool) error
 		return nil
 	}
 
-	printReplaySummary(total, changes)
+	printReplaySummary(w, total, changes)
 
 	if len(changes) > 0 {
 		return &exitError{code: 1}
@@ -185,19 +187,19 @@ func extractContractID(result guard.EvaluationResult) string {
 	return ""
 }
 
-func printReplaySummary(total int, changes []replayChange) {
-	fmt.Printf("Replayed %d events, %d would change\n", total, len(changes))
+func printReplaySummary(w io.Writer, total int, changes []replayChange) {
+	fmt.Fprintf(w, "Replayed %d events, %d would change\n", total, len(changes))
 	if len(changes) == 0 {
 		return
 	}
-	fmt.Println()
+	fmt.Fprintln(w)
 	for _, c := range changes {
 		line := fmt.Sprintf("  tool_name: %s → was %s, now %s",
 			c.ToolName, c.WasVerdict, c.NowVerdict)
 		if c.DenyContract != "" {
 			line += " by " + c.DenyContract
 		}
-		fmt.Println(line)
+		fmt.Fprintln(w, line)
 	}
 }
 

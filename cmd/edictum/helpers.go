@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/edictum-ai/edictum-go/guard"
@@ -11,14 +12,27 @@ import (
 
 // writeErrorJSON writes a structured error as JSON to stdout.
 // Used when --json is set and an error occurs before normal output.
+// Deprecated: prefer writeErrorJSONTo with an explicit writer.
 func writeErrorJSON(msg string) error {
+	return writeErrorJSONTo(os.Stdout, msg)
+}
+
+// writeErrorJSONTo writes a structured error as JSON to the given writer.
+func writeErrorJSONTo(w io.Writer, msg string) error {
 	out := map[string]any{
 		"error":   msg,
 		"success": false,
 	}
-	enc := json.NewEncoder(os.Stdout)
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(out)
+}
+
+// writeJSONTo writes v as indented JSON to the given writer.
+func writeJSONTo(w io.Writer, v any) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
 }
 
 // bundleFile holds a loaded bundle with its path and parsed data.

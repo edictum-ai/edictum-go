@@ -1,9 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
+	"io"
 	"reflect"
 	"sort"
 
@@ -19,11 +18,11 @@ func newDiffCmd() *cobra.Command {
 		Short: "Compare contract bundles",
 		Long:  "Compare two or more YAML contract bundles and show differences.",
 		Args:  cobra.MinimumNArgs(2),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 2 {
-				return runDiffTwo(args[0], args[1], jsonOutput)
+				return runDiffTwo(cmd, args[0], args[1], jsonOutput)
 			}
-			return runDiffCompose(args, jsonOutput)
+			return runDiffCompose(cmd, args, jsonOutput)
 		},
 	}
 
@@ -44,11 +43,12 @@ type contractRef struct {
 	Type string `json:"type"`
 }
 
-func runDiffTwo(path1, path2 string, jsonOut bool) error {
+func runDiffTwo(cmd *cobra.Command, path1, path2 string, jsonOut bool) error {
+	w := cmd.OutOrStdout()
 	data1, _, err := loadBundle(path1)
 	if err != nil {
 		if jsonOut {
-			writeErrorJSON(fmt.Sprintf("loading %s: %s", path1, err)) //nolint:errcheck // best-effort JSON error
+			writeErrorJSONTo(w, fmt.Sprintf("loading %s: %s", path1, err)) //nolint:errcheck // best-effort JSON error
 			return &exitError{code: 2}
 		}
 		return fmt.Errorf("loading %s: %w", path1, err)
@@ -56,7 +56,7 @@ func runDiffTwo(path1, path2 string, jsonOut bool) error {
 	data2, _, err := loadBundle(path2)
 	if err != nil {
 		if jsonOut {
-			writeErrorJSON(fmt.Sprintf("loading %s: %s", path2, err)) //nolint:errcheck // best-effort JSON error
+			writeErrorJSONTo(w, fmt.Sprintf("loading %s: %s", path2, err)) //nolint:errcheck // best-effort JSON error
 			return &exitError{code: 2}
 		}
 		return fmt.Errorf("loading %s: %w", path2, err)
@@ -101,9 +101,9 @@ func runDiffTwo(path1, path2 string, jsonOut bool) error {
 	result.HasChange = len(result.Added) > 0 || len(result.Removed) > 0 || len(result.Changed) > 0
 
 	if jsonOut {
-		return writeJSON(result)
+		return writeJSONTo(w, result)
 	}
-	printDiffText(result)
+	printDiffText(w, result)
 
 	if result.HasChange {
 		return &exitError{code: 1}
@@ -111,13 +111,14 @@ func runDiffTwo(path1, path2 string, jsonOut bool) error {
 	return nil
 }
 
-func runDiffCompose(paths []string, jsonOut bool) error {
+func runDiffCompose(cmd *cobra.Command, paths []string, jsonOut bool) error {
+	w := cmd.OutOrStdout()
 	entries := make([]yamlpkg.BundleEntry, 0, len(paths))
 	for _, p := range paths {
 		data, _, err := loadBundle(p)
 		if err != nil {
 			if jsonOut {
-				writeErrorJSON(fmt.Sprintf("loading %s: %s", p, err)) //nolint:errcheck // best-effort JSON error
+				writeErrorJSONTo(w, fmt.Sprintf("loading %s: %s", p, err)) //nolint:errcheck // best-effort JSON error
 				return &exitError{code: 2}
 			}
 			return fmt.Errorf("loading %s: %w", p, err)
@@ -128,7 +129,7 @@ func runDiffCompose(paths []string, jsonOut bool) error {
 	composed, err := yamlpkg.ComposeBundles(entries...)
 	if err != nil {
 		if jsonOut {
-			writeErrorJSON(fmt.Sprintf("composing bundles: %s", err)) //nolint:errcheck // best-effort JSON error
+			writeErrorJSONTo(w, fmt.Sprintf("composing bundles: %s", err)) //nolint:errcheck // best-effort JSON error
 			return &exitError{code: 2}
 		}
 		return fmt.Errorf("composing bundles: %w", err)
@@ -138,11 +139,11 @@ func runDiffCompose(paths []string, jsonOut bool) error {
 	hasChanges := len(report.Overrides) > 0 || len(report.Observes) > 0
 
 	if jsonOut {
-		if err := writeJSON(report); err != nil {
+		if err := writeJSONTo(w, report); err != nil {
 			return err
 		}
 	} else {
-		printComposeText(report)
+		printComposeText(w, report)
 	}
 
 	if hasChanges {
@@ -151,47 +152,41 @@ func runDiffCompose(paths []string, jsonOut bool) error {
 	return nil
 }
 
-func printDiffText(r diffResult) {
+func printDiffText(w io.Writer, r diffResult) {
 	for _, c := range r.Added {
-		fmt.Printf("+ %s (type: %s)\n", c.ID, c.Type)
+		fmt.Fprintf(w, "+ %s (type: %s)\n", c.ID, c.Type)
 	}
 	for _, c := range r.Removed {
-		fmt.Printf("- %s (type: %s)\n", c.ID, c.Type)
+		fmt.Fprintf(w, "- %s (type: %s)\n", c.ID, c.Type)
 	}
 	for _, id := range r.Changed {
-		fmt.Printf("~ %s\n", id)
+		fmt.Fprintf(w, "~ %s\n", id)
 	}
 	if len(r.Unchanged) > 0 {
-		fmt.Printf("= %d contracts unchanged\n", len(r.Unchanged))
+		fmt.Fprintf(w, "= %d contracts unchanged\n", len(r.Unchanged))
 	}
-	fmt.Printf("\nSummary: %d added, %d removed, %d changed, %d unchanged\n",
+	fmt.Fprintf(w, "\nSummary: %d added, %d removed, %d changed, %d unchanged\n",
 		len(r.Added), len(r.Removed), len(r.Changed), len(r.Unchanged))
 }
 
-func printComposeText(r yamlpkg.CompositionReport) {
+func printComposeText(w io.Writer, r yamlpkg.CompositionReport) {
 	if len(r.Overrides) > 0 {
-		fmt.Println("Overrides:")
+		fmt.Fprintln(w, "Overrides:")
 		for _, o := range r.Overrides {
-			fmt.Printf("  %s: %s overrides %s\n",
+			fmt.Fprintf(w, "  %s: %s overrides %s\n",
 				o.ContractID, o.OverriddenBy, o.OriginalSource)
 		}
 	}
 	if len(r.Observes) > 0 {
-		fmt.Println("Observe contracts:")
+		fmt.Fprintln(w, "Observe contracts:")
 		for _, o := range r.Observes {
-			fmt.Printf("  %s: enforced=%s, observed=%s\n",
+			fmt.Fprintf(w, "  %s: enforced=%s, observed=%s\n",
 				o.ContractID, o.EnforcedSource, o.ObservedSource)
 		}
 	}
 	if len(r.Overrides) == 0 && len(r.Observes) == 0 {
-		fmt.Println("No composition changes.")
+		fmt.Fprintln(w, "No composition changes.")
 	}
-}
-
-func writeJSON(v any) error {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	return enc.Encode(v)
 }
 
 // indexContracts builds a map of contract ID to contract data.
