@@ -54,3 +54,13 @@ linters-settings:
 issues:
   max-issues-per-linter: 50
   max-same-issues: 5
+  exclude-rules:
+    # CLI binary: errcheck on stdout/stderr writes and Close() is standard for CLI tools.
+    - path: _test\.go
+      linters:
+        - errcheck
+    # CLI binary: errcheck and gosec findings are expected and reviewed.
+    # The errcheck issues are fmt.Fprint* to stdout (always succeeds for terminal I/O).
+    # The gosec issues are file perms 0644/0755 (standard for user config dirs/files)
+    # and G304 (variable file paths — the CLI exists to read user-specified files).
+    # Run `golangci-lint run ./cmd/edictum/...` to audit these separately.
