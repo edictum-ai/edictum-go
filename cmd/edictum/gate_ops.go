@@ -257,9 +257,21 @@ func runGateSync(cmd *cobra.Command, jsonFlag bool) error {
 		return fmt.Errorf("sync failed: %w", pErr)
 	}
 
-	// Only delete the files that were snapshotted.
-	if aErr := archiveWALFiles(walFiles); aErr != nil {
-		return fmt.Errorf("sync succeeded but WAL cleanup failed (events may be re-uploaded): %w", aErr)
+	// Only delete snapshotted files, excluding today's WAL (still being
+	// written by concurrent gate check invocations). Today's events that
+	// were uploaded will be re-uploaded on next sync — safe duplication
+	// vs unsafe data loss from deleting an actively-written file.
+	today := walFilePath(cfg.AuditPath)
+	var toDelete []string
+	for _, f := range walFiles {
+		if f != today {
+			toDelete = append(toDelete, f)
+		}
+	}
+	if len(toDelete) > 0 {
+		if aErr := archiveWALFiles(toDelete); aErr != nil {
+			return fmt.Errorf("sync succeeded but WAL cleanup failed (events may be re-uploaded): %w", aErr)
+		}
 	}
 
 	if jsonFlag {
