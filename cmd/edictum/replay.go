@@ -15,6 +15,7 @@ import (
 func newReplayCmd() *cobra.Command {
 	var auditLog string
 	var outputPath string
+	var jsonFlag bool
 
 	cmd := &cobra.Command{
 		Use:   "replay <bundle>",
@@ -25,12 +26,13 @@ func newReplayCmd() *cobra.Command {
 			if auditLog == "" {
 				return fmt.Errorf("--audit-log is required")
 			}
-			return runReplay(args[0], auditLog, outputPath)
+			return runReplay(args[0], auditLog, outputPath, jsonFlag)
 		},
 	}
 
 	cmd.Flags().StringVar(&auditLog, "audit-log", "", "path to JSONL audit log file (required)")
 	cmd.Flags().StringVar(&outputPath, "output", "", "path for detailed JSONL report")
+	cmd.Flags().BoolVar(&jsonFlag, "json", false, "output as JSON")
 	return cmd
 }
 
@@ -57,7 +59,7 @@ type replayReport struct {
 	DenyReasons []string       `json:"deny_reasons,omitempty"`
 }
 
-func runReplay(bundlePath, auditLogPath, outputPath string) error {
+func runReplay(bundlePath, auditLogPath, outputPath string, jsonFlag bool) error {
 	g, err := buildGuard([]string{bundlePath}, "production")
 	if err != nil {
 		return fmt.Errorf("building guard: %w", err)
@@ -135,6 +137,24 @@ func runReplay(bundlePath, auditLogPath, outputPath string) error {
 		if err := writeReplayReport(outputPath, reports); err != nil {
 			return fmt.Errorf("writing report: %w", err)
 		}
+	}
+
+	if jsonFlag {
+		if changes == nil {
+			changes = []replayChange{}
+		}
+		out := map[string]any{
+			"total":   total,
+			"changes": len(changes),
+			"details": changes,
+		}
+		if jErr := writeJSON(out); jErr != nil {
+			return fmt.Errorf("writing JSON output: %w", jErr)
+		}
+		if len(changes) > 0 {
+			return &exitError{code: 1}
+		}
+		return nil
 	}
 
 	printReplaySummary(total, changes)

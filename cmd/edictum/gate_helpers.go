@@ -447,11 +447,14 @@ func writeCheckOutput(cmd *cobra.Command, format, verdict, contractID, reason st
 
 	case "gemini":
 		if verdict == "deny" {
-			// Gemini: plain text reason, exit 2.
-			fmt.Fprintln(w, buildDenyReason(contractID, reason))
-			return &exitError{code: 2}
+			output = map[string]any{
+				"decision": "deny",
+				"reason":   buildDenyReason(contractID, reason),
+			}
+			exitCode = 1
+		} else {
+			output = map[string]any{}
 		}
-		output = map[string]any{}
 
 	case "opencode":
 		if verdict == "deny" {
@@ -744,14 +747,14 @@ const geminiHookScript = `#!/usr/bin/env bash
 input=$(cat)
 result=$(echo "$input" | edictum gate check --format gemini 2>/dev/null)
 exit_code=$?
-if [ $exit_code -eq 2 ]; then
+if [ $exit_code -eq 1 ]; then
   echo "$result" >&2
-  exit 2
+  exit 1
 fi
-# Fail-closed: if edictum is missing or crashed (non-0, non-2), deny the call
+# Fail-closed: if edictum is missing or crashed (non-0, non-1), deny the call
 if [ $exit_code -ne 0 ]; then
   echo "Edictum gate check failed (exit $exit_code)" >&2
-  exit 2
+  exit 1
 fi
 echo "{}"
 exit 0

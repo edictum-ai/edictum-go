@@ -1,11 +1,25 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/edictum-ai/edictum-go/guard"
 	yamlpkg "github.com/edictum-ai/edictum-go/yaml"
 )
+
+// writeErrorJSON writes a structured error as JSON to stdout.
+// Used when --json is set and an error occurs before normal output.
+func writeErrorJSON(msg string) error {
+	out := map[string]any{
+		"error":   msg,
+		"success": false,
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(out)
+}
 
 // bundleFile holds a loaded bundle with its path and parsed data.
 type bundleFile struct {

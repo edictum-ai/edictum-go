@@ -66,11 +66,19 @@ type checkArgs struct {
 func runCheck(cmd *cobra.Command, files []string, ca checkArgs) error {
 	var args map[string]any
 	if err := json.Unmarshal([]byte(ca.argsJSON), &args); err != nil {
+		if ca.jsonOutput {
+			writeErrorJSON(fmt.Sprintf("invalid --args JSON: %s", err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("invalid --args JSON: %w", err)
 	}
 
 	g, err := buildGuardFromFiles(files, ca.environment)
 	if err != nil {
+		if ca.jsonOutput {
+			writeErrorJSON(fmt.Sprintf("loading contracts: %s", err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("loading contracts: %w", err)
 	}
 

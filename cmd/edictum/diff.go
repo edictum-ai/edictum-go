@@ -47,10 +47,18 @@ type contractRef struct {
 func runDiffTwo(path1, path2 string, jsonOut bool) error {
 	data1, _, err := loadBundle(path1)
 	if err != nil {
+		if jsonOut {
+			writeErrorJSON(fmt.Sprintf("loading %s: %s", path1, err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("loading %s: %w", path1, err)
 	}
 	data2, _, err := loadBundle(path2)
 	if err != nil {
+		if jsonOut {
+			writeErrorJSON(fmt.Sprintf("loading %s: %s", path2, err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("loading %s: %w", path2, err)
 	}
 
@@ -108,6 +116,10 @@ func runDiffCompose(paths []string, jsonOut bool) error {
 	for _, p := range paths {
 		data, _, err := loadBundle(p)
 		if err != nil {
+			if jsonOut {
+				writeErrorJSON(fmt.Sprintf("loading %s: %s", p, err)) //nolint:errcheck // best-effort JSON error
+				return &exitError{code: 2}
+			}
 			return fmt.Errorf("loading %s: %w", p, err)
 		}
 		entries = append(entries, yamlpkg.BundleEntry{Data: data, Label: p})
@@ -115,6 +127,10 @@ func runDiffCompose(paths []string, jsonOut bool) error {
 
 	composed, err := yamlpkg.ComposeBundles(entries...)
 	if err != nil {
+		if jsonOut {
+			writeErrorJSON(fmt.Sprintf("composing bundles: %s", err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("composing bundles: %w", err)
 	}
 

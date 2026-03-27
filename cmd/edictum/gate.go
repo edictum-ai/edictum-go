@@ -129,29 +129,53 @@ func newGateCheckCmd() *cobra.Command {
 	return cmd
 }
 
-func runGateCheck(cmd *cobra.Command, format, contractsOverride string, _ bool) error {
+func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag bool) error {
+	if jsonFlag {
+		format = "raw"
+	}
+
 	raw, err := io.ReadAll(cmd.InOrStdin())
 	if err != nil {
-		return fmt.Errorf("reading stdin: %w", err)
+		msg := fmt.Sprintf("reading stdin: %s", err)
+		if format == "raw" {
+			_ = writeGateError(cmd, msg)
+			return &exitError{code: 2}
+		}
+		return fmt.Errorf("%s", msg)
 	}
 
 	toolName, toolArgs, parseErr := parseFormatStdin(format, raw)
 	if parseErr != nil {
-		return fmt.Errorf("parsing input: %w", parseErr)
+		msg := fmt.Sprintf("parsing input: %s", parseErr)
+		if format == "raw" {
+			_ = writeGateError(cmd, msg)
+			return &exitError{code: 2}
+		}
+		return fmt.Errorf("%s", msg)
 	}
 
 	cPath := contractsOverride
 	if cPath == "" {
 		cfg, cfgErr := loadGateConfigDefault()
 		if cfgErr != nil {
-			return fmt.Errorf("loading config: %w", cfgErr)
+			msg := fmt.Sprintf("loading config: %s", cfgErr)
+			if format == "raw" {
+				_ = writeGateError(cmd, msg)
+				return &exitError{code: 2}
+			}
+			return fmt.Errorf("%s", msg)
 		}
 		cPath = cfg.ContractsPath
 	}
 
 	g, gErr := buildGuardFromPath(cPath)
 	if gErr != nil {
-		return fmt.Errorf("loading contracts: %w", gErr)
+		msg := fmt.Sprintf("loading contracts: %s", gErr)
+		if format == "raw" {
+			_ = writeGateError(cmd, msg)
+			return &exitError{code: 2}
+		}
+		return fmt.Errorf("%s", msg)
 	}
 
 	ctx := context.Background()
@@ -225,29 +249,62 @@ func newGateUninstallCmd() *cobra.Command {
 }
 
 func newGateStatusCmd() *cobra.Command {
-	return &cobra.Command{
+	var jsonFlag bool
+
+	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show current gate configuration and health",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runGateStatus(cmd)
+			return runGateStatus(cmd, jsonFlag)
 		},
 	}
+
+	cmd.Flags().BoolVar(&jsonFlag, "json", false, "output as JSON")
+	return cmd
 }
 
-func runGateStatus(cmd *cobra.Command) error {
+func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 	cfg, err := loadGateConfigDefault()
 	if err != nil {
 		return fmt.Errorf("no gate config found — run 'edictum gate init' first: %w", err)
+	}
+
+	files, _ := filepath.Glob(filepath.Join(cfg.ContractsPath, "*.yaml"))
+	ymlFiles, _ := filepath.Glob(filepath.Join(cfg.ContractsPath, "*.yml"))
+	files = append(files, ymlFiles...)
+
+	pending := countWALEvents(cfg.AuditPath)
+
+	installed := cfg.Installed
+	if len(installed) == 0 {
+		installed = detectInstalledAssistants()
+	}
+
+	if jsonFlag {
+		contractNames := make([]string, 0, len(files))
+		for _, f := range files {
+			contractNames = append(contractNames, filepath.Base(f))
+		}
+		if contractNames == nil {
+			contractNames = []string{}
+		}
+		if installed == nil {
+			installed = []string{}
+		}
+		out := map[string]any{
+			"contracts":      contractNames,
+			"server_url":     cfg.ServerURL,
+			"pending_events": pending,
+			"installed":      installed,
+		}
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		return enc.Encode(out)
 	}
 
 	w := cmd.OutOrStdout()
 	fmt.Fprintln(w, "Edictum Gate Status")
 	fmt.Fprintln(w)
 
-	// Contracts info.
-	files, _ := filepath.Glob(filepath.Join(cfg.ContractsPath, "*.yaml"))
-	ymlFiles, _ := filepath.Glob(filepath.Join(cfg.ContractsPath, "*.yml"))
-	files = append(files, ymlFiles...)
 	if len(files) > 0 {
 		for _, f := range files {
 			hash := fileHash(f)
@@ -263,13 +320,8 @@ func runGateStatus(cmd *cobra.Command) error {
 		fmt.Fprintln(w, "  Server:    not configured")
 	}
 
-	pending := countWALEvents(cfg.AuditPath)
 	fmt.Fprintf(w, "  Audit:     %d events pending\n", pending)
 
-	installed := cfg.Installed
-	if len(installed) == 0 {
-		installed = detectInstalledAssistants()
-	}
 	if len(installed) > 0 {
 		fmt.Fprintf(w, "  Installed: %s\n", strings.Join(installed, ", "))
 	} else {
@@ -281,26 +333,28 @@ func runGateStatus(cmd *cobra.Command) error {
 
 func newGateAuditCmd() *cobra.Command {
 	var (
-		limit   int
-		tool    string
-		verdict string
+		limit    int
+		tool     string
+		verdict  string
+		jsonFlag bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "audit",
 		Short: "Show recent audit events",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runGateAudit(cmd, limit, tool, verdict)
+			return runGateAudit(cmd, limit, tool, verdict, jsonFlag)
 		},
 	}
 
 	cmd.Flags().IntVar(&limit, "limit", 20, "number of recent events")
 	cmd.Flags().StringVar(&tool, "tool", "", "filter by tool name")
 	cmd.Flags().StringVar(&verdict, "verdict", "", "filter by verdict (allow, deny)")
+	cmd.Flags().BoolVar(&jsonFlag, "json", false, "output as JSON")
 	return cmd
 }
 
-func runGateAudit(cmd *cobra.Command, limit int, tool, verdict string) error {
+func runGateAudit(cmd *cobra.Command, limit int, tool, verdict string, jsonFlag bool) error {
 	cfg, err := loadGateConfigDefault()
 	if err != nil {
 		return fmt.Errorf("no gate config: %w", err)
@@ -309,6 +363,15 @@ func runGateAudit(cmd *cobra.Command, limit int, tool, verdict string) error {
 	events, rErr := readWALEvents(cfg.AuditPath, limit, tool, verdict)
 	if rErr != nil {
 		return fmt.Errorf("reading audit events: %w", rErr)
+	}
+
+	if jsonFlag {
+		if events == nil {
+			events = []walEvent{}
+		}
+		out := map[string]any{"events": events}
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		return enc.Encode(out)
 	}
 
 	w := cmd.OutOrStdout()
@@ -330,22 +393,33 @@ func runGateAudit(cmd *cobra.Command, limit int, tool, verdict string) error {
 }
 
 func newGateSyncCmd() *cobra.Command {
-	return &cobra.Command{
+	var jsonFlag bool
+
+	cmd := &cobra.Command{
 		Use:   "sync",
 		Short: "Flush buffered audit events to Console",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runGateSync(cmd)
+			return runGateSync(cmd, jsonFlag)
 		},
 	}
+
+	cmd.Flags().BoolVar(&jsonFlag, "json", false, "output as JSON")
+	return cmd
 }
 
-func runGateSync(cmd *cobra.Command) error {
+func runGateSync(cmd *cobra.Command, jsonFlag bool) error {
 	cfg, err := loadGateConfigDefault()
 	if err != nil {
 		return fmt.Errorf("no gate config: %w", err)
 	}
 	if cfg.ServerURL == "" {
-		fmt.Fprintln(cmd.ErrOrStderr(), "Console not configured. Run 'edictum gate init --server <url>'")
+		if jsonFlag {
+			out := map[string]any{"synced": 0, "success": false, "error": "Console not configured"}
+			enc := json.NewEncoder(cmd.OutOrStdout())
+			_ = enc.Encode(out)
+		} else {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Console not configured. Run 'edictum gate init --server <url>'")
+		}
 		return &exitError{code: 1}
 	}
 
@@ -355,6 +429,11 @@ func runGateSync(cmd *cobra.Command) error {
 	}
 
 	if len(events) == 0 {
+		if jsonFlag {
+			out := map[string]any{"synced": 0, "success": true}
+			enc := json.NewEncoder(cmd.OutOrStdout())
+			return enc.Encode(out)
+		}
 		fmt.Fprintln(cmd.OutOrStdout(), "No events to sync.")
 		return nil
 	}
@@ -373,8 +452,21 @@ func runGateSync(cmd *cobra.Command) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: archiving WAL files: %s\n", aErr)
 	}
 
+	if jsonFlag {
+		out := map[string]any{"synced": len(events), "success": true}
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		return enc.Encode(out)
+	}
+
 	fmt.Fprintf(cmd.OutOrStdout(), "Synced %d events to Console.\n", len(events))
 	return nil
+}
+
+// writeGateError outputs a structured JSON error for gate check.
+func writeGateError(cmd *cobra.Command, msg string) error {
+	out := map[string]any{"error": msg, "decision": "error"}
+	enc := json.NewEncoder(cmd.OutOrStdout())
+	return enc.Encode(out)
 }
 
 func fileHash(path string) string {

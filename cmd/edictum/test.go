@@ -73,16 +73,28 @@ type toolCall struct {
 func runTestCases(bundlePath, casesPath, env string, jsonOut bool) error {
 	g, err := buildGuard([]string{bundlePath}, env)
 	if err != nil {
+		if jsonOut {
+			writeErrorJSON(fmt.Sprintf("building guard: %s", err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("building guard: %w", err)
 	}
 
 	raw, err := os.ReadFile(casesPath) //nolint:gosec // Path is caller-provided CLI arg.
 	if err != nil {
+		if jsonOut {
+			writeErrorJSON(fmt.Sprintf("reading cases file: %s", err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("reading cases file: %w", err)
 	}
 
 	var cf testCaseFile
 	if err := yaml.Unmarshal(raw, &cf); err != nil {
+		if jsonOut {
+			writeErrorJSON(fmt.Sprintf("parsing cases file: %s", err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("parsing cases file: %w", err)
 	}
 
@@ -92,7 +104,7 @@ func runTestCases(bundlePath, casesPath, env string, jsonOut bool) error {
 
 	type caseResult struct {
 		ID       string `json:"id"`
-		Tool     string `json:"tool"`
+		Tool     string `json:"tool_name"`
 		Verdict  string `json:"verdict"`
 		Expected string `json:"expected"`
 		Passed   bool   `json:"passed"`
@@ -186,16 +198,28 @@ func runTestCases(bundlePath, casesPath, env string, jsonOut bool) error {
 func runTestCalls(bundlePath, callsPath, env string, jsonOut bool) error {
 	g, err := buildGuard([]string{bundlePath}, env)
 	if err != nil {
+		if jsonOut {
+			writeErrorJSON(fmt.Sprintf("building guard: %s", err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("building guard: %w", err)
 	}
 
 	raw, err := os.ReadFile(callsPath) //nolint:gosec // Path is caller-provided CLI arg.
 	if err != nil {
+		if jsonOut {
+			writeErrorJSON(fmt.Sprintf("reading calls file: %s", err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("reading calls file: %w", err)
 	}
 
 	var calls []toolCall
 	if err := json.Unmarshal(raw, &calls); err != nil {
+		if jsonOut {
+			writeErrorJSON(fmt.Sprintf("parsing calls file: %s", err)) //nolint:errcheck // best-effort JSON error
+			return &exitError{code: 2}
+		}
 		return fmt.Errorf("parsing calls file: %w", err)
 	}
 
