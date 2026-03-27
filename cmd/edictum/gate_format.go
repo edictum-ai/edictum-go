@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/guard"
@@ -98,10 +99,14 @@ func parseFormatStdin(format string, raw []byte) (string, map[string]any, error)
 	if toolName == "" {
 		return "", nil, fmt.Errorf("tool_name is required and must not be empty")
 	}
-	// Reject tool names with null bytes or control characters — these can
-	// bypass tool-matching logic in contracts.
+	// Reject tool names with null bytes, control characters, or path
+	// separators — these bypass tool-matching logic in contracts.
 	if err := envelope.ValidateToolName(toolName); err != nil {
 		return "", nil, fmt.Errorf("invalid tool_name: %w", err)
+	}
+	// Whitespace-only names would also bypass matching.
+	if strings.TrimSpace(toolName) == "" {
+		return "", nil, fmt.Errorf("tool_name must not be whitespace-only")
 	}
 	return toolName, toolArgs, nil
 }
@@ -142,7 +147,7 @@ func parseCopilotStdin(data map[string]any) (string, map[string]any, error) {
 	switch v := data["toolArgs"].(type) {
 	case string:
 		if jErr := json.Unmarshal([]byte(v), &toolInput); jErr != nil {
-			toolInput = map[string]any{}
+			return "", nil, fmt.Errorf("invalid toolArgs JSON: %w", jErr)
 		}
 	case map[string]any:
 		toolInput = v

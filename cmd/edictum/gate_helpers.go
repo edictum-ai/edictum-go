@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"syscall"
 	"time"
 )
 
@@ -167,7 +166,7 @@ func appendWALEvent(auditDir string, event walEvent) error {
 	}
 	// Exclusive lock prevents concurrent gate check processes from
 	// interleaving writes (O_APPEND alone is only atomic for ≤PIPE_BUF).
-	if lErr := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); lErr != nil {
+	if lErr := lockFile(f); lErr != nil {
 		f.Close()
 		return fmt.Errorf("WAL file lock: %w", lErr)
 	}
