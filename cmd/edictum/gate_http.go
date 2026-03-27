@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -156,6 +157,11 @@ func filterDirectEntries(entries []any, cmdKey string) ([]any, bool) {
 // ---------------------------------------------------------------------------
 
 func currentUser() string {
+	// Prefer os/user.Current() (reads /etc/passwd or OS API) over $USER
+	// env var, which is trivially spoofable.
+	if u, err := user.Current(); err == nil && u.Username != "" {
+		return u.Username
+	}
 	if u := os.Getenv("USER"); u != "" {
 		return u
 	}

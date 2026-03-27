@@ -91,15 +91,16 @@ func resolvePaths(path string) (filePath, dirPath string, err error) {
 }
 
 // readBounded reads a file up to maxFileSize bytes.
+// Reads first then checks length to avoid TOCTOU between stat and read.
 func readBounded(path string) ([]byte, error) {
-	info, err := os.Stat(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path is caller-provided scan target
 	if err != nil {
 		return nil, err
 	}
-	if info.Size() > maxFileSize {
-		return nil, fmt.Errorf("file size %d exceeds %d byte limit", info.Size(), maxFileSize)
+	if len(data) > int(maxFileSize) {
+		return nil, fmt.Errorf("file size %d exceeds %d byte limit", len(data), maxFileSize)
 	}
-	return os.ReadFile(path) //nolint:gosec // path is validated by caller via os.Stat
+	return data, nil
 }
 
 // scanCodeBlocks runs all patterns against each line of each code block.

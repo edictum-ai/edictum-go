@@ -151,7 +151,7 @@ func appendWALEvent(auditDir string, event walEvent) error {
 	}
 	data = append(data, '\n')
 
-	f, err := os.OpenFile(walFilePath(auditDir), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(walFilePath(auditDir), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
@@ -207,6 +207,7 @@ func readJSONLFile(path string) ([]walEvent, error) {
 
 	var events []walEvent
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // 1 MB buffer, matching replay.go
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {

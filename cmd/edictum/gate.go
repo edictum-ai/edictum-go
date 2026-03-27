@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/edictum-ai/edictum-go/guard"
 	"github.com/spf13/cobra"
@@ -125,53 +126,43 @@ func newGateCheckCmd() *cobra.Command {
 	return cmd
 }
 
+// maxStdinBytes is the maximum input size for gate check (10 MB).
+// Prevents OOM on large tool_input payloads (e.g., Write with multi-MB files).
+const maxStdinBytes = 10 * 1024 * 1024
+
 func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag bool) error {
 	if jsonFlag {
 		format = "raw"
 	}
 
-	raw, err := io.ReadAll(cmd.InOrStdin())
+	raw, err := io.ReadAll(io.LimitReader(cmd.InOrStdin(), maxStdinBytes+1))
 	if err != nil {
-		msg := fmt.Sprintf("reading stdin: %s", err)
-		if format == "raw" {
-			_ = writeGateError(cmd, msg)
-			return &exitError{code: 2}
-		}
-		return fmt.Errorf("%s", msg)
+		return gateCheckError(cmd, format, fmt.Sprintf("reading stdin: %s", err))
+	}
+	if len(raw) > maxStdinBytes {
+		return gateCheckError(cmd, format, "stdin input exceeds 10 MB limit")
 	}
 
 	toolName, toolArgs, parseErr := parseFormatStdin(format, raw)
 	if parseErr != nil {
-		msg := fmt.Sprintf("parsing input: %s", parseErr)
-		if format == "raw" {
-			_ = writeGateError(cmd, msg)
-			return &exitError{code: 2}
-		}
-		return fmt.Errorf("%s", msg)
+		return gateCheckError(cmd, format, fmt.Sprintf("parsing input: %s", parseErr))
 	}
 
+	// Load config once for both contracts path and audit path.
+	var cfg *gateConfig
 	cPath := contractsOverride
 	if cPath == "" {
-		cfg, cfgErr := loadGateConfigDefault()
+		var cfgErr error
+		cfg, cfgErr = loadGateConfigDefault()
 		if cfgErr != nil {
-			msg := fmt.Sprintf("loading config: %s", cfgErr)
-			if format == "raw" {
-				_ = writeGateError(cmd, msg)
-				return &exitError{code: 2}
-			}
-			return fmt.Errorf("%s", msg)
+			return gateCheckError(cmd, format, fmt.Sprintf("loading config: %s", cfgErr))
 		}
 		cPath = cfg.ContractsPath
 	}
 
 	g, gErr := buildGuardFromPath(cPath)
 	if gErr != nil {
-		msg := fmt.Sprintf("loading contracts: %s", gErr)
-		if format == "raw" {
-			_ = writeGateError(cmd, msg)
-			return &exitError{code: 2}
-		}
-		return fmt.Errorf("%s", msg)
+		return gateCheckError(cmd, format, fmt.Sprintf("loading contracts: %s", gErr))
 	}
 
 	ctx := context.Background()
@@ -183,14 +174,21 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 		reason = result.DenyReasons[0]
 	}
 
-	// Append audit event.
-	if cfg, cfgErr := loadGateConfigDefault(); cfgErr == nil && cfg.AuditPath != "" {
-		_ = appendWALEvent(cfg.AuditPath, walEvent{
-			ToolName: toolName,
-			Verdict:  result.Verdict,
-			User:     currentUser(),
-			Detail:   reason,
-			Reason:   reason,
+	// Append audit event with timestamp.
+	auditPath := ""
+	if cfg != nil {
+		auditPath = cfg.AuditPath
+	} else if acfg, acfgErr := loadGateConfigDefault(); acfgErr == nil {
+		auditPath = acfg.AuditPath
+	}
+	if auditPath != "" {
+		_ = appendWALEvent(auditPath, walEvent{
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			ToolName:  toolName,
+			Verdict:   result.Verdict,
+			User:      currentUser(),
+			Detail:    reason,
+			Reason:    reason,
 		})
 	}
 
@@ -202,6 +200,14 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 	}
 
 	return writeCheckOutput(cmd, format, "allow", "", "")
+}
+
+func gateCheckError(cmd *cobra.Command, format, msg string) error {
+	if format == "raw" {
+		_ = writeGateError(cmd, msg) //nolint:gosec // best-effort error output
+		return &exitError{code: 2}
+	}
+	return fmt.Errorf("%s", msg)
 }
 
 // writeGateError outputs a structured JSON error for gate check.
