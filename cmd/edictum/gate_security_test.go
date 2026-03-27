@@ -103,27 +103,34 @@ func TestSecurityGateCheckUnknownFormat(t *testing.T) {
 func TestSecurityGateCheckToolNameWithControlChars(t *testing.T) {
 	bundlePath := writeTestBundle(t)
 
-	// Tool names with null bytes and control characters.
-	inputs := []string{
-		`{"tool_name": "Bash\u0000Inject", "tool_input": {"command": "echo hello"}}`,
-		`{"tool_name": "\t\n\r", "tool_input": {}}`,
-		`{"tool_name": "", "tool_input": {"command": "echo hello"}}`,
+	// Tool names with null bytes and control characters must not panic and must not allow.
+	inputs := []struct {
+		name  string
+		input string
+	}{
+		{"null_byte", `{"tool_name": "Bash\u0000Inject", "tool_input": {"command": "echo hello"}}`},
+		{"control_chars", `{"tool_name": "\t\n\r", "tool_input": {}}`},
+		{"empty_tool_name", `{"tool_name": "", "tool_input": {"command": "rm -rf /"}}`},
 	}
 
-	for i, input := range inputs {
-		t.Run(strings.ReplaceAll(input[:min(30, len(input))], "\n", "\\n"), func(t *testing.T) {
+	for _, tc := range inputs {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Helper()
 			cmd := newGateCheckCmd()
-			cmd.SetIn(strings.NewReader(input))
+			cmd.SetIn(strings.NewReader(tc.input))
 			var stdout bytes.Buffer
 			cmd.SetOut(&stdout)
 			cmd.SetErr(&stdout)
 			cmd.SetArgs([]string{"--format", "raw", "--contracts", bundlePath})
 
-			// Must not panic.
+			// Must not panic, and must not allow.
 			err := cmd.Execute()
-			_ = err // Any non-panic result is acceptable.
-			_ = i
+			if err == nil {
+				// Check stdout — if verdict is "allow", that's a bypass.
+				if strings.Contains(stdout.String(), `"allow"`) {
+					t.Fatal("empty/malformed tool_name must not produce allow verdict")
+				}
+			}
 		})
 	}
 }

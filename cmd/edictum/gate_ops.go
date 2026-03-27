@@ -230,7 +230,9 @@ func runGateSync(cmd *cobra.Command, jsonFlag bool) error {
 		return fmt.Errorf("listing WAL files: %w", lErr)
 	}
 
-	events, rErr := readWALEvents(cfg.AuditPath, 0, "", "")
+	// Read only from snapshotted files to avoid uploading events written
+	// concurrently and then deleting them (which would cause data loss).
+	events, rErr := readWALFromFiles(walFiles)
 	if rErr != nil {
 		return fmt.Errorf("reading WAL: %w", rErr)
 	}
@@ -257,7 +259,7 @@ func runGateSync(cmd *cobra.Command, jsonFlag bool) error {
 
 	// Only delete the files that were snapshotted.
 	if aErr := archiveWALFiles(walFiles); aErr != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: archiving WAL files: %s\n", aErr)
+		return fmt.Errorf("sync succeeded but WAL cleanup failed (events may be re-uploaded): %w", aErr)
 	}
 
 	if jsonFlag {

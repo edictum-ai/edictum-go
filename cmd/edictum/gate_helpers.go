@@ -164,9 +164,12 @@ func appendWALEvent(auditDir string, event walEvent) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	_, err = f.Write(data)
-	return err
+	_, wErr := f.Write(data)
+	// Close error may surface buffered I/O failures on some filesystems.
+	if cErr := f.Close(); cErr != nil && wErr == nil {
+		return cErr
+	}
+	return wErr
 }
 
 func readWALEvents(auditDir string, limit int, toolFilter, verdictFilter string) ([]walEvent, error) {
@@ -205,6 +208,20 @@ func readWALEvents(auditDir string, limit int, toolFilter, verdictFilter string)
 		filtered = filtered[len(filtered)-limit:]
 	}
 	return filtered, nil
+}
+
+// readWALFromFiles reads events only from the given file paths (no re-glob).
+// Used by sync to avoid TOCTOU: only files snapshotted before reading are processed.
+func readWALFromFiles(files []string) ([]walEvent, error) {
+	var all []walEvent
+	for _, f := range files {
+		events, err := readJSONLFile(f)
+		if err != nil {
+			continue // skip corrupt files
+		}
+		all = append(all, events...)
+	}
+	return all, nil
 }
 
 func readJSONLFile(path string) ([]walEvent, error) {
