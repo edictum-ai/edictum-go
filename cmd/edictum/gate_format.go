@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/guard"
 	"github.com/spf13/cobra"
 )
@@ -93,9 +94,14 @@ func parseFormatStdin(format string, raw []byte) (string, map[string]any, error)
 	if parseErr != nil {
 		return "", nil, parseErr
 	}
-	// Fail-closed: empty tool name bypasses all tool-specific contracts.
+	// Fail-closed: empty or malformed tool name bypasses tool-specific contracts.
 	if toolName == "" {
 		return "", nil, fmt.Errorf("tool_name is required and must not be empty")
+	}
+	// Reject tool names with null bytes or control characters — these can
+	// bypass tool-matching logic in contracts.
+	if err := envelope.ValidateToolName(toolName); err != nil {
+		return "", nil, fmt.Errorf("invalid tool_name: %w", err)
 	}
 	return toolName, toolArgs, nil
 }

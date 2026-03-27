@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -192,16 +190,9 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 }
 
 func gateCheckError(cmd *cobra.Command, format, msg string) error {
-	if format == "raw" {
-		_ = writeGateError(cmd, msg) //nolint:gosec // best-effort error output
-		return &exitError{code: 2}
-	}
-	return errors.New(msg)
-}
-
-// writeGateError outputs a structured JSON error for gate check.
-func writeGateError(cmd *cobra.Command, msg string) error {
-	out := map[string]any{"error": msg, "decision": "error"}
-	enc := json.NewEncoder(cmd.OutOrStdout())
-	return enc.Encode(out)
+	// Output a deny-formatted response to stdout so the assistant sees a
+	// deny even if it ignores exit codes. Defence-in-depth: some hook
+	// systems treat exit 2 as "allow".
+	_ = writeCheckOutput(cmd, format, "deny", "", msg)
+	return &exitError{code: 2}
 }

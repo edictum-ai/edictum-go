@@ -39,10 +39,9 @@ export const EdictumGate = async ({ directory }) => {
           throw new Error(parsed.reason || "Denied by edictum gate");
         }
       } catch (e) {
-        if (e.message && e.message.startsWith("Denied")) throw e;
-        if (e.message && e.message.startsWith("Contract")) throw e;
-        // Fail-closed: unknown error blocks the tool call
-        throw new Error("Edictum gate check failed: " + e.message);
+        // Fail-closed: all errors block the tool call, preserving
+        // the original message for deny reasons.
+        throw e;
       }
     }
   };
