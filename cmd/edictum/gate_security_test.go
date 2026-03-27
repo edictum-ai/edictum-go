@@ -67,7 +67,7 @@ func TestSecurityGateCheckMalformedStdin(t *testing.T) {
 	}
 
 	for _, tc := range inputs {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(_ *testing.T) { //nolint:thelper // subtest body
 			cmd := newGateCheckCmd()
 			cmd.SetIn(strings.NewReader(tc.input))
 			var stdout bytes.Buffer
@@ -115,7 +115,7 @@ func TestSecurityGateCheckToolNameWithControlChars(t *testing.T) {
 	}
 
 	for i, input := range inputs {
-		t.Run(strings.ReplaceAll(input[:min(30, len(input))], "\n", "\\n"), func(t *testing.T) {
+		t.Run(strings.ReplaceAll(input[:min(30, len(input))], "\n", "\\n"), func(_ *testing.T) { //nolint:thelper // subtest body
 			cmd := newGateCheckCmd()
 			cmd.SetIn(strings.NewReader(input))
 			var stdout bytes.Buffer

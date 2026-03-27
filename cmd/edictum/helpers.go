@@ -4,18 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/edictum-ai/edictum-go/guard"
 	yamlpkg "github.com/edictum-ai/edictum-go/yaml"
 )
-
-// writeErrorJSON writes a structured error as JSON to stdout.
-// Used when --json is set and an error occurs before normal output.
-// Deprecated: prefer writeErrorJSONTo with an explicit writer.
-func writeErrorJSON(msg string) error {
-	return writeErrorJSONTo(os.Stdout, msg)
-}
 
 // writeErrorJSONTo writes a structured error as JSON to the given writer.
 func writeErrorJSONTo(w io.Writer, msg string) error {
