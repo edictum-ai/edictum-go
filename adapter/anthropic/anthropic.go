@@ -14,7 +14,7 @@ import (
 )
 
 // VERSION is the adapter version.
-const VERSION = "0.1.0"
+const VERSION = "0.2.0"
 
 // Adapter wraps a guard.Guard for use with Anthropic SDK tool functions.
 type Adapter struct {

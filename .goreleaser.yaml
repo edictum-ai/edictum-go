@@ -16,7 +16,6 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/edictum-ai/edictum-go.VERSION={{.Version}}
 
 archives:
   - format: tar.gz
