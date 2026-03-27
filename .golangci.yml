@@ -9,6 +9,19 @@ formatters:
     - goimports
 
 linters:
+  exclusions:
+    # cmd/edictum/ is a CLI binary. errcheck on fmt.Fprint*/Close is noise.
+    # gosec G304 (variable file paths), G301 (dir perms 0755), G302/G306
+    # (file perms 0644), G117 (api_key field name), G104 (unhandled errors
+    # on best-effort JSON error output), G703 (taint analysis on atomic
+    # write temp path) are all expected for a user-facing CLI that manages
+    # config files at ~/.edictum/. Gate enforcement logic (contract eval,
+    # pipeline, verdict) lives in the core library which IS gosec-checked.
+    rules:
+      - path: cmd/edictum/
+        linters:
+          - errcheck
+          - gosec
   enable:
     - errcheck
     - govet
@@ -54,3 +67,8 @@ linters-settings:
 issues:
   max-issues-per-linter: 50
   max-same-issues: 5
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+

@@ -6,6 +6,13 @@
 *.so
 *.dylib
 
+# CLI binary
+/edictum
+/cmd/edictum/edictum
+
+# GoReleaser
+/dist/
+
 # Test
 *.test
 coverage.out
@@ -36,3 +43,4 @@ CLAUDE.local
 !.claude/skills/
 !.claude/agents/
 .gocache/
+.harness/
