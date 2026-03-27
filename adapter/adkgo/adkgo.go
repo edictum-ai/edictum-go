@@ -15,7 +15,7 @@ import (
 )
 
 // VERSION is the adapter version.
-const VERSION = "0.1.0"
+const VERSION = "0.2.0"
 
 // Adapter wraps an edictum Guard for Google ADK Go.
 type Adapter struct {
