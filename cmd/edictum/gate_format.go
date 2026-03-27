@@ -171,7 +171,6 @@ func buildDenyReason(contractID, reason string) string {
 func writeCheckOutput(cmd *cobra.Command, format, verdict, contractID, reason string) error {
 	w := cmd.OutOrStdout()
 	var output any
-	exitCode := 0
 
 	switch format {
 	case "claude-code":
@@ -213,7 +212,6 @@ func writeCheckOutput(cmd *cobra.Command, format, verdict, contractID, reason st
 				"decision": "deny",
 				"reason":   buildDenyReason(contractID, reason),
 			}
-			exitCode = 1
 		} else {
 			output = map[string]any{}
 		}
@@ -237,9 +235,6 @@ func writeCheckOutput(cmd *cobra.Command, format, verdict, contractID, reason st
 			result["reason"] = reason
 		}
 		output = result
-		if verdict == "deny" {
-			exitCode = 1
-		}
 
 	default:
 		output = map[string]any{"verdict": verdict}
@@ -251,8 +246,10 @@ func writeCheckOutput(cmd *cobra.Command, format, verdict, contractID, reason st
 	}
 	fmt.Fprintln(w, string(data))
 
-	if exitCode != 0 {
-		return &exitError{code: exitCode}
+	// Exit code 1 for deny verdicts — consolidated here so callers don't
+	// need to return their own exitError after calling this function.
+	if verdict == "deny" {
+		return &exitError{code: 1}
 	}
 	return nil
 }

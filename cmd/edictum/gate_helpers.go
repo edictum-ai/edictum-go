@@ -118,12 +118,7 @@ func atomicWrite(path string, data []byte) error {
 		os.Remove(tmpName)
 		return cErr
 	}
-	// Set 0o600 before rename: all callers write to ~/.edictum/ which
-	// may contain API keys or other sensitive data.
-	if chErr := os.Chmod(tmpName, 0o600); chErr != nil {
-		os.Remove(tmpName)
-		return chErr
-	}
+	// os.CreateTemp already creates with 0o600 (owner-only). No chmod needed.
 	return os.Rename(tmpName, path)
 }
 

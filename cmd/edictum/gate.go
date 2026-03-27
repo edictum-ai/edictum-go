@@ -86,7 +86,8 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ 
 			return fmt.Errorf("copying contracts: %w", cpErr)
 		}
 		if _, buildErr := guard.FromYAML(dst); buildErr != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: contracts validation failed: %s\n", buildErr)
+			_ = os.Remove(dst)
+			return fmt.Errorf("contract validation failed: %w", buildErr)
 		}
 	}
 
@@ -185,12 +186,8 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 	}
 
 	if result.Verdict == "deny" {
-		if wErr := writeCheckDeny(cmd, format, buildDenyReason(contractID, reason)); wErr != nil {
-			return wErr
-		}
-		return &exitError{code: 1}
+		return writeCheckDeny(cmd, format, buildDenyReason(contractID, reason))
 	}
-
 	return writeCheckOutput(cmd, format, "allow", "", "")
 }
 
