@@ -149,10 +149,6 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 	if parseErr != nil {
 		return gateCheckError(cmd, format, fmt.Sprintf("parsing input: %s", parseErr))
 	}
-	// Fail-closed: empty tool name would bypass all tool-specific contracts.
-	if toolName == "" {
-		return gateCheckError(cmd, format, "tool_name is required and must not be empty")
-	}
 
 	// Load config once for both contracts path and audit path.
 	cfg, _ := loadGateConfigDefault() // nil if no config exists — audit is optional

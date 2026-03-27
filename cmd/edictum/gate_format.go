@@ -55,34 +55,49 @@ func parseFormatStdin(format string, raw []byte) (string, map[string]any, error)
 		return "", nil, fmt.Errorf("invalid JSON in stdin")
 	}
 
+	var toolName string
+	var toolArgs map[string]any
+	var parseErr error
+
 	switch format {
 	case "claude-code", "raw":
 		// Auto-detect Cursor when stdin contains Cursor-specific fields.
 		if format == "claude-code" {
 			if _, ok := data["cursor_version"]; ok {
-				return parseCursorStdin(data)
+				toolName, toolArgs, parseErr = parseCursorStdin(data)
+				break
 			}
 			if _, ok := data["workspace_roots"]; ok {
-				return parseCursorStdin(data)
+				toolName, toolArgs, parseErr = parseCursorStdin(data)
+				break
 			}
 		}
-		return parseStandardStdin(data, nil)
+		toolName, toolArgs, parseErr = parseStandardStdin(data, nil)
 
 	case "cursor":
-		return parseCursorStdin(data)
+		toolName, toolArgs, parseErr = parseCursorStdin(data)
 
 	case "copilot":
-		return parseCopilotStdin(data)
+		toolName, toolArgs, parseErr = parseCopilotStdin(data)
 
 	case "gemini":
-		return parseStandardStdin(data, geminiToolMap)
+		toolName, toolArgs, parseErr = parseStandardStdin(data, geminiToolMap)
 
 	case "opencode":
-		return parseOpenCodeStdin(data)
+		toolName, toolArgs, parseErr = parseOpenCodeStdin(data)
 
 	default:
 		return "", nil, fmt.Errorf("unsupported format %q; supported: claude-code, cursor, copilot, gemini, opencode, raw", format)
 	}
+
+	if parseErr != nil {
+		return "", nil, parseErr
+	}
+	// Fail-closed: empty tool name bypasses all tool-specific contracts.
+	if toolName == "" {
+		return "", nil, fmt.Errorf("tool_name is required and must not be empty")
+	}
+	return toolName, toolArgs, nil
 }
 
 func parseStandardStdin(data map[string]any, toolMap map[string]string) (string, map[string]any, error) {
