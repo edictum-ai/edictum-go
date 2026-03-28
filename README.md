@@ -31,13 +31,13 @@ Requires Go 1.25+.
 Define a ruleset in YAML:
 
 ```yaml
-apiVersion: edictum/v2
+apiVersion: edictum/v1
 kind: Ruleset
 defaults:
   mode: enforce
 rules:
   - id: no-destructive-bash
-    type: check
+    type: pre
     tool: Bash
     when:
       args.command:

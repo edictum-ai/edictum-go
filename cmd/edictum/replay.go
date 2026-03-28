@@ -48,7 +48,7 @@ type replayChange struct {
 	ToolName      string `json:"tool_name"`
 	WasVerdict    string `json:"was_verdict"`
 	NowVerdict    string `json:"now_verdict"`
-	BlockedByRule string `json:"deny_contract,omitempty"`
+	BlockedByRule string `json:"blocked_by_rule,omitempty"`
 }
 
 type replayReport struct {
