@@ -2,10 +2,10 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -198,15 +198,6 @@ rules:
       message: "Missing when."
 `
 
-func cliRepoRoot(t *testing.T) string {
-	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-}
-
 func writeCLITestFile(t *testing.T, content string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "rules.yaml")
@@ -218,7 +209,7 @@ func writeCLITestFile(t *testing.T, content string) string {
 
 func runCLI(t *testing.T, args ...string) (string, int) {
 	t.Helper()
-	repoRoot := cliRepoRoot(t)
+	repoRoot := repoRoot(t)
 	binaryPath := filepath.Join(t.TempDir(), "edictum-test")
 
 	build := exec.Command("go", "build", "-o", binaryPath, "./cmd/edictum")
@@ -238,8 +229,8 @@ func runCLI(t *testing.T, args ...string) (string, int) {
 	err := cmd.Run()
 	exitCode := 0
 	if err != nil {
-		exitErr, ok := err.(*exec.ExitError)
-		if !ok {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
 			t.Fatalf("run CLI: %v\noutput:\n%s", err, out.String())
 		}
 		exitCode = exitErr.ExitCode()

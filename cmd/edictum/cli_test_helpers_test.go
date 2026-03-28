@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +25,7 @@ rules:
         contains_any: [".env", ".secret"]
     then:
       action: block
-      message: "Sensitive file '{args.path}' denied."
+      message: "Sensitive file '{args.path}' blocked."
       tags: [secrets]
 
   - id: bash-safety
@@ -35,7 +36,7 @@ rules:
         matches: '\\brm\\s+-rf\\b'
     then:
       action: block
-      message: "Destructive command denied."
+      message: "Destructive command blocked."
       tags: [safety]
 
   - id: pii-check
@@ -75,7 +76,7 @@ rules:
         contains_any: [".env", ".secret", ".pem"]
     then:
       action: block
-      message: "Sensitive file '{args.path}' denied."
+      message: "Sensitive file '{args.path}' blocked."
       tags: [secrets]
 
   - id: require-ticket
@@ -154,7 +155,8 @@ func runEdictum(t *testing.T, args ...string) (int, string) {
 	if err == nil {
 		return 0, output
 	}
-	if ee, ok := err.(*exec.ExitError); ok {
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
 		return ee.ExitCode(), output
 	}
 	return -1, output

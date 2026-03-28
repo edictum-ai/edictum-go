@@ -200,12 +200,9 @@ func TestCheckJSON_Blocked(t *testing.T) {
 		environment: "production",
 		jsonOutput:  true,
 	})
-	var ee *exitError
 	if err == nil || !strings.Contains(err.Error(), "exit 1") {
 		t.Fatalf("expected exit 1, got %v", err)
 	}
-	_ = ee
-
 	parsed := mustJSONMap(t, &stdout)
 	if parsed["decision"] != "block" {
 		t.Fatalf("decision: got %#v, want block", parsed["decision"])
