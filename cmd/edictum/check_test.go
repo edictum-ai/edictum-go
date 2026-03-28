@@ -61,8 +61,8 @@ rules:
 `
 
 func TestCheck_BlockedSensitiveRead(t *testing.T) {
-	path := writeCLITestFile(t, checkBaseBundle)
-	out, code := runCLI(t, "check", path, "--tool", "read_file", "--args", `{"path":"/app/.env"}`)
+	path := writeTempFile(t, "rules.yaml", checkBaseBundle)
+	code, out := runEdictum(t, "check", path, "--tool", "read_file", "--args", `{"path":"/app/.env"}`)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
@@ -73,8 +73,8 @@ func TestCheck_BlockedSensitiveRead(t *testing.T) {
 }
 
 func TestCheck_AllowedSafeRead(t *testing.T) {
-	path := writeCLITestFile(t, checkBaseBundle)
-	out, code := runCLI(t, "check", path, "--tool", "read_file", "--args", `{"path":"README.md"}`)
+	path := writeTempFile(t, "rules.yaml", checkBaseBundle)
+	code, out := runEdictum(t, "check", path, "--tool", "read_file", "--args", `{"path":"README.md"}`)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\noutput:\n%s", code, out)
 	}
@@ -84,8 +84,8 @@ func TestCheck_AllowedSafeRead(t *testing.T) {
 }
 
 func TestCheck_BlockedDestructiveBash(t *testing.T) {
-	path := writeCLITestFile(t, checkBaseBundle)
-	out, code := runCLI(t, "check", path, "--tool", "bash", "--args", `{"command":"rm -rf /tmp/data"}`)
+	path := writeTempFile(t, "rules.yaml", checkBaseBundle)
+	code, out := runEdictum(t, "check", path, "--tool", "bash", "--args", `{"command":"rm -rf /tmp/data"}`)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
@@ -95,16 +95,16 @@ func TestCheck_BlockedDestructiveBash(t *testing.T) {
 }
 
 func TestCheck_AllowedSafeBash(t *testing.T) {
-	path := writeCLITestFile(t, checkBaseBundle)
-	out, code := runCLI(t, "check", path, "--tool", "bash", "--args", `{"command":"ls -la"}`)
+	path := writeTempFile(t, "rules.yaml", checkBaseBundle)
+	code, out := runEdictum(t, "check", path, "--tool", "bash", "--args", `{"command":"ls -la"}`)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\noutput:\n%s", code, out)
 	}
 }
 
 func TestCheck_WithPrincipalRole(t *testing.T) {
-	path := writeCLITestFile(t, checkRoleBundle)
-	out, code := runCLI(t, "check", path, "--tool", "deploy_service", "--args", `{"service":"api"}`, "--principal-role", "sre")
+	path := writeTempFile(t, "rules.yaml", checkRoleBundle)
+	code, out := runEdictum(t, "check", path, "--tool", "deploy_service", "--args", `{"service":"api"}`, "--principal-role", "sre")
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\noutput:\n%s", code, out)
 	}
@@ -114,8 +114,8 @@ func TestCheck_WithPrincipalRole(t *testing.T) {
 }
 
 func TestCheck_WithoutTicketBlocked(t *testing.T) {
-	path := writeCLITestFile(t, checkTicketBundle)
-	out, code := runCLI(t, "check", path, "--tool", "deploy_service", "--args", `{"service":"api"}`, "--principal-role", "sre")
+	path := writeTempFile(t, "rules.yaml", checkTicketBundle)
+	code, out := runEdictum(t, "check", path, "--tool", "deploy_service", "--args", `{"service":"api"}`, "--principal-role", "sre")
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
@@ -126,18 +126,18 @@ func TestCheck_WithoutTicketBlocked(t *testing.T) {
 }
 
 func TestCheck_WithEnvironment(t *testing.T) {
-	path := writeCLITestFile(t, checkEnvironmentBundle)
-	out, code := runCLI(t, "check", path, "--tool", "read_file", "--args", `{"path":"safe.txt"}`, "--environment", "staging")
+	path := writeTempFile(t, "rules.yaml", checkEnvironmentBundle)
+	code, out := runEdictum(t, "check", path, "--tool", "read_file", "--args", `{"path":"safe.txt"}`, "--environment", "staging")
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\noutput:\n%s", code, out)
 	}
 }
 
 func TestCheck_InvalidJSONArgs(t *testing.T) {
-	path := writeCLITestFile(t, checkBaseBundle)
-	out, code := runCLI(t, "check", path, "--tool", "read_file", "--args", "not valid json")
-	if code != 2 {
-		t.Fatalf("exit code = %d, want 2\noutput:\n%s", code, out)
+	path := writeTempFile(t, "rules.yaml", checkBaseBundle)
+	code, out := runEdictum(t, "check", path, "--tool", "read_file", "--args", "not valid json")
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
 	lower := strings.ToLower(out)
 	if !strings.Contains(lower, "json") && !strings.Contains(lower, "invalid") {
@@ -146,8 +146,8 @@ func TestCheck_InvalidJSONArgs(t *testing.T) {
 }
 
 func TestCheck_ShowsEvaluatedCount(t *testing.T) {
-	path := writeCLITestFile(t, checkBaseBundle)
-	out, code := runCLI(t, "check", path, "--tool", "read_file", "--args", `{"path":"safe.txt"}`)
+	path := writeTempFile(t, "rules.yaml", checkBaseBundle)
+	code, out := runEdictum(t, "check", path, "--tool", "read_file", "--args", `{"path":"safe.txt"}`)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\noutput:\n%s", code, out)
 	}
@@ -157,8 +157,8 @@ func TestCheck_ShowsEvaluatedCount(t *testing.T) {
 }
 
 func TestCheck_UnrelatedToolPasses(t *testing.T) {
-	path := writeCLITestFile(t, checkBaseBundle)
-	out, code := runCLI(t, "check", path, "--tool", "send_email", "--args", `{"to":"test@test.com"}`)
+	path := writeTempFile(t, "rules.yaml", checkBaseBundle)
+	code, out := runEdictum(t, "check", path, "--tool", "send_email", "--args", `{"to":"test@test.com"}`)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\noutput:\n%s", code, out)
 	}

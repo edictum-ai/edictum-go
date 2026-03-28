@@ -1,11 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"errors"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -198,49 +193,9 @@ rules:
       message: "Missing when."
 `
 
-func writeCLITestFile(t *testing.T, content string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "rules.yaml")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("write test file: %v", err)
-	}
-	return path
-}
-
-func runCLI(t *testing.T, args ...string) (string, int) {
-	t.Helper()
-	repoRoot := repoRoot(t)
-	binaryPath := filepath.Join(t.TempDir(), "edictum-test")
-
-	build := exec.Command("go", "build", "-o", binaryPath, "./cmd/edictum")
-	build.Dir = repoRoot
-	var buildOut bytes.Buffer
-	build.Stdout = &buildOut
-	build.Stderr = &buildOut
-	if err := build.Run(); err != nil {
-		t.Fatalf("build CLI: %v\noutput:\n%s", err, buildOut.String())
-	}
-
-	cmd := exec.Command(binaryPath, args...)
-	cmd.Dir = repoRoot
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err := cmd.Run()
-	exitCode := 0
-	if err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
-			t.Fatalf("run CLI: %v\noutput:\n%s", err, out.String())
-		}
-		exitCode = exitErr.ExitCode()
-	}
-	return out.String(), exitCode
-}
-
 func TestValidate_ValidBundle(t *testing.T) {
-	path := writeCLITestFile(t, validateValidBundle)
-	out, code := runCLI(t, "validate", path)
+	path := writeTempFile(t, "rules.yaml", validateValidBundle)
+	code, out := runEdictum(t, "validate", path)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\noutput:\n%s", code, out)
 	}
@@ -255,20 +210,17 @@ func TestValidate_ValidBundle(t *testing.T) {
 }
 
 func TestValidate_MultipleValidFiles(t *testing.T) {
-	path1 := writeCLITestFile(t, validateValidBundle)
-	path2 := filepath.Join(t.TempDir(), "rules-v2.yaml")
-	if err := os.WriteFile(path2, []byte(validateBundleV2), 0o600); err != nil {
-		t.Fatalf("write second file: %v", err)
-	}
-	out, code := runCLI(t, "validate", path1, path2)
+	path1 := writeTempFile(t, "rules.yaml", validateValidBundle)
+	path2 := writeTempFile(t, "rules-v2.yaml", validateBundleV2)
+	code, out := runEdictum(t, "validate", path1, path2)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0\noutput:\n%s", code, out)
 	}
 }
 
 func TestValidate_InvalidAction(t *testing.T) {
-	path := writeCLITestFile(t, validateInvalidAction)
-	out, code := runCLI(t, "validate", path)
+	path := writeTempFile(t, "rules.yaml", validateInvalidAction)
+	code, out := runEdictum(t, "validate", path)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
@@ -278,8 +230,8 @@ func TestValidate_InvalidAction(t *testing.T) {
 }
 
 func TestValidate_DuplicateID(t *testing.T) {
-	path := writeCLITestFile(t, validateDuplicateID)
-	out, code := runCLI(t, "validate", path)
+	path := writeTempFile(t, "rules.yaml", validateDuplicateID)
+	code, out := runEdictum(t, "validate", path)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
@@ -290,8 +242,8 @@ func TestValidate_DuplicateID(t *testing.T) {
 }
 
 func TestValidate_BadRegex(t *testing.T) {
-	path := writeCLITestFile(t, validateBadRegex)
-	out, code := runCLI(t, "validate", path)
+	path := writeTempFile(t, "rules.yaml", validateBadRegex)
+	code, out := runEdictum(t, "validate", path)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
@@ -302,8 +254,8 @@ func TestValidate_BadRegex(t *testing.T) {
 }
 
 func TestValidate_YAMLSyntaxError(t *testing.T) {
-	path := writeCLITestFile(t, validateYAMLSyntaxError)
-	out, code := runCLI(t, "validate", path)
+	path := writeTempFile(t, "rules.yaml", validateYAMLSyntaxError)
+	code, out := runEdictum(t, "validate", path)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
@@ -314,8 +266,8 @@ func TestValidate_YAMLSyntaxError(t *testing.T) {
 }
 
 func TestValidate_MissingWhen(t *testing.T) {
-	path := writeCLITestFile(t, validateMissingWhen)
-	out, code := runCLI(t, "validate", path)
+	path := writeTempFile(t, "rules.yaml", validateMissingWhen)
+	code, out := runEdictum(t, "validate", path)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
@@ -325,7 +277,7 @@ func TestValidate_MissingWhen(t *testing.T) {
 }
 
 func TestValidate_NonexistentFile(t *testing.T) {
-	out, code := runCLI(t, "validate", "/nonexistent/file.yaml")
+	code, out := runEdictum(t, "validate", "/nonexistent/file.yaml")
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
@@ -335,12 +287,9 @@ func TestValidate_NonexistentFile(t *testing.T) {
 }
 
 func TestValidate_MixedValidAndInvalid(t *testing.T) {
-	validPath := writeCLITestFile(t, validateValidBundle)
-	invalidPath := filepath.Join(t.TempDir(), "bad.yaml")
-	if err := os.WriteFile(invalidPath, []byte(validateInvalidAction), 0o600); err != nil {
-		t.Fatalf("write invalid file: %v", err)
-	}
-	out, code := runCLI(t, "validate", validPath, invalidPath)
+	validPath := writeTempFile(t, "rules.yaml", validateValidBundle)
+	invalidPath := writeTempFile(t, "bad.yaml", validateInvalidAction)
+	code, out := runEdictum(t, "validate", validPath, invalidPath)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}

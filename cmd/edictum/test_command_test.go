@@ -124,8 +124,8 @@ func TestTestCmd_MatchRuleWrongID(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1\noutput:\n%s", code, out)
 	}
-	if !strings.Contains(out, "expected block") {
-		t.Fatalf("expected mismatch output, got:\n%s", out)
+	if !strings.Contains(out, "wrong-rule:") || !strings.Contains(out, "block-env-reads") {
+		t.Fatalf("expected rule ID mismatch output, got:\n%s", out)
 	}
 }
 
