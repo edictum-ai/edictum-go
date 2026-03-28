@@ -1,4 +1,4 @@
-package envelope
+package toolcall
 
 import "testing"
 
@@ -111,7 +111,7 @@ func TestParity_2_15_BashOverridesRegistry(t *testing.T) {
 	reg.Register("Bash", SideEffectWrite, false)
 
 	// "ls" is a read command -- Bash classifier should override registry
-	env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName: "Bash",
 		Args:     map[string]any{"command": "ls -la"},
 		Registry: reg,
@@ -124,7 +124,7 @@ func TestParity_2_15_BashOverridesRegistry(t *testing.T) {
 	}
 
 	// "rm -rf /" should remain IRREVERSIBLE
-	env2, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env2, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName: "Bash",
 		Args:     map[string]any{"command": "rm -rf /"},
 		Registry: reg,
@@ -154,7 +154,7 @@ func TestParity_2_16_FilePathExtraction(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+			env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 				ToolName: tc.toolName,
 				Args:     tc.args,
 			})
@@ -182,7 +182,7 @@ func TestParity_2_18_BashCommandExtraction(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+			env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 				ToolName: "Bash",
 				Args:     tc.args,
 			})
@@ -198,7 +198,7 @@ func TestParity_2_18_BashCommandExtraction(t *testing.T) {
 
 func TestParity_2_18_BashCommandNotExtractedForNonBash(t *testing.T) {
 	// A non-Bash tool with a "command" key should NOT have BashCommand set.
-	env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName: "MyTool",
 		Args:     map[string]any{"command": "rm -rf /"},
 	})
@@ -254,7 +254,7 @@ func TestSecurity_BashClassifierCleanReadsStillWork(t *testing.T) {
 // --- Factory defaults ---
 
 func TestParity_2_1_FactoryDefaults(t *testing.T) {
-	env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName: "TestTool",
 		Args:     map[string]any{},
 	})
@@ -279,7 +279,7 @@ func TestParity_2_1_FactoryDefaults(t *testing.T) {
 }
 
 func TestParity_RunIDAndCallIndex(t *testing.T) {
-	env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName:  "TestTool",
 		Args:      map[string]any{},
 		RunID:     "run-1",
@@ -297,7 +297,7 @@ func TestParity_RunIDAndCallIndex(t *testing.T) {
 }
 
 func TestParity_BashCommandClassification(t *testing.T) {
-	env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName: "Bash",
 		Args:     map[string]any{"command": "ls -la /tmp"},
 	})

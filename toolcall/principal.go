@@ -1,4 +1,4 @@
-package envelope
+package toolcall
 
 import "github.com/edictum-ai/edictum-go/internal/deepcopy"
 

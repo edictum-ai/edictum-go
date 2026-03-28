@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 type invalidFixtureExpectation struct {
@@ -84,27 +84,27 @@ func TestConformanceFixtures_Security_SandboxCommandAllowlist(t *testing.T) {
 		t.Fatalf("SandboxContracts len = %d, want 1", len(compiled.SandboxContracts))
 	}
 
-	passEnv := makeEnv(t, envelope.CreateEnvelopeOptions{
+	passEnv := makeEnv(t, toolcall.CreateToolCallOptions{
 		ToolName: "Bash",
 		Args:     map[string]any{"command": "echo $HOME"},
 	})
-	verdict, err := compiled.SandboxContracts[0].Check(t.Context(), passEnv)
+	decision, err := compiled.SandboxContracts[0].Check(t.Context(), passEnv)
 	if err != nil {
 		t.Fatalf("Check(passEnv): %v", err)
 	}
-	if !verdict.Passed() {
-		t.Fatalf("echo $HOME should remain allowlist-compatible, got %q", verdict.Message())
+	if !decision.Passed() {
+		t.Fatalf("echo $HOME should remain allowlist-compatible, got %q", decision.Message())
 	}
 
-	denyEnv := makeEnv(t, envelope.CreateEnvelopeOptions{
+	denyEnv := makeEnv(t, toolcall.CreateToolCallOptions{
 		ToolName: "Bash",
 		Args:     map[string]any{"command": "echo $(rm -rf /)"},
 	})
-	verdict, err = compiled.SandboxContracts[0].Check(t.Context(), denyEnv)
+	decision, err = compiled.SandboxContracts[0].Check(t.Context(), denyEnv)
 	if err != nil {
 		t.Fatalf("Check(denyEnv): %v", err)
 	}
-	if verdict.Passed() {
+	if decision.Passed() {
 		t.Fatal("command substitution should be denied by sandbox allowlist extraction")
 	}
 }
@@ -135,15 +135,15 @@ func TestConformanceFixtures_Security_SymlinkMissingLeaf(t *testing.T) {
 		t.Fatalf("Compile: %v", err)
 	}
 
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		ToolName: "ReadFile",
 		Args:     map[string]any{"file_path": filepath.Join(linkDir, "nested", "file.txt")},
 	})
-	verdict, err := compiled.SandboxContracts[0].Check(t.Context(), env)
+	decision, err := compiled.SandboxContracts[0].Check(t.Context(), env)
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	if !verdict.Passed() {
-		t.Fatalf("expected symlinked parent + missing leaf path to stay within sandbox, got %q", verdict.Message())
+	if !decision.Passed() {
+		t.Fatalf("expected symlinked parent + missing leaf path to stay within sandbox, got %q", decision.Message())
 	}
 }

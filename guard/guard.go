@@ -1,4 +1,4 @@
-// Package guard provides the top-level Edictum guard for contract enforcement.
+// Package guard provides the top-level Edictum guard for rule enforcement.
 package guard
 
 import (
@@ -9,8 +9,8 @@ import (
 
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/redaction"
 	"github.com/edictum-ai/edictum-go/session"
@@ -27,26 +27,26 @@ type sseCloser interface {
 	Close()
 }
 
-// compiledState is an immutable snapshot of compiled contracts.
+// compiledState is an immutable snapshot of compiled rules.
 // All slices are treated as immutable after construction.
 // The guard swaps the entire state atomically under a write lock
 // in Reload(), ensuring concurrent evaluations never see a mix
-// of old and new contracts.
+// of old and new rules.
 type compiledState struct {
-	preconditions           []contract.Precondition
-	postconditions          []contract.Postcondition
-	sessionContracts        []contract.SessionContract
-	sandboxContracts        []contract.Precondition
-	observePreconditions    []contract.Precondition
-	observePostconditions   []contract.Postcondition
-	observeSessionContracts []contract.SessionContract
-	observeSandboxContracts []contract.Precondition
+	preconditions           []rule.Precondition
+	postconditions          []rule.Postcondition
+	sessionContracts        []rule.SessionRule
+	sandboxContracts        []rule.Precondition
+	observePreconditions    []rule.Precondition
+	observePostconditions   []rule.Postcondition
+	observeSessionRules []rule.SessionRule
+	observeSandboxContracts []rule.Precondition
 	limits                  pipeline.OperationLimits
 	policyVersion           string
 }
 
-// Guard is the main entry point for runtime contract enforcement.
-// Implements pipeline.ContractProvider and server.Reloader.
+// Guard is the main entry point for runtime rule enforcement.
+// Implements pipeline.RuleProvider and server.Reloader.
 type Guard struct {
 	mu                sync.RWMutex
 	environment       string
@@ -54,17 +54,17 @@ type Guard struct {
 	state             *compiledState
 	beforeHooks       []pipeline.HookRegistration
 	afterHooks        []pipeline.HookRegistration
-	toolRegistry      *envelope.ToolRegistry
+	toolRegistry      *toolcall.ToolRegistry
 	backend           session.StorageBackend
 	auditSink         audit.Sink
 	localSink         *audit.CollectingSink
 	redactionPolicy   *redaction.Policy
-	onDeny            func(env envelope.ToolEnvelope, reason string, name string)
-	onAllow           func(env envelope.ToolEnvelope)
-	onPostWarn        func(env envelope.ToolEnvelope, warnings []string)
+	onBlock            func(env toolcall.ToolCall, reason string, name string)
+	onAllow           func(env toolcall.ToolCall)
+	onPostWarn        func(env toolcall.ToolCall, warnings []string)
 	successCheck      func(toolName string, result any) bool
-	principal         *envelope.Principal
-	principalResolver func(toolName string, args map[string]any) *envelope.Principal
+	principal         *toolcall.Principal
+	principalResolver func(toolName string, args map[string]any) *toolcall.Principal
 	approvalBackend   approval.Backend
 	sessionID         string
 
@@ -96,7 +96,7 @@ func New(opts ...Option) *Guard {
 	g := &Guard{
 		environment:  "production",
 		mode:         "enforce",
-		toolRegistry: envelope.NewToolRegistry(),
+		toolRegistry: toolcall.NewToolRegistry(),
 		backend:      session.NewMemoryBackend(),
 		localSink:    localSink,
 		auditSink:    localSink,
@@ -113,7 +113,7 @@ func New(opts ...Option) *Guard {
 	}
 	g.telOpts = nil
 	g.redactionPolicy = ensureRedaction(g.redactionPolicy)
-	classifyContracts(g)
+	classifyRules(g)
 	return g
 }
 
@@ -144,7 +144,7 @@ func (g *Guard) Mode() string {
 }
 
 // SetPrincipal updates the principal used for subsequent tool calls.
-func (g *Guard) SetPrincipal(p *envelope.Principal) {
+func (g *Guard) SetPrincipal(p *toolcall.Principal) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.principal = p
@@ -152,7 +152,7 @@ func (g *Guard) SetPrincipal(p *envelope.Principal) {
 
 // resolvePrincipal resolves the principal for a tool call.
 // Caller must hold at least a read lock.
-func (g *Guard) resolvePrincipal(toolName string, args map[string]any) *envelope.Principal {
+func (g *Guard) resolvePrincipal(toolName string, args map[string]any) *toolcall.Principal {
 	if g.principalResolver != nil {
 		return g.principalResolver(toolName, args)
 	}
@@ -178,10 +178,10 @@ func generateUUID() string {
 		buf[0:4], buf[4:6], buf[6:8], buf[8:10], buf[10:16])
 }
 
-// classifyContracts sorts incoming contracts into enforce vs observe
+// classifyRules sorts incoming rules into enforce vs observe
 // lists inside the compiled state. Called once during construction.
-func classifyContracts(_ *Guard) {
+func classifyRules(_ *Guard) {
 	// Already classified by options — nothing to reclassify.
 	// This function exists as a hook for Reload() to recompile
-	// from YAML. During construction, WithContracts handles sorting.
+	// from YAML. During construction, WithRules handles sorting.
 }

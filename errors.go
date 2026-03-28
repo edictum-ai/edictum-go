@@ -11,15 +11,15 @@ func (e *Error) Error() string {
 	return e.Message
 }
 
-// DeniedError indicates a tool call was denied by a contract or hook.
-type DeniedError struct {
+// BlockedError indicates a tool call was denied by a rule or hook.
+type BlockedError struct {
 	Reason         string
 	DecisionSource string
 	DecisionName   string
 }
 
-func (e *DeniedError) Error() string {
-	return fmt.Sprintf("edictum denied: %s (source=%s, name=%s)", e.Reason, e.DecisionSource, e.DecisionName)
+func (e *BlockedError) Error() string {
+	return fmt.Sprintf("edictum blocked: %s (source=%s, name=%s)", e.Reason, e.DecisionSource, e.DecisionName)
 }
 
 // ConfigError indicates a configuration or load-time error.

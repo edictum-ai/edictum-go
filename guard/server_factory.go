@@ -14,7 +14,7 @@ import (
 const assignmentTimeout = 30 * time.Second
 
 // FromServer creates a Guard connected to an edictum-console server.
-// The server provides contracts via HTTP, with optional SSE hot-reload.
+// The server provides rules via HTTP, with optional SSE hot-reload.
 //
 // When WithBundleName is set, the named bundle is fetched immediately.
 // When WithBundleName is omitted (server-assigned mode), FromServer
@@ -77,7 +77,7 @@ func fromServerWithBundle(
 	resp, err := client.Get(ctx, fmt.Sprintf("/api/v1/bundles/%s/current", fc.bundleName))
 	if err != nil {
 		serverAudit.Close(ctx)
-		return nil, fmt.Errorf("FromServer: failed to fetch contracts: %w", err)
+		return nil, fmt.Errorf("FromServer: failed to fetch rules: %w", err)
 	}
 	if resp == nil {
 		serverAudit.Close(ctx)

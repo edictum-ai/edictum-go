@@ -6,22 +6,22 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
-func makeSandboxEnv(t *testing.T, tool string, args map[string]any) envelope.ToolEnvelope {
+func makeSandboxEnv(t *testing.T, tool string, args map[string]any) toolcall.ToolCall {
 	t.Helper()
-	env, err := envelope.CreateEnvelope(context.Background(), envelope.CreateEnvelopeOptions{
+	env, err := toolcall.CreateToolCall(context.Background(), toolcall.CreateToolCallOptions{
 		ToolName: tool,
 		Args:     args,
 	})
 	if err != nil {
-		t.Fatalf("CreateEnvelope: %v", err)
+		t.Fatalf("CreateToolCall: %v", err)
 	}
 	return env
 }
 
-// TestCompileSandbox_WithinAllows verifies that a sandbox contract with
+// TestCompileSandbox_WithinAllows verifies that a sandbox rule with
 // "within" paths produces a Check that allows paths inside the boundary.
 func TestCompileSandbox_WithinAllows(t *testing.T) {
 	// Use a temp dir so the path exists and resolves consistently.

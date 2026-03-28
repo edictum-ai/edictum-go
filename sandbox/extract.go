@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/internal/shlex"
 )
 
@@ -54,7 +54,7 @@ var pathArgKeys = map[string]bool{
 //
 // All paths are resolved via filepath.EvalSymlinks (handles both ".."
 // traversals AND symlinks). Non-existent paths fall back to filepath.Clean.
-func ExtractPaths(env envelope.ToolEnvelope) []string {
+func ExtractPaths(env toolcall.ToolCall) []string {
 	var paths []string
 	seen := make(map[string]bool)
 
@@ -110,7 +110,7 @@ func ExtractPaths(env envelope.ToolEnvelope) []string {
 	return paths
 }
 
-// ExtractCommand extracts the first command token from an envelope.
+// ExtractCommand extracts the first command token from an toolcall.
 //
 // If the command string begins with a shell redirect operator
 // (e.g. "> echo bad_cmd"), the actual command cannot be reliably
@@ -118,7 +118,7 @@ func ExtractPaths(env envelope.ToolEnvelope) []string {
 // allowed-command list (fail-closed).
 //
 // Returns "" if no command is present.
-func ExtractCommand(env envelope.ToolEnvelope) string {
+func ExtractCommand(env toolcall.ToolCall) string {
 	cmd := env.BashCommand()
 	if cmd == "" {
 		args := env.Args()

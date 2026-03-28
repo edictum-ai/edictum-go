@@ -49,7 +49,7 @@ func newGateInitCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&serverURL, "server", "", "Console server URL")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "Console API key")
-	cmd.Flags().StringVar(&contractsPath, "contracts", "", "custom ContractBundle YAML")
+	cmd.Flags().StringVar(&contractsPath, "rules", "", "custom Ruleset YAML")
 	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "skip prompts, use defaults")
 	return cmd
 }
@@ -62,7 +62,7 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ 
 
 	dirs := []string{
 		gateDir,
-		filepath.Join(gateDir, "contracts"),
+		filepath.Join(gateDir, "rules"),
 		filepath.Join(gateDir, "audit"),
 	}
 	for _, d := range dirs {
@@ -74,18 +74,18 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ 
 	cfg := &gateConfig{
 		ServerURL:     serverURL,
 		APIKey:        apiKey,
-		ContractsPath: filepath.Join(gateDir, "contracts"),
+		ContractsPath: filepath.Join(gateDir, "rules"),
 		AuditPath:     filepath.Join(gateDir, "audit"),
 	}
 
 	if contractsPath != "" {
-		dst := filepath.Join(gateDir, "contracts", filepath.Base(contractsPath))
+		dst := filepath.Join(gateDir, "rules", filepath.Base(contractsPath))
 		if cpErr := copyFile(contractsPath, dst); cpErr != nil {
-			return fmt.Errorf("copying contracts: %w", cpErr)
+			return fmt.Errorf("copying rules: %w", cpErr)
 		}
 		if _, buildErr := guard.FromYAML(dst); buildErr != nil {
 			_ = os.Remove(dst)
-			return fmt.Errorf("contract validation failed: %w", buildErr)
+			return fmt.Errorf("rule validation failed: %w", buildErr)
 		}
 	}
 
@@ -114,14 +114,14 @@ func newGateCheckCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "check",
-		Short: "Evaluate a tool call from stdin against contracts",
+		Short: "Evaluate a tool call from stdin against rules",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runGateCheck(cmd, format, contractsPath, jsonFlag)
 		},
 	}
 
 	cmd.Flags().StringVar(&format, "format", "claude-code", "output format (claude-code, cursor, copilot, gemini, opencode, raw)")
-	cmd.Flags().StringVar(&contractsPath, "contracts", "", "override contract path")
+	cmd.Flags().StringVar(&contractsPath, "rules", "", "override rule path")
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "force JSON output")
 	return cmd
 }
@@ -148,7 +148,7 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 		return gateCheckError(cmd, format, fmt.Sprintf("parsing input: %s", parseErr))
 	}
 
-	// Load config once for both contracts path and audit path.
+	// Load config once for both rules path and audit path.
 	cfg, _ := loadGateConfigDefault() // nil if no config exists — audit is optional
 	cPath := contractsOverride
 	if cPath == "" {
@@ -160,13 +160,13 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 
 	g, gErr := buildGuardFromPath(cPath)
 	if gErr != nil {
-		return gateCheckError(cmd, format, fmt.Sprintf("loading contracts: %s", gErr))
+		return gateCheckError(cmd, format, fmt.Sprintf("loading rules: %s", gErr))
 	}
 
 	ctx := context.Background()
 	result := g.Evaluate(ctx, toolName, toolArgs)
 
-	contractID := extractContractID(result)
+	ruleID := extractContractID(result)
 	reason := ""
 	if len(result.DenyReasons) > 0 {
 		reason = result.DenyReasons[0]
@@ -177,14 +177,14 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 		_ = appendWALEvent(cfg.AuditPath, walEvent{
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 			ToolName:  toolName,
-			Verdict:   result.Verdict,
+			Decision:   result.Decision,
 			User:      currentUser(),
 			Reason:    reason,
 		})
 	}
 
-	if result.Verdict == "deny" {
-		return writeCheckDeny(cmd, format, buildDenyReason(contractID, reason))
+	if result.Decision == "block" {
+		return writeCheckDeny(cmd, format, buildDenyReason(ruleID, reason))
 	}
 	return writeCheckOutput(cmd, format, "allow", "", "")
 }
@@ -193,6 +193,6 @@ func gateCheckError(cmd *cobra.Command, format, msg string) error {
 	// Output a deny-formatted response to stdout so the assistant sees a
 	// deny even if it ignores exit codes. Defence-in-depth: some hook
 	// systems treat exit 2 as "allow".
-	_ = writeCheckOutput(cmd, format, "deny", "", msg)
+	_ = writeCheckOutput(cmd, format, "block", "", msg)
 	return &exitError{code: 2}
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/guard"
 	"github.com/spf13/cobra"
 )
@@ -95,13 +95,13 @@ func parseFormatStdin(format string, raw []byte) (string, map[string]any, error)
 	if parseErr != nil {
 		return "", nil, parseErr
 	}
-	// Fail-closed: empty or malformed tool name bypasses tool-specific contracts.
+	// Fail-closed: empty or malformed tool name bypasses tool-specific rules.
 	if toolName == "" {
 		return "", nil, fmt.Errorf("tool_name is required and must not be empty")
 	}
 	// Reject tool names with null bytes, control characters, or path
-	// separators — these bypass tool-matching logic in contracts.
-	if err := envelope.ValidateToolName(toolName); err != nil {
+	// separators — these bypass tool-matching logic in rules.
+	if err := toolcall.ValidateToolName(toolName); err != nil {
 		return "", nil, fmt.Errorf("invalid tool_name: %w", err)
 	}
 	// Whitespace-only names would also bypass matching.
@@ -181,31 +181,31 @@ func parseOpenCodeStdin(data map[string]any) (string, map[string]any, error) {
 	return toolName, toolInput, nil
 }
 
-func buildDenyReason(contractID, reason string) string {
-	if contractID != "" && reason != "" {
-		return fmt.Sprintf("Contract '%s': %s", contractID, reason)
+func buildDenyReason(ruleID, reason string) string {
+	if ruleID != "" && reason != "" {
+		return fmt.Sprintf("Rule '%s': %s", ruleID, reason)
 	}
 	if reason != "" {
 		return reason
 	}
-	if contractID != "" {
-		return fmt.Sprintf("Denied by contract '%s'", contractID)
+	if ruleID != "" {
+		return fmt.Sprintf("Denied by rule '%s'", ruleID)
 	}
 	return "Denied"
 }
 
-func writeCheckOutput(cmd *cobra.Command, format, verdict, contractID, reason string) error {
+func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason string) error {
 	w := cmd.OutOrStdout()
 	var output any
 
 	switch format {
 	case "claude-code":
-		if verdict == "deny" {
+		if decision == "block" {
 			output = map[string]any{
 				"hookSpecificOutput": map[string]any{
 					"hookEventName":            "PreToolUse",
-					"permissionDecision":       "deny",
-					"permissionDecisionReason": buildDenyReason(contractID, reason),
+					"permissionDecision":       "block",
+					"permissionDecisionReason": buildDenyReason(ruleID, reason),
 				},
 			}
 		} else {
@@ -213,49 +213,49 @@ func writeCheckOutput(cmd *cobra.Command, format, verdict, contractID, reason st
 		}
 
 	case "cursor":
-		if verdict == "deny" {
+		if decision == "block" {
 			output = map[string]any{
-				"decision": "deny",
-				"reason":   buildDenyReason(contractID, reason),
+				"decision": "block",
+				"reason":   buildDenyReason(ruleID, reason),
 			}
 		} else {
 			output = map[string]any{"decision": "allow"}
 		}
 
 	case "copilot":
-		if verdict == "deny" {
+		if decision == "block" {
 			output = map[string]any{
-				"permissionDecision":       "deny",
-				"permissionDecisionReason": buildDenyReason(contractID, reason),
+				"permissionDecision":       "block",
+				"permissionDecisionReason": buildDenyReason(ruleID, reason),
 			}
 		} else {
 			output = map[string]any{}
 		}
 
 	case "gemini":
-		if verdict == "deny" {
+		if decision == "block" {
 			output = map[string]any{
-				"decision": "deny",
-				"reason":   buildDenyReason(contractID, reason),
+				"decision": "block",
+				"reason":   buildDenyReason(ruleID, reason),
 			}
 		} else {
 			output = map[string]any{}
 		}
 
 	case "opencode":
-		if verdict == "deny" {
+		if decision == "block" {
 			output = map[string]any{
 				"allow":  false,
-				"reason": buildDenyReason(contractID, reason),
+				"reason": buildDenyReason(ruleID, reason),
 			}
 		} else {
 			output = map[string]any{"allow": true}
 		}
 
 	case "raw":
-		result := map[string]any{"verdict": verdict}
-		if contractID != "" {
-			result["contract_id"] = contractID
+		result := map[string]any{"decision": decision}
+		if ruleID != "" {
+			result["contract_id"] = ruleID
 		}
 		if reason != "" {
 			result["reason"] = reason
@@ -263,7 +263,7 @@ func writeCheckOutput(cmd *cobra.Command, format, verdict, contractID, reason st
 		output = result
 
 	default:
-		output = map[string]any{"verdict": verdict}
+		output = map[string]any{"decision": decision}
 	}
 
 	data, err := json.Marshal(output)
@@ -274,12 +274,12 @@ func writeCheckOutput(cmd *cobra.Command, format, verdict, contractID, reason st
 
 	// Exit code 1 for deny verdicts — consolidated here so callers don't
 	// need to return their own exitError after calling this function.
-	if verdict == "deny" {
+	if decision == "block" {
 		return &exitError{code: 1}
 	}
 	return nil
 }
 
 func writeCheckDeny(cmd *cobra.Command, format, reason string) error {
-	return writeCheckOutput(cmd, format, "deny", "", reason)
+	return writeCheckOutput(cmd, format, "block", "", reason)
 }

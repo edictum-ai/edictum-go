@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
 	yamlpkg "github.com/edictum-ai/edictum-go/yaml"
@@ -22,7 +22,7 @@ func extractFactory(opts []Option) *factoryCfg {
 		factoryCfg:   fc,
 		environment:  "production",
 		mode:         "enforce",
-		toolRegistry: envelope.NewToolRegistry(),
+		toolRegistry: toolcall.NewToolRegistry(),
 		backend:      session.NewMemoryBackend(),
 		localSink:    localSink,
 		auditSink:    localSink,
@@ -43,7 +43,7 @@ func extractFactoryAndEnv(opts []Option) (*factoryCfg, string) {
 		factoryCfg:   fc,
 		environment:  "production",
 		mode:         "enforce",
-		toolRegistry: envelope.NewToolRegistry(),
+		toolRegistry: toolcall.NewToolRegistry(),
 		backend:      session.NewMemoryBackend(),
 		localSink:    localSink,
 		auditSink:    localSink,
@@ -111,7 +111,7 @@ func resolvePaths(path string) ([]string, error) {
 		}
 		// Ensure resolved target stays within the canonical root.
 		if !strings.HasPrefix(resolved, prefix) {
-			continue // symlink escapes contracts directory — skip
+			continue // symlink escapes rules directory — skip
 		}
 		files = append(files, resolved)
 	}

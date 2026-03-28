@@ -31,7 +31,7 @@ func newSkillScanCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scan <path>",
 		Short: "Scan a skill directory or SKILL.md for security risks",
-		Long:  "Scan a skill directory (or SKILL.md file) for dangerous patterns, obfuscation, and missing contracts. Supports batch scanning of skill collections.",
+		Long:  "Scan a skill directory (or SKILL.md file) for dangerous patterns, obfuscation, and missing rules. Supports batch scanning of skill collections.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			thresh, err := parseThreshold(threshold)
@@ -44,7 +44,7 @@ func newSkillScanCmd() *cobra.Command {
 
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "output as JSON")
 	cmd.Flags().StringVar(&threshold, "threshold", "MEDIUM", "minimum risk level for non-zero exit (CRITICAL, HIGH, MEDIUM)")
-	cmd.Flags().BoolVar(&structuralOnly, "structural-only", false, "only check contracts.yaml presence")
+	cmd.Flags().BoolVar(&structuralOnly, "structural-only", false, "only check rules.yaml presence")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "show all details even for clean skills")
 
 	return cmd
@@ -213,7 +213,7 @@ func printSingleResult(w io.Writer, r *skill.ScanResult) {
 	case skill.RiskMedium:
 		fmt.Fprintf(w, "\n\u26a0 MEDIUM: %s\n\n", r.SkillName)
 	case skill.RiskClean:
-		fmt.Fprintf(w, "\n\u2713 CLEAN: %s\n  No security findings detected.\n", r.SkillName)
+		fmt.Fprintf(w, "\n\u2713 CLEAN: %s\n  No security violations detected.\n", r.SkillName)
 		return
 	}
 
@@ -225,11 +225,11 @@ func printSingleResult(w io.Writer, r *skill.ScanResult) {
 		}
 	}
 	if !r.HasContracts {
-		fmt.Fprintln(w, "  [INFO] no contracts.yaml found")
+		fmt.Fprintln(w, "  [INFO] no rules.yaml found")
 	}
 
 	if r.RiskTier == skill.RiskCritical || r.RiskTier == skill.RiskHigh {
-		fmt.Fprintln(w, "\n  Verdict: DO NOT INSTALL without review")
+		fmt.Fprintln(w, "\n  Decision: DO NOT INSTALL without review")
 	}
 }
 

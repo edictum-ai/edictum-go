@@ -137,7 +137,7 @@ func copyFile(src, dst string) error {
 type walEvent struct {
 	Timestamp string `json:"timestamp"`
 	ToolName  string `json:"tool_name"`
-	Verdict   string `json:"verdict"`
+	Decision   string `json:"decision"`
 	Assistant string `json:"assistant,omitempty"`
 	User      string `json:"user,omitempty"`
 	Reason    string `json:"reason,omitempty"`
@@ -203,7 +203,7 @@ func readWALEvents(auditDir string, limit int, toolFilter, verdictFilter string)
 		if toolFilter != "" && e.ToolName != toolFilter {
 			continue
 		}
-		if verdictFilter != "" && e.Verdict != verdictFilter {
+		if verdictFilter != "" && e.Decision != verdictFilter {
 			continue
 		}
 		filtered = append(filtered, e)

@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
 )
 
-func TestPreExecute_SessionContractDeny(t *testing.T) {
+func TestPreExecute_SessionRuleDeny(t *testing.T) {
 	backend := session.NewMemoryBackend()
 	sess, _ := session.New("test", backend)
 	ctx := context.Background()
@@ -27,15 +27,15 @@ func TestPreExecute_SessionContractDeny(t *testing.T) {
 	}
 
 	prov := defaultProvider()
-	prov.sessionContracts = []contract.SessionContract{{
+	prov.sessionContracts = []rule.SessionRule{{
 		Name: "max_3_execs",
-		Check: func(ctx context.Context, s any) (contract.Verdict, error) {
+		Check: func(ctx context.Context, s any) (rule.Decision, error) {
 			sess := s.(*session.Session)
 			count, _ := sess.ExecutionCount(ctx)
 			if count >= 3 {
-				return contract.Fail("Too many executions"), nil
+				return rule.Fail("Too many executions"), nil
 			}
-			return contract.Pass(), nil
+			return rule.Pass(), nil
 		},
 	}}
 	p := pipeline.New(prov)
@@ -44,11 +44,11 @@ func TestPreExecute_SessionContractDeny(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
-	if dec.DecisionSource != "session_contract" {
-		t.Fatalf("expected session_contract, got %s", dec.DecisionSource)
+	if dec.DecisionSource != "session_rule" {
+		t.Fatalf("expected session_rule, got %s", dec.DecisionSource)
 	}
 }
 
@@ -76,7 +76,7 @@ func TestPreExecute_ExecutionLimitDeny(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 	if dec.DecisionSource != "operation_limit" {
@@ -109,7 +109,7 @@ func TestPreExecute_PerToolLimitDeny(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 	if !strings.Contains(strings.ToLower(dec.Reason), "per-tool limit") {
@@ -127,16 +127,16 @@ func TestPreExecute_EvaluationOrder(t *testing.T) {
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "tracking_hook",
-		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ toolcall.ToolCall) (pipeline.HookDecision, error) {
 			order = append(order, "hook")
 			return pipeline.AllowHook(), nil
 		},
 	}}
-	prov.preconditions = []contract.Precondition{{
+	prov.preconditions = []rule.Precondition{{
 		Name: "tracking_pre", Tool: "*",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
 			order = append(order, "precondition")
-			return contract.Pass(), nil
+			return rule.Pass(), nil
 		},
 	}}
 	p := pipeline.New(prov)
@@ -155,10 +155,10 @@ func TestPreExecute_ContractsEvaluatedPopulated(t *testing.T) {
 	}
 
 	prov := defaultProvider()
-	prov.preconditions = []contract.Precondition{{
+	prov.preconditions = []rule.Precondition{{
 		Name: "check_a", Tool: "*",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Pass(), nil
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Pass(), nil
 		},
 	}}
 	p := pipeline.New(prov)
@@ -168,7 +168,7 @@ func TestPreExecute_ContractsEvaluatedPopulated(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(dec.ContractsEvaluated) != 1 {
-		t.Fatalf("expected 1 contract, got %d", len(dec.ContractsEvaluated))
+		t.Fatalf("expected 1 rule, got %d", len(dec.ContractsEvaluated))
 	}
 	if dec.ContractsEvaluated[0]["type"] != "precondition" {
 		t.Fatalf("expected precondition type, got %v", dec.ContractsEvaluated[0]["type"])
@@ -186,10 +186,10 @@ func TestPreExecute_ToolSpecificPrecondition(t *testing.T) {
 	}
 
 	prov := defaultProvider()
-	prov.preconditions = []contract.Precondition{{
+	prov.preconditions = []rule.Precondition{{
 		Name: "bash_only", Tool: "Bash",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("bash denied"), nil
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("bash denied"), nil
 		},
 	}}
 	p := pipeline.New(prov)
@@ -208,7 +208,7 @@ func TestPreExecute_ToolSpecificPrecondition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("Bash should be denied, got %s", dec.Action)
 	}
 }
@@ -222,7 +222,7 @@ func TestPreExecute_HookExceptionDenies(t *testing.T) {
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "exploding_hook",
-		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ toolcall.ToolCall) (pipeline.HookDecision, error) {
 			return pipeline.HookDecision{}, errors.New("hook exploded")
 		},
 	}}
@@ -232,7 +232,7 @@ func TestPreExecute_HookExceptionDenies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("expected deny on hook error, got %s", dec.Action)
 	}
 	if !dec.PolicyError {
@@ -247,10 +247,10 @@ func TestPreExecute_PreconditionExceptionDenies(t *testing.T) {
 	}
 
 	prov := defaultProvider()
-	prov.preconditions = []contract.Precondition{{
+	prov.preconditions = []rule.Precondition{{
 		Name: "exploding", Tool: "*",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Verdict{}, errors.New("check exploded")
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Decision{}, errors.New("check exploded")
 		},
 	}}
 	p := pipeline.New(prov)
@@ -259,7 +259,7 @@ func TestPreExecute_PreconditionExceptionDenies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 	if !dec.PolicyError {
@@ -275,10 +275,10 @@ func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 	prov := &mockProvider{limits: pipeline.OperationLimits{
 		MaxAttempts: 3, MaxToolCalls: 200, MaxCallsPerTool: map[string]int{},
 	}}
-	prov.preconditions = []contract.Precondition{{
+	prov.preconditions = []rule.Precondition{{
 		Name: "always_deny", Tool: "*",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("denied"), nil
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("denied"), nil
 		},
 	}}
 	p := pipeline.New(prov)
@@ -291,7 +291,7 @@ func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 
@@ -302,7 +302,7 @@ func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 
@@ -313,7 +313,7 @@ func TestPreExecute_DenialsCountAsAttempts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 	if dec.DecisionSource != "attempt_limit" {
@@ -328,17 +328,17 @@ func TestPreExecute_PolicyErrorAggregation(t *testing.T) {
 	}
 
 	prov := defaultProvider()
-	prov.preconditions = []contract.Precondition{
+	prov.preconditions = []rule.Precondition{
 		{
 			Name: "error_contract", Tool: "*",
-			Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-				return contract.Fail("err", map[string]any{"policy_error": true}), nil
+			Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+				return rule.Fail("err", map[string]any{"policy_error": true}), nil
 			},
 		},
 		{
 			Name: "pass_contract", Tool: "*",
-			Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-				return contract.Pass(), nil
+			Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+				return rule.Pass(), nil
 			},
 		},
 	}
@@ -348,7 +348,7 @@ func TestPreExecute_PolicyErrorAggregation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 	if !dec.PolicyError {

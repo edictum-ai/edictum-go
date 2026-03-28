@@ -6,14 +6,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
 func TestParity_1_22_MessageTruncation500(t *testing.T) {
 	long := strings.Repeat("x", 600)
-	v := contract.Fail(long)
+	v := rule.Fail(long)
 	if len(v.Message()) != 500 {
 		t.Fatalf("expected 500, got %d", len(v.Message()))
 	}
@@ -55,7 +55,7 @@ func TestParity_1_23_PreDecisionShape(t *testing.T) {
 	}
 }
 
-func TestParity_1_5_HookExceptionDeny(t *testing.T) {
+func TestParity_1_5_HookExceptionBlock(t *testing.T) {
 	sess, _ := newTestSession(t)
 	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
 		t.Fatal(err)
@@ -64,7 +64,7 @@ func TestParity_1_5_HookExceptionDeny(t *testing.T) {
 	prov := defaultProvider()
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "boom",
-		Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+		Before: func(_ context.Context, _ toolcall.ToolCall) (pipeline.HookDecision, error) {
 			return pipeline.HookDecision{}, fmt.Errorf("kaboom")
 		},
 	}}
@@ -74,7 +74,7 @@ func TestParity_1_5_HookExceptionDeny(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("hook exception should deny, got %s", dec.Action)
 	}
 	if !strings.Contains(dec.Reason, "Hook error:") {

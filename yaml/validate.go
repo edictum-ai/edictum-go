@@ -8,7 +8,7 @@ import (
 
 var (
 	metadataNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
-	contractIDRe   = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+	ruleIDRe   = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 )
 
 var (
@@ -17,7 +17,7 @@ var (
 		"kind":              true,
 		"metadata":          true,
 		"defaults":          true,
-		"contracts":         true,
+		"rules":         true,
 		"tools":             true,
 		"observability":     true,
 		"observe_alongside": true,
@@ -38,7 +38,7 @@ var (
 		"id": true, "type": true, "enabled": true, "mode": true,
 		"tool": true, "tools": true, "within": true, "not_within": true,
 		"allows": true, "not_allows": true, "outside": true, "message": true,
-		"timeout": true, "timeout_effect": true,
+		"timeout": true, "timeout_action": true,
 	}
 )
 
@@ -57,8 +57,8 @@ func validateSchema(data map[string]any) error {
 
 	if kind, ok := data["kind"].(string); !ok || kind == "" {
 		return schemaError("kind is required")
-	} else if kind != "ContractBundle" {
-		return schemaError("kind must be %q", "ContractBundle")
+	} else if kind != "Ruleset" {
+		return schemaError("kind must be %q", "Ruleset")
 	}
 
 	if err := validateMetadata(data["metadata"]); err != nil {
@@ -76,7 +76,7 @@ func validateSchema(data map[string]any) error {
 	if err := validateObservability(data["observability"]); err != nil {
 		return err
 	}
-	if err := validateContracts(data["contracts"]); err != nil {
+	if err := validateContracts(data["rules"]); err != nil {
 		return err
 	}
 
@@ -269,17 +269,17 @@ func validateObservability(v any) error {
 }
 
 func validateContracts(v any) error {
-	contracts, ok := v.([]any)
+	rules, ok := v.([]any)
 	if !ok {
-		return schemaError("contracts is required and must be an array")
+		return schemaError("rules is required and must be an array")
 	}
-	if len(contracts) == 0 {
-		return schemaError("contracts must contain at least 1 item")
+	if len(rules) == 0 {
+		return schemaError("rules must contain at least 1 item")
 	}
-	for i, raw := range contracts {
+	for i, raw := range rules {
 		contractMap, ok := raw.(map[string]any)
 		if !ok {
-			return schemaError("contracts[%d] must be an object", i)
+			return schemaError("rules[%d] must be an object", i)
 		}
 		if err := validateContract(contractMap, i); err != nil {
 			return err
@@ -290,20 +290,20 @@ func validateContracts(v any) error {
 
 func validateContract(contractMap map[string]any, index int) error {
 	if _, has := contractMap["_observe"]; has {
-		return fmt.Errorf("yaml: contract %q uses reserved internal key '_observe'", contractMap["id"])
+		return fmt.Errorf("yaml: rule %q uses reserved internal key '_observe'", contractMap["id"])
 	}
 
-	contractID, ok := contractMap["id"].(string)
-	if !ok || contractID == "" {
-		return schemaError("contracts[%d].id is required", index)
+	ruleID, ok := contractMap["id"].(string)
+	if !ok || ruleID == "" {
+		return schemaError("rules[%d].id is required", index)
 	}
-	if !contractIDRe.MatchString(contractID) {
-		return schemaError("contracts[%d].id must match %q", index, contractIDRe.String())
+	if !ruleIDRe.MatchString(ruleID) {
+		return schemaError("rules[%d].id must match %q", index, ruleIDRe.String())
 	}
 
 	contractType, ok := contractMap["type"].(string)
 	if !ok || contractType == "" {
-		return schemaError("contracts[%d].type is required", index)
+		return schemaError("rules[%d].type is required", index)
 	}
 
 	switch contractType {
@@ -352,30 +352,30 @@ func validateContract(contractMap map[string]any, index int) error {
 		}
 		return nil
 	default:
-		return schemaError("contracts[%d].type must be one of pre, post, session, sandbox", index)
+		return schemaError("rules[%d].type must be one of pre, post, session, sandbox", index)
 	}
 }
 
 func contractPath(index int) string {
-	return fmt.Sprintf("contracts[%d]", index)
+	return fmt.Sprintf("rules[%d]", index)
 }
 
 func validateCommonContractFields(contractMap map[string]any, index int, requireTool bool) error {
 	if enabled, ok := contractMap["enabled"]; ok {
 		if _, ok := enabled.(bool); !ok {
-			return schemaError("contracts[%d].enabled must be a boolean", index)
+			return schemaError("rules[%d].enabled must be a boolean", index)
 		}
 	}
 	if mode, ok := contractMap["mode"].(string); ok {
 		if mode != "enforce" && mode != "observe" {
-			return schemaError("contracts[%d].mode must be one of %q or %q", index, "enforce", "observe")
+			return schemaError("rules[%d].mode must be one of %q or %q", index, "enforce", "observe")
 		}
 	} else if _, ok := contractMap["mode"]; ok {
-		return schemaError("contracts[%d].mode must be a string", index)
+		return schemaError("rules[%d].mode must be a string", index)
 	}
 
 	if requireTool {
-		if err := validateToolSelector(contractMap["tool"], fmt.Sprintf("contracts[%d].tool", index), true); err != nil {
+		if err := validateToolSelector(contractMap["tool"], fmt.Sprintf("rules[%d].tool", index), true); err != nil {
 			return err
 		}
 	}
@@ -406,32 +406,32 @@ func validateThenMap(v any, path, contractType string) error {
 	}
 
 	allowed := map[string]bool{
-		"effect": true, "message": true, "tags": true, "metadata": true,
+		"action": true, "message": true, "tags": true, "metadata": true,
 	}
 	if contractType == "pre" {
 		allowed["timeout"] = true
-		allowed["timeout_effect"] = true
+		allowed["timeout_action"] = true
 	}
 	if err := validateAdditionalProperties(m, path, allowed); err != nil {
 		return err
 	}
 
-	effect, ok := m["effect"].(string)
+	effect, ok := m["action"].(string)
 	if !ok || effect == "" {
-		return schemaError("%s.effect is required", path)
+		return schemaError("%s.action is required", path)
 	}
 	switch contractType {
 	case "pre":
-		if effect != "deny" && effect != "approve" {
-			return schemaError("%s.effect must be one of deny or approve", path)
+		if effect != "block" && effect != "ask" {
+			return schemaError("%s.action must be one of block or ask", path)
 		}
 	case "post":
-		if effect != "warn" && effect != "redact" && effect != "deny" {
-			return schemaError("%s.effect must be one of warn, redact, deny", path)
+		if effect != "warn" && effect != "redact" && effect != "block" {
+			return schemaError("%s.action must be one of warn, redact, block", path)
 		}
 	case "session":
-		if effect != "deny" {
-			return schemaError("%s.effect must be %q", path, "deny")
+		if effect != "block" {
+			return schemaError("%s.action must be %q", path, "block")
 		}
 	}
 
@@ -453,12 +453,12 @@ func validateThenMap(v any, path, contractType string) error {
 				return schemaError("%s.timeout must be an integer >= 1", path)
 			}
 		}
-		if timeoutEffect, ok := m["timeout_effect"].(string); ok {
-			if timeoutEffect != "deny" && timeoutEffect != "allow" {
-				return schemaError("%s.timeout_effect must be one of deny or allow", path)
+		if timeoutEffect, ok := m["timeout_action"].(string); ok {
+			if timeoutEffect != "block" && timeoutEffect != "allow" {
+				return schemaError("%s.timeout_action must be one of deny or allow", path)
 			}
-		} else if _, ok := m["timeout_effect"]; ok {
-			return schemaError("%s.timeout_effect must be a string", path)
+		} else if _, ok := m["timeout_action"]; ok {
+			return schemaError("%s.timeout_action must be a string", path)
 		}
 	}
 
@@ -718,79 +718,79 @@ func validateSandboxStructural(contractMap map[string]any, index int) error {
 	hasTool := contractMap["tool"] != nil
 	hasTools := contractMap["tools"] != nil
 	if hasTool == hasTools {
-		return schemaError("contracts[%d] sandbox contracts must set exactly one of tool or tools", index)
+		return schemaError("rules[%d] sandbox rules must set exactly one of tool or tools", index)
 	}
 	if hasTool {
-		if err := validateToolSelector(contractMap["tool"], fmt.Sprintf("contracts[%d].tool", index), true); err != nil {
+		if err := validateToolSelector(contractMap["tool"], fmt.Sprintf("rules[%d].tool", index), true); err != nil {
 			return err
 		}
 	}
 	if hasTools {
 		tools, ok := contractMap["tools"].([]any)
 		if !ok {
-			return schemaError("contracts[%d].tools must be an array", index)
+			return schemaError("rules[%d].tools must be an array", index)
 		}
 		if len(tools) == 0 {
-			return schemaError("contracts[%d].tools must contain at least 1 item", index)
+			return schemaError("rules[%d].tools must contain at least 1 item", index)
 		}
 		for i, raw := range tools {
-			if err := validateToolSelector(raw, fmt.Sprintf("contracts[%d].tools[%d]", index, i), true); err != nil {
+			if err := validateToolSelector(raw, fmt.Sprintf("rules[%d].tools[%d]", index, i), true); err != nil {
 				return err
 			}
 		}
 	}
-	if err := validateMessageString(contractMap["message"], fmt.Sprintf("contracts[%d].message", index), true); err != nil {
+	if err := validateMessageString(contractMap["message"], fmt.Sprintf("rules[%d].message", index), true); err != nil {
 		return err
 	}
 	if outside, ok := contractMap["outside"].(string); ok {
-		if outside != "deny" && outside != "approve" {
-			return schemaError("contracts[%d].outside must be one of deny or approve", index)
+		if outside != "block" && outside != "ask" {
+			return schemaError("rules[%d].outside must be one of deny or approve", index)
 		}
 	} else if _, ok := contractMap["outside"]; ok {
-		return schemaError("contracts[%d].outside must be a string", index)
+		return schemaError("rules[%d].outside must be a string", index)
 	}
 	if timeout, ok := contractMap["timeout"]; ok {
 		n, ok := intOrSchema(timeout)
 		if !ok || n < 1 {
-			return schemaError("contracts[%d].timeout must be an integer >= 1", index)
+			return schemaError("rules[%d].timeout must be an integer >= 1", index)
 		}
 	}
-	if timeoutEffect, ok := contractMap["timeout_effect"].(string); ok {
-		if timeoutEffect != "deny" && timeoutEffect != "allow" {
-			return schemaError("contracts[%d].timeout_effect must be one of deny or allow", index)
+	if timeoutEffect, ok := contractMap["timeout_action"].(string); ok {
+		if timeoutEffect != "block" && timeoutEffect != "allow" {
+			return schemaError("rules[%d].timeout_action must be one of deny or allow", index)
 		}
-	} else if _, ok := contractMap["timeout_effect"]; ok {
-		return schemaError("contracts[%d].timeout_effect must be a string", index)
+	} else if _, ok := contractMap["timeout_action"]; ok {
+		return schemaError("rules[%d].timeout_action must be a string", index)
 	}
 	if within, ok := contractMap["within"]; ok {
 		items, ok := within.([]any)
 		if !ok {
-			return schemaError("contracts[%d].within must be an array", index)
+			return schemaError("rules[%d].within must be an array", index)
 		}
 		if len(items) == 0 {
-			return schemaError("contracts[%d].within must contain at least 1 item", index)
+			return schemaError("rules[%d].within must contain at least 1 item", index)
 		}
-		if err := validateStringArray(items, fmt.Sprintf("contracts[%d].within", index)); err != nil {
+		if err := validateStringArray(items, fmt.Sprintf("rules[%d].within", index)); err != nil {
 			return err
 		}
 	}
 	if notWithin, ok := contractMap["not_within"]; ok {
 		items, ok := notWithin.([]any)
 		if !ok {
-			return schemaError("contracts[%d].not_within must be an array", index)
+			return schemaError("rules[%d].not_within must be an array", index)
 		}
-		if err := validateStringArray(items, fmt.Sprintf("contracts[%d].not_within", index)); err != nil {
+		if err := validateStringArray(items, fmt.Sprintf("rules[%d].not_within", index)); err != nil {
 			return err
 		}
 	}
-	if err := validateSandboxAllows(contractMap["allows"], fmt.Sprintf("contracts[%d].allows", index)); err != nil {
+	if err := validateSandboxAllows(contractMap["allows"], fmt.Sprintf("rules[%d].allows", index)); err != nil {
 		return err
 	}
-	if err := validateSandboxNotAllows(contractMap["not_allows"], fmt.Sprintf("contracts[%d].not_allows", index)); err != nil {
+	if err := validateSandboxNotAllows(contractMap["not_allows"], fmt.Sprintf("rules[%d].not_allows", index)); err != nil {
 		return err
 	}
 	if contractMap["within"] == nil && contractMap["allows"] == nil {
-		return schemaError("contracts[%d] sandbox contracts must set at least one of within or allows", index)
+		return schemaError("rules[%d] sandbox rules must set at least one of within or allows", index)
 	}
 	return nil
 }
@@ -878,12 +878,12 @@ func validateStringArray(items []any, path string) error {
 
 func validateUniqueIDs(data map[string]any) error {
 	seen := make(map[string]bool)
-	contracts, _ := data["contracts"].([]any)
-	for _, c := range contracts {
+	rules, _ := data["rules"].([]any)
+	for _, c := range rules {
 		cm, _ := c.(map[string]any)
 		id, _ := cm["id"].(string)
 		if seen[id] {
-			return fmt.Errorf("yaml: duplicate contract id: %q", id)
+			return fmt.Errorf("yaml: duplicate rule id: %q", id)
 		}
 		seen[id] = true
 	}
@@ -891,8 +891,8 @@ func validateUniqueIDs(data map[string]any) error {
 }
 
 func validateRegexes(data map[string]any) error {
-	contracts, _ := data["contracts"].([]any)
-	for _, c := range contracts {
+	rules, _ := data["rules"].([]any)
+	for _, c := range rules {
 		cm, _ := c.(map[string]any)
 		when, ok := cm["when"]
 		if !ok {
@@ -954,8 +954,8 @@ func validateExprRegexes(expr any) error {
 }
 
 func validatePreSelectors(data map[string]any) error {
-	contracts, _ := data["contracts"].([]any)
-	for _, c := range contracts {
+	rules, _ := data["rules"].([]any)
+	for _, c := range rules {
 		cm, _ := c.(map[string]any)
 		if cm["type"] != "pre" {
 			continue
@@ -965,7 +965,7 @@ func validatePreSelectors(data map[string]any) error {
 			continue
 		}
 		if exprHasSelector(when, "output.text") {
-			return fmt.Errorf("yaml: contract %q: output.text selector is not available in type: pre contracts", cm["id"])
+			return fmt.Errorf("yaml: rule %q: output.text selector is not available in type: pre rules", cm["id"])
 		}
 	}
 	return nil

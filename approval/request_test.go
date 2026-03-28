@@ -161,9 +161,9 @@ func TestWithTimeout_Zero(t *testing.T) {
 // --- WithTimeoutEffect option ---
 
 func TestWithTimeoutEffect_Deny(t *testing.T) {
-	r := NewRequest("req-9", "Tool", nil, "msg", WithTimeoutEffect("deny"))
-	if r.TimeoutEffect() != "deny" {
-		t.Errorf("TimeoutEffect() = %q, want %q", r.TimeoutEffect(), "deny")
+	r := NewRequest("req-9", "Tool", nil, "msg", WithTimeoutEffect("block"))
+	if r.TimeoutEffect() != "block" {
+		t.Errorf("TimeoutEffect() = %q, want %q", r.TimeoutEffect(), "block")
 	}
 }
 
@@ -179,12 +179,12 @@ func TestWithTimeoutEffect_Allow(t *testing.T) {
 func TestNewRequest_MultipleOptions(t *testing.T) {
 	r := NewRequest("req-11", "Tool", nil, "msg",
 		WithTimeout(60*time.Second),
-		WithTimeoutEffect("deny"),
+		WithTimeoutEffect("block"),
 	)
 	if r.Timeout() != 60*time.Second {
 		t.Errorf("Timeout() = %v, want %v", r.Timeout(), 60*time.Second)
 	}
-	if r.TimeoutEffect() != "deny" {
-		t.Errorf("TimeoutEffect() = %q, want %q", r.TimeoutEffect(), "deny")
+	if r.TimeoutEffect() != "block" {
+		t.Errorf("TimeoutEffect() = %q, want %q", r.TimeoutEffect(), "block")
 	}
 }

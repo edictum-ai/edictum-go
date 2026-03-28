@@ -1,6 +1,6 @@
 // Package sandbox provides path, command, and domain sandboxing for tool calls.
 //
-// Sandbox contracts extract resources (paths, commands, domains/URLs) from
+// Sandbox rules extract resources (paths, commands, domains/URLs) from
 // tool call envelopes and check them against configurable boundaries.
 // All paths are resolved via filepath.EvalSymlinks to handle both ".."
 // traversals and symlink escapes. TOCTOU caveat: a symlink created after

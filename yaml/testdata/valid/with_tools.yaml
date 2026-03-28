@@ -1,5 +1,5 @@
 apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 metadata:
   name: tools-bundle
 defaults:
@@ -8,7 +8,7 @@ tools:
   ReadFile:
     side_effect: read
     idempotent: true
-contracts:
+rules:
   - id: redact-secret
     type: post
     tool: ReadFile
@@ -16,5 +16,5 @@ contracts:
       "output.text":
         contains: "secret"
     then:
-      effect: warn
+      action: warn
       message: "Sensitive data observed"

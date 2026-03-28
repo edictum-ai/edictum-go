@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
@@ -35,11 +35,11 @@ func TestObserveMode_SetsObservedDenySpanAttr(t *testing.T) {
 	g := New(
 		WithMode("observe"),
 		WithTelemetry(tel),
-		WithContracts(
-			contract.Precondition{
+		WithRules(
+			rule.Precondition{
 				Name: "deny-all",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("denied by contract"), nil
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("denied by rule"), nil
 				},
 			},
 		),
@@ -85,12 +85,12 @@ func TestObserveMode_ApprovalDoesNotSetObservedDenySpanAttr(t *testing.T) {
 	g := New(
 		WithMode("observe"),
 		WithTelemetry(tel),
-		WithContracts(
-			contract.Precondition{
-				Name:   "approval-contract",
-				Effect: "approve",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("needs approval"), nil
+		WithRules(
+			rule.Precondition{
+				Name:   "approval-rule",
+				Effect: "ask",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("needs approval"), nil
 				},
 			},
 		),

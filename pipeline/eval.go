@@ -5,46 +5,46 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
-// evalPreconditions evaluates a slice of preconditions (or sandbox contracts).
+// evalPreconditions evaluates a slice of preconditions (or sandbox rules).
 // Returns (decision, true) if a deny/approval was triggered; (zero, false) otherwise.
-func (p *GovernancePipeline) evalPreconditions(
+func (p *CheckPipeline) evalPreconditions(
 	ctx context.Context,
-	env envelope.ToolEnvelope,
-	pres []contract.Precondition,
+	env toolcall.ToolCall,
+	pres []rule.Precondition,
 	defaultSource string,
 	hooks []map[string]any,
-	contracts *[]map[string]any,
+	rules *[]map[string]any,
 	hasObservedDeny *bool,
 ) (PreDecision, bool) {
 	for _, c := range pres {
-		// When predicate: skip this contract if When returns false
+		// When predicate: skip this rule if When returns false
 		if c.When != nil && !c.When(ctx, env) {
 			continue
 		}
-		verdict, err := c.Check(ctx, env)
+		decision, err := c.Check(ctx, env)
 		if err != nil {
-			log.Printf("Contract %s raised: %v", contractName(c.Name), err)
-			verdict = contract.Fail(
+			log.Printf("Rule %s raised: %v", ruleName(c.Name), err)
+			decision = rule.Fail(
 				fmt.Sprintf("Precondition error: %s", err),
 				map[string]any{"policy_error": true},
 			)
 		}
 		record := map[string]any{
-			"name":    contractName(c.Name),
+			"name":    ruleName(c.Name),
 			"type":    contractType(defaultSource),
-			"passed":  verdict.Passed(),
-			"message": verdict.Message(),
+			"passed":  decision.Passed(),
+			"message": decision.Message(),
 		}
-		if verdict.Metadata() != nil {
-			record["metadata"] = verdict.Metadata()
+		if decision.Metadata() != nil {
+			record["metadata"] = decision.Metadata()
 		}
-		*contracts = append(*contracts, record)
+		*rules = append(*rules, record)
 
-		if !verdict.Passed() {
+		if !decision.Passed() {
 			if c.Mode == "observe" {
 				record["observed"] = true
 				*hasObservedDeny = true
@@ -54,40 +54,40 @@ func (p *GovernancePipeline) evalPreconditions(
 			if source == "" {
 				source = defaultSource
 			}
-			pe := hasPolicyError(*contracts)
+			pe := hasPolicyError(*rules)
 			effect := c.Effect
 			if effect == "" {
-				effect = "deny"
+				effect = "block"
 			}
-			if effect == "approve" {
+			if effect == "ask" {
 				timeout := c.Timeout
 				if timeout == 0 {
 					timeout = 300
 				}
 				timeoutEff := c.TimeoutEffect
 				if timeoutEff == "" {
-					timeoutEff = "deny"
+					timeoutEff = "block"
 				}
 				return PreDecision{
 					Action:             "pending_approval",
-					Reason:             verdict.Message(),
+					Reason:             decision.Message(),
 					DecisionSource:     source,
-					DecisionName:       contractName(c.Name),
+					DecisionName:       ruleName(c.Name),
 					HooksEvaluated:     hooks,
-					ContractsEvaluated: *contracts,
+					ContractsEvaluated: *rules,
 					PolicyError:        pe,
 					ApprovalTimeout:    timeout,
 					ApprovalTimeoutEff: timeoutEff,
-					ApprovalMessage:    verdict.Message(),
+					ApprovalMessage:    decision.Message(),
 				}, true
 			}
 			return PreDecision{
-				Action:             "deny",
-				Reason:             verdict.Message(),
+				Action:             "block",
+				Reason:             decision.Message(),
 				DecisionSource:     source,
-				DecisionName:       contractName(c.Name),
+				DecisionName:       ruleName(c.Name),
 				HooksEvaluated:     hooks,
-				ContractsEvaluated: *contracts,
+				ContractsEvaluated: *rules,
 				PolicyError:        pe,
 			}, true
 		}
@@ -95,7 +95,7 @@ func (p *GovernancePipeline) evalPreconditions(
 	return PreDecision{}, false
 }
 
-func contractName(name string) string {
+func ruleName(name string) string {
 	if name != "" {
 		return name
 	}
@@ -111,8 +111,8 @@ func contractType(source string) string {
 	}
 }
 
-func hasPolicyError(contracts []map[string]any) bool {
-	for _, c := range contracts {
+func hasPolicyError(rules []map[string]any) bool {
+	for _, c := range rules {
 		if meta, ok := c["metadata"].(map[string]any); ok {
 			if pe, ok := meta["policy_error"].(bool); ok && pe {
 				return true

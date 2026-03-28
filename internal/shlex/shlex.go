@@ -1,4 +1,4 @@
-// Package shlex provides shell-aware tokenization for sandbox contract
+// Package shlex provides shell-aware tokenization for sandbox rule
 // evaluation. Security-critical: used to extract paths and commands
 // from shell command strings for sandbox enforcement.
 //

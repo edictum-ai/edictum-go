@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/contract"
+	"github.com/edictum-ai/edictum-go/rule"
 )
 
 // Unit tests for helper functions and edge cases.
@@ -147,7 +147,7 @@ func TestCheckReturnsContractVerdict(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if reflect.TypeOf(v) != reflect.TypeOf(contract.Pass()) {
+	if reflect.TypeOf(v) != reflect.TypeOf(rule.Pass()) {
 		t.Errorf("Check() returned wrong type: %T", v)
 	}
 }

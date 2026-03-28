@@ -3,7 +3,7 @@ package pipeline
 import (
 	"context"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // HookResult represents the outcome of a hook evaluation.
@@ -12,7 +12,7 @@ type HookResult string
 // HookResult values.
 const (
 	HookResultAllow HookResult = "allow"
-	HookResultDeny  HookResult = "deny"
+	HookResultDeny  HookResult = "block"
 )
 
 // HookDecision is the result of a before/after hook.
@@ -36,10 +36,10 @@ func DenyHook(reason string) HookDecision {
 }
 
 // BeforeHookFunc is the signature for before-execution hooks.
-type BeforeHookFunc func(ctx context.Context, env envelope.ToolEnvelope) (HookDecision, error)
+type BeforeHookFunc func(ctx context.Context, env toolcall.ToolCall) (HookDecision, error)
 
 // AfterHookFunc is the signature for after-execution hooks.
-type AfterHookFunc func(ctx context.Context, env envelope.ToolEnvelope, result any) error
+type AfterHookFunc func(ctx context.Context, env toolcall.ToolCall, result any) error
 
 // HookRegistration binds a hook callback to a phase and tool pattern.
 type HookRegistration struct {
@@ -47,7 +47,7 @@ type HookRegistration struct {
 	Tool   string         // Tool name, glob pattern, or "*" for all.
 	Before BeforeHookFunc // Set for phase="before".
 	After  AfterHookFunc  // Set for phase="after".
-	When   func(ctx context.Context, env envelope.ToolEnvelope) bool
+	When   func(ctx context.Context, env toolcall.ToolCall) bool
 	Name   string // Human-readable name for audit.
 }
 

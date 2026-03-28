@@ -1,10 +1,10 @@
 apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 metadata:
   name: security-command-allowlist
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: allow-echo
     type: sandbox
     tool: Bash

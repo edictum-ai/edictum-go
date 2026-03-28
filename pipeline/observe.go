@@ -5,22 +5,22 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/session"
 )
 
-// evaluateObserveContracts evaluates observe-mode contracts without
+// evaluateObserveContracts evaluates observe-mode rules without
 // affecting the real decision. Results are returned for audit emission.
-func (p *GovernancePipeline) evaluateObserveContracts(
+func (p *CheckPipeline) evaluateObserveContracts(
 	ctx context.Context,
-	env envelope.ToolEnvelope,
+	env toolcall.ToolCall,
 	sess *session.Session,
 ) []map[string]any {
-	// Pre-allocate results slice based on total observe contract count.
+	// Pre-allocate results slice based on total observe rule count.
 	observePres := p.provider.GetObservePreconditions(env)
 	observeSandbox := p.provider.GetObserveSandboxContracts(env)
-	observeSession := p.provider.GetObserveSessionContracts()
+	observeSession := p.provider.GetObserveSessionRules()
 	results := make([]map[string]any, 0, len(observePres)+len(observeSandbox)+len(observeSession))
 
 	// Observe preconditions
@@ -28,10 +28,10 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 		if c.When != nil && !c.When(ctx, env) {
 			continue
 		}
-		verdict, err := c.Check(ctx, env)
+		decision, err := c.Check(ctx, env)
 		if err != nil {
-			log.Printf("Observe-mode precondition %s raised: %v", contractName(c.Name), err)
-			verdict = contract.Fail(
+			log.Printf("Observe-mode precondition %s raised: %v", ruleName(c.Name), err)
+			decision = rule.Fail(
 				fmt.Sprintf("Observe-mode precondition error: %s", err),
 				map[string]any{"policy_error": true},
 			)
@@ -41,23 +41,23 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 			source = "yaml_precondition"
 		}
 		results = append(results, map[string]any{
-			"name":    contractName(c.Name),
+			"name":    ruleName(c.Name),
 			"type":    "precondition",
-			"passed":  verdict.Passed(),
-			"message": verdict.Message(),
+			"passed":  decision.Passed(),
+			"message": decision.Message(),
 			"source":  source,
 		})
 	}
 
-	// Observe sandbox contracts
+	// Observe sandbox rules
 	for _, c := range observeSandbox {
 		if c.When != nil && !c.When(ctx, env) {
 			continue
 		}
-		verdict, err := c.Check(ctx, env)
+		decision, err := c.Check(ctx, env)
 		if err != nil {
-			log.Printf("Observe-mode sandbox %s raised: %v", contractName(c.Name), err)
-			verdict = contract.Fail(
+			log.Printf("Observe-mode sandbox %s raised: %v", ruleName(c.Name), err)
+			decision = rule.Fail(
 				fmt.Sprintf("Observe-mode sandbox error: %s", err),
 				map[string]any{"policy_error": true},
 			)
@@ -67,21 +67,21 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 			source = "yaml_sandbox"
 		}
 		results = append(results, map[string]any{
-			"name":    contractName(c.Name),
+			"name":    ruleName(c.Name),
 			"type":    "sandbox",
-			"passed":  verdict.Passed(),
-			"message": verdict.Message(),
+			"passed":  decision.Passed(),
+			"message": decision.Message(),
 			"source":  source,
 		})
 	}
 
-	// Observe session contracts
+	// Observe session rules
 	for _, sc := range observeSession {
-		verdict, err := sc.Check(ctx, sess)
+		decision, err := sc.Check(ctx, sess)
 		if err != nil {
-			log.Printf("Observe-mode session contract %s raised: %v", contractName(sc.Name), err)
-			verdict = contract.Fail(
-				fmt.Sprintf("Observe-mode session contract error: %s", err),
+			log.Printf("Observe-mode session rule %s raised: %v", ruleName(sc.Name), err)
+			decision = rule.Fail(
+				fmt.Sprintf("Observe-mode session rule error: %s", err),
 				map[string]any{"policy_error": true},
 			)
 		}
@@ -90,10 +90,10 @@ func (p *GovernancePipeline) evaluateObserveContracts(
 			source = "yaml_session"
 		}
 		results = append(results, map[string]any{
-			"name":    contractName(sc.Name),
-			"type":    "session_contract",
-			"passed":  verdict.Passed(),
-			"message": verdict.Message(),
+			"name":    ruleName(sc.Name),
+			"type":    "session_rule",
+			"passed":  decision.Passed(),
+			"message": decision.Message(),
 			"source":  source,
 		})
 	}

@@ -12,7 +12,7 @@ import (
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/telemetry"
@@ -21,9 +21,9 @@ import (
 // handleApproval handles the pending_approval flow.
 func (g *Guard) handleApproval(
 	ctx context.Context,
-	env2 envelope.ToolEnvelope,
+	env2 toolcall.ToolCall,
 	sess *session.Session,
-	pipe *pipeline.GovernancePipeline,
+	pipe *pipeline.CheckPipeline,
 	pre pipeline.PreDecision,
 	mode, policyVersion string,
 	toolCallable func(map[string]any) (any, error),
@@ -32,7 +32,7 @@ func (g *Guard) handleApproval(
 	if g.approvalBackend == nil {
 		telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval backend not configured")
 		g.telemetry.RecordDenial(ctx, env2.ToolName())
-		return nil, &edictum.DeniedError{
+		return nil, &edictum.BlockedError{
 			Reason:         fmt.Sprintf("Approval required but no approval backend configured: %s", pre.Reason),
 			DecisionSource: pre.DecisionSource,
 			DecisionName:   pre.DecisionName,
@@ -44,7 +44,7 @@ func (g *Guard) handleApproval(
 		msg = pre.Reason
 	}
 
-	// Propagate per-contract timeout settings to the approval backend.
+	// Propagate per-rule timeout settings to the approval backend.
 	var reqOpts []approval.RequestOption
 	if pre.ApprovalTimeout > 0 {
 		reqOpts = append(reqOpts, approval.WithTimeout(time.Duration(pre.ApprovalTimeout)*time.Second))
@@ -62,13 +62,13 @@ func (g *Guard) handleApproval(
 	decision, err := g.approvalBackend.PollApprovalStatus(ctx, req.ApprovalID())
 	if err != nil {
 		// Context cancellation/deadline → treat as approval timeout.
-		// Apply timeout_effect rather than propagating the raw error.
+		// Apply timeout_action rather than propagating the raw error.
 		// Use a fresh context for post-timeout operations (audit, execution)
 		// since the original context is expired.
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			// Mark the span BEFORE dropping the context that carries it.
 			// Set ERROR only when timeout results in deny (default).
-			// For timeout_effect=allow, the span status should match
+			// For timeout_action=allow, the span status should match
 			// the governance outcome (allowed), so use an attribute.
 			if pre.ApprovalTimeoutEff != "allow" {
 				telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval timeout")
@@ -117,7 +117,7 @@ func (g *Guard) handleApproval(
 		reason = pre.Reason
 	}
 	g.fireOnDeny(env2, reason, pre.DecisionName)
-	return nil, &edictum.DeniedError{
+	return nil, &edictum.BlockedError{
 		Reason:         reason,
 		DecisionSource: pre.DecisionSource,
 		DecisionName:   pre.DecisionName,

@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
 )
@@ -13,7 +13,7 @@ import (
 // emitPreAudit emits a pre-execution audit event.
 func (g *Guard) emitPreAudit(
 	ctx context.Context,
-	env2 envelope.ToolEnvelope,
+	env2 toolcall.ToolCall,
 	sess *session.Session,
 	action audit.Action,
 	pre pipeline.PreDecision,
@@ -51,7 +51,7 @@ func (g *Guard) emitPreAudit(
 // emitPostAudit emits a post-execution audit event.
 func (g *Guard) emitPostAudit(
 	ctx context.Context,
-	env2 envelope.ToolEnvelope,
+	env2 toolcall.ToolCall,
 	sess *session.Session,
 	action audit.Action,
 	post pipeline.PostDecision,
@@ -84,10 +84,10 @@ func (g *Guard) emitPostAudit(
 	}
 }
 
-// emitObservedDenials emits CALL_WOULD_DENY for per-contract observed denials.
+// emitObservedDenials emits CALL_WOULD_DENY for per-rule observed denials.
 func (g *Guard) emitObservedDenials(
 	ctx context.Context,
-	env2 envelope.ToolEnvelope,
+	env2 toolcall.ToolCall,
 	pre pipeline.PreDecision,
 	policyVersion string,
 ) {
@@ -123,10 +123,10 @@ func (g *Guard) emitObservedDenials(
 	}
 }
 
-// emitObserveResults emits audit events for observe-mode contracts.
+// emitObserveResults emits audit events for observe-mode rules.
 func (g *Guard) emitObserveResults(
 	ctx context.Context,
-	env2 envelope.ToolEnvelope,
+	env2 toolcall.ToolCall,
 	pre pipeline.PreDecision,
 	policyVersion string,
 ) {
@@ -164,7 +164,7 @@ func (g *Guard) emitObserveResults(
 	}
 }
 
-func principalMap(p *envelope.Principal) map[string]any {
+func principalMap(p *toolcall.Principal) map[string]any {
 	if p == nil {
 		return nil
 	}
@@ -228,8 +228,8 @@ func deepCopyAny(v any) any {
 }
 
 // fireOnDeny invokes the on_deny callback, swallowing panics.
-func (g *Guard) fireOnDeny(env2 envelope.ToolEnvelope, reason, name string) {
-	if g.onDeny == nil {
+func (g *Guard) fireOnDeny(env2 toolcall.ToolCall, reason, name string) {
+	if g.onBlock == nil {
 		return
 	}
 	defer func() {
@@ -237,11 +237,11 @@ func (g *Guard) fireOnDeny(env2 envelope.ToolEnvelope, reason, name string) {
 			log.Printf("on_deny callback panicked: %v", r)
 		}
 	}()
-	g.onDeny(env2, reason, name)
+	g.onBlock(env2, reason, name)
 }
 
 // fireOnAllow invokes the on_allow callback, swallowing panics.
-func (g *Guard) fireOnAllow(env2 envelope.ToolEnvelope) {
+func (g *Guard) fireOnAllow(env2 toolcall.ToolCall) {
 	if g.onAllow == nil {
 		return
 	}
@@ -254,7 +254,7 @@ func (g *Guard) fireOnAllow(env2 envelope.ToolEnvelope) {
 }
 
 // fireOnPostWarn invokes the on_post_warn callback, swallowing panics.
-func (g *Guard) fireOnPostWarn(env2 envelope.ToolEnvelope, warnings []string) {
+func (g *Guard) fireOnPostWarn(env2 toolcall.ToolCall, warnings []string) {
 	if g.onPostWarn == nil {
 		return
 	}

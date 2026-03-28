@@ -14,8 +14,8 @@ func newValidateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "validate <files...>",
-		Short: "Validate YAML contract bundles",
-		Long:  "Validate one or more YAML contract bundles. Exits 1 if any are invalid.",
+		Short: "Validate YAML rule bundles",
+		Long:  "Validate one or more YAML rule bundles. Exits 1 if any are invalid.",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runValidate(cmd, args, jsonOutput)
@@ -163,7 +163,7 @@ func printValidateText(
 	w := cmd.OutOrStdout()
 	for _, r := range results {
 		if r.Valid {
-			fmt.Fprintf(w, "\u2713 %s \u2014 %d contracts (%d pre, %d post, %d session, %d sandbox)\n",
+			fmt.Fprintf(w, "\u2713 %s \u2014 %d rules (%d pre, %d post, %d session, %d sandbox)\n",
 				r.File, r.Total,
 				r.Counts["pre"], r.Counts["post"],
 				r.Counts["session"], r.Counts["sandbox"])

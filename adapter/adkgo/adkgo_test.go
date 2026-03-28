@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	edictum "github.com/edictum-ai/edictum-go"
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/guard"
 )
 
-// 11.1: Allow with no contracts -- tool executes normally.
+// 11.1: Allow with no rules -- tool executes normally.
 func TestAdapterParity_11_1_AllowNoContracts(t *testing.T) {
 	g := guard.New()
 	adapter := New(g)
@@ -35,12 +35,12 @@ func TestAdapterParity_11_1_AllowNoContracts(t *testing.T) {
 func TestAdapterParity_11_2_DenyPrecondition(t *testing.T) {
 	toolCalled := false
 	g := guard.New(
-		guard.WithContracts(
-			contract.Precondition{
+		guard.WithRules(
+			rule.Precondition{
 				Name: "deny-all",
 				Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("denied by policy"), nil
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("denied by policy"), nil
 				},
 			},
 		),
@@ -55,11 +55,11 @@ func TestAdapterParity_11_2_DenyPrecondition(t *testing.T) {
 
 	_, err := wrapped(context.Background(), map[string]any{"command": "ls"})
 	if err == nil {
-		t.Fatal("expected DeniedError, got nil")
+		t.Fatal("expected BlockedError, got nil")
 	}
-	var denied *edictum.DeniedError
+	var denied *edictum.BlockedError
 	if !errors.As(err, &denied) {
-		t.Fatalf("expected DeniedError, got %T: %v", err, err)
+		t.Fatalf("expected BlockedError, got %T: %v", err, err)
 	}
 	if toolCalled {
 		t.Error("tool should not have been called after deny")
@@ -69,15 +69,15 @@ func TestAdapterParity_11_2_DenyPrecondition(t *testing.T) {
 // 11.3: Deny reason preserved end-to-end.
 func TestAdapterParity_11_3_DenyReasonPreserved(t *testing.T) {
 	g := guard.New(
-		guard.WithContracts(
-			contract.Precondition{
+		guard.WithRules(
+			rule.Precondition{
 				Name: "no-rm",
 				Tool: "Bash",
-				Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+				Check: func(_ context.Context, env toolcall.ToolCall) (rule.Decision, error) {
 					if strings.Contains(env.BashCommand(), "rm -rf") {
-						return contract.Fail("rm -rf is forbidden"), nil
+						return rule.Fail("rm -rf is forbidden"), nil
 					}
-					return contract.Pass(), nil
+					return rule.Pass(), nil
 				},
 			},
 		),
@@ -91,11 +91,11 @@ func TestAdapterParity_11_3_DenyReasonPreserved(t *testing.T) {
 
 	_, err := wrapped(context.Background(), map[string]any{"command": "rm -rf /"})
 	if err == nil {
-		t.Fatal("expected DeniedError")
+		t.Fatal("expected BlockedError")
 	}
-	var denied *edictum.DeniedError
+	var denied *edictum.BlockedError
 	if !errors.As(err, &denied) {
-		t.Fatalf("expected DeniedError, got %T: %v", err, err)
+		t.Fatalf("expected BlockedError, got %T: %v", err, err)
 	}
 	if denied.Reason != "rm -rf is forbidden" {
 		t.Errorf("reason: got %q, want %q", denied.Reason, "rm -rf is forbidden")
@@ -110,12 +110,12 @@ func TestAdapterParity_11_4_ObserveMode(t *testing.T) {
 	toolCalled := false
 	g := guard.New(
 		guard.WithMode("observe"),
-		guard.WithContracts(
-			contract.Precondition{
+		guard.WithRules(
+			rule.Precondition{
 				Name: "would-deny",
 				Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("should observe, not deny"), nil
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("should observe, not deny"), nil
 				},
 			},
 		),
@@ -146,16 +146,16 @@ func TestAdapterParity_11_5_OnDenyCallback(t *testing.T) {
 	var capturedReason string
 
 	g := guard.New(
-		guard.WithContracts(
-			contract.Precondition{
+		guard.WithRules(
+			rule.Precondition{
 				Name: "deny-cb",
 				Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("denied for test"), nil
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("denied for test"), nil
 				},
 			},
 		),
-		guard.WithOnDeny(func(_ envelope.ToolEnvelope, reason string, _ string) {
+		guard.WithOnDeny(func(_ toolcall.ToolCall, reason string, _ string) {
 			denyCount.Add(1)
 			capturedReason = reason
 		}),
@@ -182,7 +182,7 @@ func TestAdapterParity_11_6_OnAllowCallback(t *testing.T) {
 	var allowCount atomic.Int32
 
 	g := guard.New(
-		guard.WithOnAllow(func(_ envelope.ToolEnvelope) {
+		guard.WithOnAllow(func(_ toolcall.ToolCall) {
 			allowCount.Add(1)
 		}),
 	)
@@ -233,26 +233,26 @@ func TestAdapterParity_11_7_CustomSuccessCheck(t *testing.T) {
 	}
 }
 
-// 11.8: SetPrincipal propagates to envelope.
+// 11.8: SetPrincipal propagates to toolcall.
 func TestAdapterParity_11_8_SetPrincipal(t *testing.T) {
-	var capturedPrincipal *envelope.Principal
+	var capturedPrincipal *toolcall.Principal
 
 	g := guard.New(
-		guard.WithContracts(
-			contract.Precondition{
+		guard.WithRules(
+			rule.Precondition{
 				Name: "capture-principal",
 				Tool: "*",
-				Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+				Check: func(_ context.Context, env toolcall.ToolCall) (rule.Decision, error) {
 					capturedPrincipal = env.Principal()
-					return contract.Pass(), nil
+					return rule.Pass(), nil
 				},
 			},
 		),
 	)
 
-	p := envelope.NewPrincipal(
-		envelope.WithUserID("user-42"),
-		envelope.WithRole("admin"),
+	p := toolcall.NewPrincipal(
+		toolcall.WithUserID("user-42"),
+		toolcall.WithRole("admin"),
 	)
 	g.SetPrincipal(&p)
 
@@ -279,24 +279,24 @@ func TestAdapterParity_11_8_SetPrincipal(t *testing.T) {
 
 // 11.9: PrincipalResolver resolves per-call principal.
 func TestAdapterParity_11_9_PrincipalResolver(t *testing.T) {
-	var capturedPrincipal *envelope.Principal
+	var capturedPrincipal *toolcall.Principal
 
 	g := guard.New(
-		guard.WithPrincipalResolver(func(_ string, args map[string]any) *envelope.Principal {
+		guard.WithPrincipalResolver(func(_ string, args map[string]any) *toolcall.Principal {
 			userID, _ := args["user"].(string)
-			p := envelope.NewPrincipal(
-				envelope.WithUserID(userID),
-				envelope.WithRole("resolver-role"),
+			p := toolcall.NewPrincipal(
+				toolcall.WithUserID(userID),
+				toolcall.WithRole("resolver-role"),
 			)
 			return &p
 		}),
-		guard.WithContracts(
-			contract.Precondition{
+		guard.WithRules(
+			rule.Precondition{
 				Name: "capture-resolved",
 				Tool: "*",
-				Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+				Check: func(_ context.Context, env toolcall.ToolCall) (rule.Decision, error) {
 					capturedPrincipal = env.Principal()
-					return contract.Pass(), nil
+					return rule.Pass(), nil
 				},
 			},
 		),
@@ -332,21 +332,21 @@ func TestAdapterParity_11_10_OnPostconditionWarn(t *testing.T) {
 	var capturedWarnings []string
 
 	g := guard.New(
-		guard.WithContracts(
-			contract.Postcondition{
+		guard.WithRules(
+			rule.Postcondition{
 				Name:   "warn-pii",
 				Tool:   "*",
 				Effect: "warn",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope, result any) (contract.Verdict, error) {
+				Check: func(_ context.Context, _ toolcall.ToolCall, result any) (rule.Decision, error) {
 					s, ok := result.(string)
 					if ok && strings.Contains(s, "SSN") {
-						return contract.Fail("PII detected: SSN"), nil
+						return rule.Fail("PII detected: SSN"), nil
 					}
-					return contract.Pass(), nil
+					return rule.Pass(), nil
 				},
 			},
 		),
-		guard.WithOnPostWarn(func(_ envelope.ToolEnvelope, warnings []string) {
+		guard.WithOnPostWarn(func(_ toolcall.ToolCall, warnings []string) {
 			warnCount.Add(1)
 			capturedWarnings = warnings
 		}),

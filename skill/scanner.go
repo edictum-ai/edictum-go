@@ -35,23 +35,23 @@ func ScanSkill(path string) (*ScanResult, error) {
 
 	blockFindings := scanCodeBlocks(blocks)
 	blobFindings := scanBase64Blobs(blocks)
-	findings := make([]Finding, 0, len(blockFindings)+len(blobFindings))
-	findings = append(findings, blockFindings...)
-	findings = append(findings, blobFindings...)
+	violations := make([]Finding, 0, len(blockFindings)+len(blobFindings))
+	violations = append(violations, blockFindings...)
+	violations = append(violations, blobFindings...)
 
 	hasContracts := checkContracts(dirPath)
 
 	return &ScanResult{
 		SkillName:    filepath.Base(dirPath),
 		SkillPath:    filePath,
-		RiskTier:     ClassifyRisk(findings),
-		Findings:     findings,
+		RiskTier:     ClassifyRisk(violations),
+		Findings:     violations,
 		HasContracts: hasContracts,
 	}, nil
 }
 
 // ScanSkillStructural performs structural-only analysis, checking
-// whether contracts.yaml exists in the skill directory without
+// whether rules.yaml exists in the skill directory without
 // scanning file content for patterns.
 func ScanSkillStructural(path string) (*ScanResult, error) {
 	_, dirPath, err := resolvePaths(path)
@@ -112,14 +112,14 @@ func readBounded(path string) ([]byte, error) {
 
 // scanCodeBlocks runs all patterns against each line of each code block.
 func scanCodeBlocks(blocks []codeBlock) []Finding {
-	var findings []Finding
+	var violations []Finding
 	for _, block := range blocks {
 		lines := strings.Split(block.Content, "\n")
 		for lineIdx, line := range lines {
 			truncated := truncateForRegex(line)
 			for _, pat := range Patterns {
 				if pat.Regex.MatchString(truncated) {
-					findings = append(findings, Finding{
+					violations = append(violations, Finding{
 						Severity: pat.Severity,
 						Category: pat.Category,
 						Message:  fmt.Sprintf("matched pattern %q", pat.Name),
@@ -130,14 +130,14 @@ func scanCodeBlocks(blocks []codeBlock) []Finding {
 			}
 		}
 	}
-	return findings
+	return violations
 }
 
 // scanBase64Blobs finds base64-encoded strings in code blocks, decodes
 // them, checks Shannon entropy, and scans decoded content for dangerous
 // patterns.
 func scanBase64Blobs(blocks []codeBlock) []Finding {
-	var findings []Finding
+	var violations []Finding
 	for _, block := range blocks {
 		truncated := truncateForRegex(block.Content)
 		matches := base64Re.FindAllStringIndex(truncated, -1)
@@ -168,7 +168,7 @@ func scanBase64Blobs(blocks []codeBlock) []Finding {
 			dangerousFound := false
 			for _, pat := range Patterns {
 				if pat.Regex.MatchString(truncateForRegex(decodedStr)) {
-					findings = append(findings, Finding{
+					violations = append(violations, Finding{
 						Severity: SeverityCritical,
 						Category: pat.Category,
 						Message:  fmt.Sprintf("base64-decoded content matches pattern %q (entropy: %.2f)", pat.Name, entropy),
@@ -181,7 +181,7 @@ func scanBase64Blobs(blocks []codeBlock) []Finding {
 			}
 
 			if !dangerousFound {
-				findings = append(findings, Finding{
+				violations = append(violations, Finding{
 					Severity: SeverityMedium,
 					Category: "obfuscation",
 					Message:  fmt.Sprintf("high-entropy base64 blob (entropy: %.2f, length: %d)", entropy, len(decoded)),
@@ -191,16 +191,16 @@ func scanBase64Blobs(blocks []codeBlock) []Finding {
 			}
 		}
 	}
-	return findings
+	return violations
 }
 
-// checkContracts returns true if contracts.yaml or contracts.yml exists
+// checkContracts returns true if rules.yaml or rules.yml exists
 // in the given directory.
 func checkContracts(dir string) bool {
-	if _, err := os.Stat(filepath.Join(dir, "contracts.yaml")); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, "rules.yaml")); err == nil {
 		return true
 	}
-	if _, err := os.Stat(filepath.Join(dir, "contracts.yml")); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, "rules.yml")); err == nil {
 		return true
 	}
 	return false

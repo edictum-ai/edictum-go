@@ -20,8 +20,8 @@ func newReplayCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "replay <bundle>",
-		Short: "Replay audit events against contracts",
-		Long:  "Re-evaluate historical audit log entries against a contract bundle to detect verdict changes.",
+		Short: "Replay audit events against rules",
+		Long:  "Re-evaluate historical audit log entries against a rule bundle to detect decision changes.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if auditLog == "" {
@@ -104,15 +104,15 @@ func runReplay(cmd *cobra.Command, bundlePath, auditLogPath, outputPath string, 
 		result := g.Evaluate(ctx, event.ToolName, event.ToolArgs, evalOpts...)
 
 		oldVerdict := actionToVerdict(event.Action)
-		changed := result.Verdict != oldVerdict
+		changed := result.Decision != oldVerdict
 
 		if changed {
 			change := replayChange{
 				ToolName:   event.ToolName,
 				WasVerdict: strings.ToUpper(oldVerdict),
-				NowVerdict: strings.ToUpper(result.Verdict),
+				NowVerdict: strings.ToUpper(result.Decision),
 			}
-			if result.Verdict == "deny" && len(result.DenyReasons) > 0 {
+			if result.Decision == "block" && len(result.DenyReasons) > 0 {
 				change.DenyContract = extractContractID(result)
 			}
 			changes = append(changes, change)
@@ -123,7 +123,7 @@ func runReplay(cmd *cobra.Command, bundlePath, auditLogPath, outputPath string, 
 				ToolName:    event.ToolName,
 				ToolArgs:    event.ToolArgs,
 				OldAction:   event.Action,
-				NewVerdict:  result.Verdict,
+				NewVerdict:  result.Decision,
 				Changed:     changed,
 				DenyReasons: result.DenyReasons,
 			})
@@ -172,7 +172,7 @@ func actionToVerdict(action string) string {
 	case "call_allowed":
 		return "allow"
 	case "call_denied":
-		return "deny"
+		return "block"
 	default:
 		return action
 	}

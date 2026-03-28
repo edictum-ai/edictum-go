@@ -5,18 +5,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
-// makeEnv creates a test ToolEnvelope with common defaults.
-func makeEnv(t *testing.T, opts envelope.CreateEnvelopeOptions) envelope.ToolEnvelope {
+// makeEnv creates a test ToolCall with common defaults.
+func makeEnv(t *testing.T, opts toolcall.CreateToolCallOptions) toolcall.ToolCall {
 	t.Helper()
 	if opts.ToolName == "" {
 		opts.ToolName = "TestTool"
 	}
-	env, err := envelope.CreateEnvelope(context.Background(), opts)
+	env, err := toolcall.CreateToolCall(context.Background(), opts)
 	if err != nil {
-		t.Fatalf("CreateEnvelope: %v", err)
+		t.Fatalf("CreateToolCall: %v", err)
 	}
 	return env
 }
@@ -29,7 +29,7 @@ func leaf(selector, op string, value any) map[string]any {
 // --- 3.8-3.19: All 15 operators + exists ---
 
 func TestOperatorEquals(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{ToolName: "Bash"})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{ToolName: "Bash"})
 	r := EvaluateExpression(leaf("tool.name", "equals", "Bash"), env, "")
 	if !r.Matched {
 		t.Fatal("expected match")
@@ -41,7 +41,7 @@ func TestOperatorEquals(t *testing.T) {
 }
 
 func TestOperatorNotEquals(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{ToolName: "Bash"})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{ToolName: "Bash"})
 	r := EvaluateExpression(leaf("tool.name", "not_equals", "Other"), env, "")
 	if !r.Matched {
 		t.Fatal("expected match")
@@ -53,7 +53,7 @@ func TestOperatorNotEquals(t *testing.T) {
 }
 
 func TestOperatorIn(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{ToolName: "Bash"})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{ToolName: "Bash"})
 	r := EvaluateExpression(leaf("tool.name", "in", []any{"Bash", "Read"}), env, "")
 	if !r.Matched {
 		t.Fatal("expected match")
@@ -65,7 +65,7 @@ func TestOperatorIn(t *testing.T) {
 }
 
 func TestOperatorNotIn(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{ToolName: "Bash"})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{ToolName: "Bash"})
 	r := EvaluateExpression(leaf("tool.name", "not_in", []any{"Write", "Edit"}), env, "")
 	if !r.Matched {
 		t.Fatal("expected match")
@@ -77,7 +77,7 @@ func TestOperatorNotIn(t *testing.T) {
 }
 
 func TestOperatorContains(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"cmd": "rm -rf /tmp"},
 	})
 	r := EvaluateExpression(leaf("args.cmd", "contains", "rm -rf"), env, "")
@@ -91,7 +91,7 @@ func TestOperatorContains(t *testing.T) {
 }
 
 func TestOperatorContainsAny(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"cmd": "rm -rf /tmp"},
 	})
 	r := EvaluateExpression(leaf("args.cmd", "contains_any", []any{"mkdir", "rm -rf"}), env, "")
@@ -105,7 +105,7 @@ func TestOperatorContainsAny(t *testing.T) {
 }
 
 func TestOperatorStartsWith(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"path": "/etc/passwd"},
 	})
 	r := EvaluateExpression(leaf("args.path", "starts_with", "/etc"), env, "")
@@ -119,7 +119,7 @@ func TestOperatorStartsWith(t *testing.T) {
 }
 
 func TestOperatorEndsWith(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"file": "config.yaml"},
 	})
 	r := EvaluateExpression(leaf("args.file", "ends_with", ".yaml"), env, "")
@@ -133,7 +133,7 @@ func TestOperatorEndsWith(t *testing.T) {
 }
 
 func TestOperatorMatches(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"cmd": "curl https://example.com"},
 	})
 	r := EvaluateExpression(leaf("args.cmd", "matches", `https?://`), env, "")
@@ -147,7 +147,7 @@ func TestOperatorMatches(t *testing.T) {
 }
 
 func TestOperatorMatchesAny(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"cmd": "curl https://example.com"},
 	})
 	r := EvaluateExpression(leaf("args.cmd", "matches_any", []any{`^ftp://`, `https?://`}), env, "")
@@ -161,7 +161,7 @@ func TestOperatorMatchesAny(t *testing.T) {
 }
 
 func TestOperatorGt(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"count": 10},
 	})
 	r := EvaluateExpression(leaf("args.count", "gt", 5), env, "")
@@ -175,7 +175,7 @@ func TestOperatorGt(t *testing.T) {
 }
 
 func TestOperatorGte(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"count": 10},
 	})
 	r := EvaluateExpression(leaf("args.count", "gte", 10), env, "")
@@ -189,7 +189,7 @@ func TestOperatorGte(t *testing.T) {
 }
 
 func TestOperatorLt(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"count": 5},
 	})
 	r := EvaluateExpression(leaf("args.count", "lt", 10), env, "")
@@ -203,7 +203,7 @@ func TestOperatorLt(t *testing.T) {
 }
 
 func TestOperatorLte(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"count": 5},
 	})
 	r := EvaluateExpression(leaf("args.count", "lte", 5), env, "")
@@ -217,7 +217,7 @@ func TestOperatorLte(t *testing.T) {
 }
 
 func TestOperatorExists(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"key": "value"},
 	})
 	// Field present, exists: true -> match.
@@ -249,7 +249,7 @@ func TestRegexInputCap10k(t *testing.T) {
 	long := strings.Repeat("a", MaxRegexInput+500)
 	// Place a match marker beyond the cap boundary.
 	long += "MARKER"
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"text": long},
 	})
 	// Should NOT match because MARKER is past the 10k cap.
@@ -267,7 +267,7 @@ func TestRegexInputCap10k(t *testing.T) {
 // --- 3.21-3.23: Boolean AST ---
 
 func TestBooleanAll(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		ToolName: "Bash",
 		Args:     map[string]any{"cmd": "rm -rf /"},
 	})
@@ -295,7 +295,7 @@ func TestBooleanAll(t *testing.T) {
 }
 
 func TestBooleanAny(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{ToolName: "Bash"})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{ToolName: "Bash"})
 	expr := map[string]any{
 		"any": []any{
 			leaf("tool.name", "equals", "Read"),
@@ -320,7 +320,7 @@ func TestBooleanAny(t *testing.T) {
 }
 
 func TestBooleanNot(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{ToolName: "Bash"})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{ToolName: "Bash"})
 	expr := map[string]any{
 		"not": leaf("tool.name", "equals", "Read"),
 	}
@@ -340,7 +340,7 @@ func TestBooleanNot(t *testing.T) {
 // --- 3.24: Missing fields -> false ---
 
 func TestMissingFieldsFalse(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{})
 	// args.nonexistent with equals -> false (not PolicyError).
 	r := EvaluateExpression(leaf("args.nonexistent", "equals", "x"), env, "")
 	if r.Matched {
@@ -358,7 +358,7 @@ func TestEvalLeaf_MultiKeyReturnsError(t *testing.T) {
 		"args.name":  map[string]any{"equals": "test"},
 		"args.other": map[string]any{"equals": "bad"},
 	}
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		ToolName: "Test",
 		Args:     map[string]any{"name": "test", "other": "bad"},
 	})
@@ -371,7 +371,7 @@ func TestEvalLeaf_MultiKeyReturnsError(t *testing.T) {
 // --- 3.25: Type mismatch -> PolicyError ---
 
 func TestTypeMismatchPolicyError(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"count": 42},
 	})
 	// contains on an int -> PolicyError.

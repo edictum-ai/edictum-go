@@ -8,7 +8,7 @@ import (
 
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/telemetry"
@@ -18,9 +18,9 @@ import (
 // governance checks, audit emission, and callbacks.
 func (g *Guard) executeAndPost(
 	ctx context.Context,
-	env2 envelope.ToolEnvelope,
+	env2 toolcall.ToolCall,
 	sess *session.Session,
-	pipe *pipeline.GovernancePipeline,
+	pipe *pipeline.CheckPipeline,
 	mode, policyVersion string,
 	toolCallable func(map[string]any) (any, error),
 	args map[string]any,

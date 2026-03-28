@@ -9,7 +9,7 @@ import (
 
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/telemetry"
@@ -21,7 +21,7 @@ type RunOption func(*runConfig)
 type runConfig struct {
 	sessionID   string
 	environment string
-	principal   *envelope.Principal
+	principal   *toolcall.Principal
 }
 
 // WithSessionID overrides the guard's session ID for this call.
@@ -35,7 +35,7 @@ func WithRunEnvironment(env string) RunOption {
 }
 
 // WithRunPrincipal overrides the principal for this call.
-func WithRunPrincipal(p *envelope.Principal) RunOption {
+func WithRunPrincipal(p *toolcall.Principal) RunOption {
 	return func(c *runConfig) { c.principal = p }
 }
 
@@ -76,7 +76,7 @@ func (g *Guard) Run(
 		g.mu.RUnlock()
 	}
 
-	env2, err := envelope.CreateEnvelope(ctx, envelope.CreateEnvelopeOptions{
+	env2, err := toolcall.CreateToolCall(ctx, toolcall.CreateToolCallOptions{
 		ToolName:    toolName,
 		Args:        args,
 		RunID:       cfg.sessionID,
@@ -140,15 +140,15 @@ func (g *Guard) Run(
 // handlePreDecision routes the pre-execution decision.
 func (g *Guard) handlePreDecision(
 	ctx context.Context,
-	env2 envelope.ToolEnvelope,
+	env2 toolcall.ToolCall,
 	sess *session.Session,
-	pipe *pipeline.GovernancePipeline,
+	pipe *pipeline.CheckPipeline,
 	pre pipeline.PreDecision,
 	mode, policyVersion string,
 	toolCallable func(map[string]any) (any, error),
 	args map[string]any,
 ) (any, error) {
-	realDeny := pre.Action == "deny" && !pre.Observed
+	realDeny := pre.Action == "block" && !pre.Observed
 
 	if realDeny {
 		action := audit.ActionCallDenied
@@ -158,20 +158,20 @@ func (g *Guard) handlePreDecision(
 		g.emitPreAudit(ctx, env2, sess, action, pre, mode, policyVersion)
 
 		if mode == "enforce" {
-			telemetry.SetSpanError(trace.SpanFromContext(ctx), "contract denied: "+pre.DecisionName)
+			telemetry.SetSpanError(trace.SpanFromContext(ctx), "rule denied: "+pre.DecisionName)
 			g.telemetry.RecordDenial(ctx, env2.ToolName())
 			g.fireOnDeny(env2, pre.Reason, pre.DecisionName)
-			return nil, &edictum.DeniedError{
+			return nil, &edictum.BlockedError{
 				Reason:         pre.Reason,
 				DecisionSource: pre.DecisionSource,
 				DecisionName:   pre.DecisionName,
 			}
 		}
-		// observe mode: record denial (contract fired) then fall through
+		// observe mode: record denial (rule fired) then fall through
 		g.telemetry.RecordDenial(ctx, env2.ToolName())
 		trace.SpanFromContext(ctx).SetAttributes(attribute.Bool("governance.observed_deny", true))
 	} else {
-		// Emit CALL_WOULD_DENY for per-contract observed denials
+		// Emit CALL_WOULD_DENY for per-rule observed denials
 		g.emitObservedDenials(ctx, env2, pre, policyVersion)
 		g.emitPreAudit(ctx, env2, sess, audit.ActionCallAllowed, pre, mode, policyVersion)
 		g.telemetry.RecordAllowed(ctx, env2.ToolName())

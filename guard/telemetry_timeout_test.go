@@ -8,12 +8,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/edictum-ai/edictum-go/approval"
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
-// TestApprovalTimeout_SetsSpanAttrAndAllowedCounter verifies timeout_effect=allow path.
+// TestApprovalTimeout_SetsSpanAttrAndAllowedCounter verifies timeout_action=allow path.
 func TestApprovalTimeout_SetsSpanAttrAndAllowedCounter(t *testing.T) {
 	tp := newTTP()
 	mp := newTMP()
@@ -23,12 +23,12 @@ func TestApprovalTimeout_SetsSpanAttrAndAllowedCounter(t *testing.T) {
 	)
 	g := New(
 		WithTelemetry(tel),
-		WithContracts(
-			contract.Precondition{
-				Name: "timeout-approval", Tool: "*", Effect: "approve",
+		WithRules(
+			rule.Precondition{
+				Name: "timeout-approval", Tool: "*", Effect: "ask",
 				Timeout: 1, TimeoutEffect: "allow",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("needs approval"), nil
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("needs approval"), nil
 				},
 			},
 		),
@@ -41,7 +41,7 @@ func TestApprovalTimeout_SetsSpanAttrAndAllowedCounter(t *testing.T) {
 	_, err := g.Run(ctx, "Bash", map[string]any{"command": "ls"},
 		func(_ map[string]any) (any, error) { return "ok", nil })
 	if err != nil {
-		t.Fatalf("timeout_effect=allow should succeed: %v", err)
+		t.Fatalf("timeout_action=allow should succeed: %v", err)
 	}
 
 	tp.tracer.mu.Lock()
@@ -76,19 +76,19 @@ func TestApprovalTimeout_SetsSpanAttrAndAllowedCounter(t *testing.T) {
 	}
 }
 
-// TestApprovalTimeoutDeny_NoTimeoutAttr verifies that timeout_effect=deny
+// TestApprovalTimeoutDeny_NoTimeoutAttr verifies that timeout_action=deny
 // sets span error status rather than the approval_timeout attribute.
 func TestApprovalTimeoutDeny_NoTimeoutAttr(t *testing.T) {
 	tp := newTTP()
 	tel := telemetry.New(telemetry.WithTracerProvider(tp))
 	g := New(
 		WithTelemetry(tel),
-		WithContracts(
-			contract.Precondition{
-				Name: "timeout-deny", Tool: "*", Effect: "approve",
+		WithRules(
+			rule.Precondition{
+				Name: "timeout-deny", Tool: "*", Effect: "ask",
 				Timeout: 1,
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("needs approval"), nil
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("needs approval"), nil
 				},
 			},
 		),

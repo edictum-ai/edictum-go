@@ -4,13 +4,13 @@ package skill
 type RiskTier string
 
 const (
-	// RiskCritical indicates one or more critical findings.
+	// RiskCritical indicates one or more critical violations.
 	RiskCritical RiskTier = "CRITICAL"
-	// RiskHigh indicates one or more high-severity findings.
+	// RiskHigh indicates one or more high-severity violations.
 	RiskHigh RiskTier = "HIGH"
-	// RiskMedium indicates one or more medium-severity findings.
+	// RiskMedium indicates one or more medium-severity violations.
 	RiskMedium RiskTier = "MEDIUM"
-	// RiskClean indicates no security findings.
+	// RiskClean indicates no security violations.
 	RiskClean RiskTier = "CLEAN"
 )
 
@@ -29,18 +29,18 @@ type ScanResult struct {
 	SkillPath    string
 	RiskTier     RiskTier
 	Findings     []Finding
-	HasContracts bool // Whether contracts.yaml exists in the skill dir
+	HasContracts bool // Whether rules.yaml exists in the skill dir
 }
 
-// ClassifyRisk returns the highest severity tier from the given findings.
-// Returns RiskClean if findings is empty.
-func ClassifyRisk(findings []Finding) RiskTier {
-	if len(findings) == 0 {
+// ClassifyRisk returns the highest severity tier from the given violations.
+// Returns RiskClean if violations is empty.
+func ClassifyRisk(violations []Finding) RiskTier {
+	if len(violations) == 0 {
 		return RiskClean
 	}
 
 	tier := RiskClean
-	for _, f := range findings {
+	for _, f := range violations {
 		switch f.Severity {
 		case SeverityCritical:
 			return RiskCritical // short-circuit
@@ -51,7 +51,7 @@ func ClassifyRisk(findings []Finding) RiskTier {
 				tier = RiskMedium
 			}
 		case SeverityLow, SeverityInfo:
-			// Low and info findings do not affect the risk tier.
+			// Low and info violations do not affect the risk tier.
 		}
 	}
 	return tier

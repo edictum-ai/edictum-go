@@ -1,4 +1,4 @@
-package contract
+package rule
 
 import (
 	"reflect"
@@ -74,7 +74,7 @@ func TestPreconditionFields(t *testing.T) {
 		Tool:   "Bash",
 		Mode:   "observe",
 		Source: "precondition",
-		Effect: "deny",
+		Effect: "block",
 	}
 	tests := []struct {
 		name string
@@ -85,7 +85,7 @@ func TestPreconditionFields(t *testing.T) {
 		{"Tool", p.Tool, "Bash"},
 		{"Mode", p.Mode, "observe"},
 		{"Source", p.Source, "precondition"},
-		{"Effect", p.Effect, "deny"},
+		{"Effect", p.Effect, "block"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -124,11 +124,11 @@ func TestPostconditionFields(t *testing.T) {
 	}
 }
 
-func TestSessionContractFields(t *testing.T) {
-	s := SessionContract{
+func TestSessionRuleFields(t *testing.T) {
+	s := SessionRule{
 		Name:   "rate-limit",
 		Mode:   "observe",
-		Source: "session_contract",
+		Source: "session_rule",
 	}
 	tests := []struct {
 		name string
@@ -137,7 +137,7 @@ func TestSessionContractFields(t *testing.T) {
 	}{
 		{"Name", s.Name, "rate-limit"},
 		{"Mode", s.Mode, "observe"},
-		{"Source", s.Source, "session_contract"},
+		{"Source", s.Source, "session_rule"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

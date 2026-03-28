@@ -4,17 +4,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func TestRegression_SchemaRejectsMalformedPostEffectLikePython(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 metadata:
   name: test-bundle
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: bad-post
     type: post
     tool: Bash
@@ -22,7 +22,7 @@ contracts:
       "output.text":
         contains: "secret"
     then:
-      effect: approve
+      action: ask
       message: "bad"
 `
 	_, _, err := LoadBundleString(y)
@@ -37,10 +37,10 @@ contracts:
 func TestRegression_ExplicitObserveSessionLimitMergesButInternalObserveShadowDoesNot(t *testing.T) {
 	bundle := map[string]any{
 		"apiVersion": "edictum/v1",
-		"kind":       "ContractBundle",
+		"kind":       "Ruleset",
 		"metadata":   map[string]any{"name": "test-bundle"},
 		"defaults":   map[string]any{"mode": "observe"},
-		"contracts": []any{
+		"rules": []any{
 			map[string]any{
 				"id":   "observe-limit",
 				"type": "session",
@@ -49,7 +49,7 @@ func TestRegression_ExplicitObserveSessionLimitMergesButInternalObserveShadowDoe
 					"max_tool_calls": 5,
 				},
 				"then": map[string]any{
-					"effect":  "deny",
+					"action":  "block",
 					"message": "observe",
 				},
 			},
@@ -62,7 +62,7 @@ func TestRegression_ExplicitObserveSessionLimitMergesButInternalObserveShadowDoe
 					"max_tool_calls": 3,
 				},
 				"then": map[string]any{
-					"effect":  "deny",
+					"action":  "block",
 					"message": "shadow",
 				},
 			},
@@ -74,7 +74,7 @@ func TestRegression_ExplicitObserveSessionLimitMergesButInternalObserveShadowDoe
 					"max_attempts": 7,
 				},
 				"then": map[string]any{
-					"effect":  "deny",
+					"action":  "block",
 					"message": "enforce",
 				},
 			},
@@ -116,6 +116,6 @@ func TestRegression_OutputTextEmptyStringIsPresent(t *testing.T) {
 	}
 }
 
-func envelopeOpts(tool string, args map[string]any) envelope.CreateEnvelopeOptions {
-	return envelope.CreateEnvelopeOptions{ToolName: tool, Args: args}
+func envelopeOpts(tool string, args map[string]any) toolcall.CreateToolCallOptions {
+	return toolcall.CreateToolCallOptions{ToolName: tool, Args: args}
 }

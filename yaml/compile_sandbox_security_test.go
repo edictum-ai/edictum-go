@@ -9,7 +9,7 @@ import (
 // --- Security bypass tests (TestSecurity prefix for CI filtering) ---
 
 // TestSecurityYAMLSandboxPathTraversal verifies that path traversal
-// attempts through YAML-compiled sandbox contracts are denied.
+// attempts through YAML-compiled sandbox rules are denied.
 func TestSecurityYAMLSandboxPathTraversal(t *testing.T) {
 	dir := t.TempDir()
 	resolved, _ := filepath.EvalSymlinks(dir)
@@ -41,7 +41,7 @@ func TestSecurityYAMLSandboxPathTraversal(t *testing.T) {
 }
 
 // TestSecurityYAMLSandboxCommandInjection verifies that command injection
-// patterns through YAML-compiled sandbox contracts are denied.
+// patterns through YAML-compiled sandbox rules are denied.
 func TestSecurityYAMLSandboxCommandInjection(t *testing.T) {
 	raw := map[string]any{
 		"id":   "cmd-sandbox",
@@ -102,7 +102,7 @@ func TestSecurityYAMLSandboxRedirectDeniedByPathConstraint(t *testing.T) {
 }
 
 // TestSecurityYAMLSandboxDomainBypass verifies that domain bypass
-// attempts through YAML-compiled sandbox contracts are denied.
+// attempts through YAML-compiled sandbox rules are denied.
 func TestSecurityYAMLSandboxDomainBypass(t *testing.T) {
 	raw := map[string]any{
 		"id":   "domain-sandbox",

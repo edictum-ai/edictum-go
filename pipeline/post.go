@@ -5,60 +5,60 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // PostExecute runs all post-execution governance checks.
-func (p *GovernancePipeline) PostExecute(
+func (p *CheckPipeline) PostExecute(
 	ctx context.Context,
-	env envelope.ToolEnvelope,
+	env toolcall.ToolCall,
 	toolResponse any,
 	toolSuccess bool,
 ) (PostDecision, error) {
 	var warnings []string
-	contracts := make([]map[string]any, 0)
+	rules := make([]map[string]any, 0)
 	var redactedResponse any
 	outputSuppressed := false
 
 	// 1. Postconditions
 	for _, c := range p.provider.GetPostconditions(env) {
-		// When predicate: skip this contract if When returns false
+		// When predicate: skip this rule if When returns false
 		if c.When != nil && !c.When(ctx, env) {
 			continue
 		}
-		verdict, err := c.Check(ctx, env, toolResponse)
+		decision, err := c.Check(ctx, env, toolResponse)
 		if err != nil {
-			log.Printf("Postcondition %s raised: %v", contractName(c.Name), err)
-			verdict = contract.Fail(
+			log.Printf("Postcondition %s raised: %v", ruleName(c.Name), err)
+			decision = rule.Fail(
 				fmt.Sprintf("Postcondition error: %s", err),
 				map[string]any{"policy_error": true},
 			)
 		}
 
 		record := map[string]any{
-			"name":    contractName(c.Name),
+			"name":    ruleName(c.Name),
 			"type":    "postcondition",
-			"passed":  verdict.Passed(),
-			"message": verdict.Message(),
+			"passed":  decision.Passed(),
+			"message": decision.Message(),
 		}
-		if verdict.Metadata() != nil {
-			record["metadata"] = verdict.Metadata()
+		if decision.Metadata() != nil {
+			record["metadata"] = decision.Metadata()
 		}
-		contracts = append(contracts, record)
+		rules = append(rules, record)
 
-		if !verdict.Passed() {
+		if !decision.Passed() {
 			effect := c.Effect
 			if effect == "" {
 				effect = "warn"
 			}
-			isSafe := env.SideEffect() == envelope.SideEffectPure ||
-				env.SideEffect() == envelope.SideEffectRead
+			isSafe := env.SideEffect() == toolcall.SideEffectPure ||
+				env.SideEffect() == toolcall.SideEffectRead
 
 			switch {
 			case c.Mode == "observe":
 				warnings = append(warnings,
-					fmt.Sprintf("\u26a0\ufe0f [observe] %s", verdict.Message()))
+					fmt.Sprintf("\u26a0\ufe0f [observe] %s", decision.Message()))
 			case effect == "redact" && isSafe:
 				source := redactedResponse
 				if source == nil {
@@ -74,23 +74,23 @@ func (p *GovernancePipeline) PostExecute(
 				}
 				redactedResponse = text
 				warnings = append(warnings,
-					fmt.Sprintf("\u26a0\ufe0f Content redacted by %s.", contractName(c.Name)))
-			case effect == "deny" && isSafe:
-				redactedResponse = fmt.Sprintf("[OUTPUT SUPPRESSED] %s", verdict.Message())
+					fmt.Sprintf("\u26a0\ufe0f Content redacted by %s.", ruleName(c.Name)))
+			case effect == "block" && isSafe:
+				redactedResponse = fmt.Sprintf("[OUTPUT SUPPRESSED] %s", decision.Message())
 				outputSuppressed = true
 				warnings = append(warnings,
-					fmt.Sprintf("\u26a0\ufe0f Output suppressed by %s.", contractName(c.Name)))
-			case (effect == "redact" || effect == "deny") && !isSafe:
+					fmt.Sprintf("\u26a0\ufe0f Output suppressed by %s.", ruleName(c.Name)))
+			case (effect == "redact" || effect == "block") && !isSafe:
 				log.Printf("Postcondition %s declares effect=%s but tool %s has side_effect=%s; falling back to warn.",
-					contractName(c.Name), effect, env.ToolName(), env.SideEffect())
+					ruleName(c.Name), effect, env.ToolName(), env.SideEffect())
 				warnings = append(warnings,
-					fmt.Sprintf("\u26a0\ufe0f %s Tool already executed \u2014 assess before proceeding.", verdict.Message()))
+					fmt.Sprintf("\u26a0\ufe0f %s Tool already executed \u2014 assess before proceeding.", decision.Message()))
 			case isSafe:
 				warnings = append(warnings,
-					fmt.Sprintf("\u26a0\ufe0f %s Consider retrying.", verdict.Message()))
+					fmt.Sprintf("\u26a0\ufe0f %s Consider retrying.", decision.Message()))
 			default:
 				warnings = append(warnings,
-					fmt.Sprintf("\u26a0\ufe0f %s Tool already executed \u2014 assess before proceeding.", verdict.Message()))
+					fmt.Sprintf("\u26a0\ufe0f %s Tool already executed \u2014 assess before proceeding.", decision.Message()))
 			}
 		}
 	}
@@ -112,31 +112,31 @@ func (p *GovernancePipeline) PostExecute(
 		if c.When != nil && !c.When(ctx, env) {
 			continue
 		}
-		verdict, err := c.Check(ctx, env, toolResponse)
+		decision, err := c.Check(ctx, env, toolResponse)
 		if err != nil {
 			log.Printf("Observe-mode postcondition %s raised: %v",
-				contractName(c.Name), err)
-			verdict = contract.Fail(
+				ruleName(c.Name), err)
+			decision = rule.Fail(
 				fmt.Sprintf("Observe-mode postcondition error: %s", err),
 				map[string]any{"policy_error": true},
 			)
 		}
 		record := map[string]any{
-			"name":     contractName(c.Name),
+			"name":     ruleName(c.Name),
 			"type":     "postcondition",
-			"passed":   verdict.Passed(),
-			"message":  verdict.Message(),
+			"passed":   decision.Passed(),
+			"message":  decision.Message(),
 			"observed": true,
 		}
-		contracts = append(contracts, record)
-		if !verdict.Passed() {
+		rules = append(rules, record)
+		if !decision.Passed() {
 			warnings = append(warnings,
-				fmt.Sprintf("\u26a0\ufe0f [observe] %s", verdict.Message()))
+				fmt.Sprintf("\u26a0\ufe0f [observe] %s", decision.Message()))
 		}
 	}
 
 	postconditionsPassed := true
-	for _, c := range contracts {
+	for _, c := range rules {
 		if passed, ok := c["passed"].(bool); ok && !passed {
 			postconditionsPassed = false
 			break
@@ -147,8 +147,8 @@ func (p *GovernancePipeline) PostExecute(
 		ToolSuccess:          toolSuccess,
 		PostconditionsPassed: postconditionsPassed,
 		Warnings:             warnings,
-		ContractsEvaluated:   contracts,
-		PolicyError:          hasPolicyError(contracts),
+		ContractsEvaluated:   rules,
+		PolicyError:          hasPolicyError(rules),
 		RedactedResponse:     redactedResponse,
 		OutputSuppressed:     outputSuppressed,
 	}, nil

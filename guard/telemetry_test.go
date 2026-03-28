@@ -6,8 +6,8 @@ import (
 
 	"go.opentelemetry.io/otel/codes"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
@@ -40,13 +40,13 @@ func TestWithTracerProvider_DirectOption(t *testing.T) {
 func TestWithTelemetry_SpanErrorOnDeny(t *testing.T) {
 	tp := newTTP()
 	tel := telemetry.New(telemetry.WithTracerProvider(tp))
-	deny := contract.Precondition{
+	deny := rule.Precondition{
 		Name: "block-all",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("denied"), nil
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("denied"), nil
 		},
 	}
-	g := New(WithTelemetry(tel), WithContracts(deny))
+	g := New(WithTelemetry(tel), WithRules(deny))
 
 	_, err := g.Run(context.Background(), "Bash",
 		map[string]any{"command": "rm"}, nopCallable)

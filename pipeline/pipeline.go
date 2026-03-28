@@ -5,32 +5,32 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/session"
 )
 
-// GovernancePipeline orchestrates all governance checks.
+// CheckPipeline orchestrates all governance checks.
 // This is the single source of truth for governance logic.
 // Adapters call PreExecute() and PostExecute(), then translate
 // the structured results into framework-specific formats.
-type GovernancePipeline struct {
-	provider ContractProvider
+type CheckPipeline struct {
+	provider RuleProvider
 }
 
-// New creates a GovernancePipeline backed by the given ContractProvider.
-func New(provider ContractProvider) *GovernancePipeline {
-	return &GovernancePipeline{provider: provider}
+// New creates a CheckPipeline backed by the given RuleProvider.
+func New(provider RuleProvider) *CheckPipeline {
+	return &CheckPipeline{provider: provider}
 }
 
 // PreExecute runs all pre-execution governance checks.
-func (p *GovernancePipeline) PreExecute(
+func (p *CheckPipeline) PreExecute(
 	ctx context.Context,
-	env envelope.ToolEnvelope,
+	env toolcall.ToolCall,
 	sess *session.Session,
 ) (PreDecision, error) {
 	hooks := make([]map[string]any, 0)
-	contracts := make([]map[string]any, 0)
+	rules := make([]map[string]any, 0)
 	hasObservedDeny := false
 	limits := p.provider.GetLimits()
 
@@ -50,12 +50,12 @@ func (p *GovernancePipeline) PreExecute(
 	// This matches Python parity: increment_attempts() before pre_execute().
 	if counters["attempts"] >= limits.MaxAttempts {
 		return PreDecision{
-			Action:             "deny",
+			Action:             "block",
 			Reason:             fmt.Sprintf("Attempt limit reached (%d). Agent may be stuck in a retry loop. Stop and reassess.", limits.MaxAttempts),
 			DecisionSource:     "attempt_limit",
 			DecisionName:       "max_attempts",
 			HooksEvaluated:     hooks,
-			ContractsEvaluated: contracts,
+			ContractsEvaluated: rules,
 		}, nil
 	}
 
@@ -79,12 +79,12 @@ func (p *GovernancePipeline) PreExecute(
 		hooks = append(hooks, hookRecord)
 		if decision.Result == HookResultDeny {
 			return PreDecision{
-				Action:             "deny",
+				Action:             "block",
 				Reason:             decision.Reason,
 				DecisionSource:     "hook",
 				DecisionName:       hook.HookName(),
 				HooksEvaluated:     hooks,
-				ContractsEvaluated: contracts,
+				ContractsEvaluated: rules,
 				PolicyError:        hookRaisedException,
 			}, nil
 		}
@@ -92,51 +92,51 @@ func (p *GovernancePipeline) PreExecute(
 
 	// 3. Preconditions
 	deny, done := p.evalPreconditions(ctx, env, p.provider.GetPreconditions(env),
-		"precondition", hooks, &contracts, &hasObservedDeny)
+		"precondition", hooks, &rules, &hasObservedDeny)
 	if done {
 		return deny, nil
 	}
 
-	// 3.5. Sandbox contracts
+	// 3.5. Sandbox rules
 	deny, done = p.evalPreconditions(ctx, env, p.provider.GetSandboxContracts(env),
-		"yaml_sandbox", hooks, &contracts, &hasObservedDeny)
+		"yaml_sandbox", hooks, &rules, &hasObservedDeny)
 	if done {
 		return deny, nil
 	}
 
-	// 4. Session contracts
-	for _, sc := range p.provider.GetSessionContracts() {
-		verdict, scErr := sc.Check(ctx, sess)
+	// 4. Session rules
+	for _, sc := range p.provider.GetSessionRules() {
+		decision, scErr := sc.Check(ctx, sess)
 		if scErr != nil {
-			log.Printf("Session contract %s raised: %v", contractName(sc.Name), scErr)
-			verdict = contract.Fail(
-				fmt.Sprintf("Session contract error: %s", scErr),
+			log.Printf("Session rule %s raised: %v", ruleName(sc.Name), scErr)
+			decision = rule.Fail(
+				fmt.Sprintf("Session rule error: %s", scErr),
 				map[string]any{"policy_error": true},
 			)
 		}
 		record := map[string]any{
-			"name":    contractName(sc.Name),
-			"type":    "session_contract",
-			"passed":  verdict.Passed(),
-			"message": verdict.Message(),
+			"name":    ruleName(sc.Name),
+			"type":    "session_rule",
+			"passed":  decision.Passed(),
+			"message": decision.Message(),
 		}
-		if verdict.Metadata() != nil {
-			record["metadata"] = verdict.Metadata()
+		if decision.Metadata() != nil {
+			record["metadata"] = decision.Metadata()
 		}
-		contracts = append(contracts, record)
-		if !verdict.Passed() {
+		rules = append(rules, record)
+		if !decision.Passed() {
 			source := sc.Source
 			if source == "" {
-				source = "session_contract"
+				source = "session_rule"
 			}
 			return PreDecision{
-				Action:             "deny",
-				Reason:             verdict.Message(),
+				Action:             "block",
+				Reason:             decision.Message(),
 				DecisionSource:     source,
-				DecisionName:       contractName(sc.Name),
+				DecisionName:       ruleName(sc.Name),
 				HooksEvaluated:     hooks,
-				ContractsEvaluated: contracts,
-				PolicyError:        hasPolicyError(contracts),
+				ContractsEvaluated: rules,
+				PolicyError:        hasPolicyError(rules),
 			}, nil
 		}
 	}
@@ -144,12 +144,12 @@ func (p *GovernancePipeline) PreExecute(
 	// 5. Execution limits
 	if counters["execs"] >= limits.MaxToolCalls {
 		return PreDecision{
-			Action:             "deny",
+			Action:             "block",
 			Reason:             fmt.Sprintf("Execution limit reached (%d calls). Summarize progress and stop.", limits.MaxToolCalls),
 			DecisionSource:     "operation_limit",
 			DecisionName:       "max_tool_calls",
 			HooksEvaluated:     hooks,
-			ContractsEvaluated: contracts,
+			ContractsEvaluated: rules,
 		}, nil
 	}
 
@@ -159,26 +159,26 @@ func (p *GovernancePipeline) PreExecute(
 		toolCount := counters[toolKey]
 		if toolCount >= toolLimit {
 			return PreDecision{
-				Action:             "deny",
+				Action:             "block",
 				Reason:             fmt.Sprintf("Per-tool limit: %s called %d times (limit: %d).", env.ToolName(), toolCount, toolLimit),
 				DecisionSource:     "operation_limit",
 				DecisionName:       "max_calls_per_tool:" + env.ToolName(),
 				HooksEvaluated:     hooks,
-				ContractsEvaluated: contracts,
+				ContractsEvaluated: rules,
 			}, nil
 		}
 	}
 
 	// 6. All checks passed
-	// 7. Evaluate observe-mode contracts
+	// 7. Evaluate observe-mode rules
 	observeResults := p.evaluateObserveContracts(ctx, env, sess)
 
 	return PreDecision{
 		Action:             "allow",
 		HooksEvaluated:     hooks,
-		ContractsEvaluated: contracts,
+		ContractsEvaluated: rules,
 		Observed:           hasObservedDeny,
-		PolicyError:        hasPolicyError(contracts),
+		PolicyError:        hasPolicyError(rules),
 		ObserveResults:     observeResults,
 	}, nil
 }

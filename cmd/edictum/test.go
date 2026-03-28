@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/guard"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -21,8 +21,8 @@ func newTestCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "test <bundle>",
-		Short: "Run contract test cases",
-		Long:  "Evaluate tool calls against a contract bundle using test cases or ad-hoc calls.",
+		Short: "Run rule test cases",
+		Long:  "Evaluate tool calls against a rule bundle using test cases or ad-hoc calls.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if casesPath != "" && callsPath != "" {
@@ -106,10 +106,10 @@ func runTestCases(cmd *cobra.Command, bundlePath, casesPath, env string, jsonOut
 	type caseResult struct {
 		ID       string `json:"id"`
 		Tool     string `json:"tool_name"`
-		Verdict  string `json:"verdict"`
+		Decision  string `json:"decision"`
 		Expected string `json:"expected"`
 		Passed   bool   `json:"passed"`
-		Contract string `json:"contract,omitempty"`
+		Rule string `json:"rule,omitempty"`
 		Message  string `json:"message,omitempty"`
 	}
 	var results []caseResult
@@ -124,22 +124,22 @@ func runTestCases(cmd *cobra.Command, bundlePath, casesPath, env string, jsonOut
 		evalOpts = append(evalOpts, guard.WithEvalEnvironment(caseEnv))
 
 		if tc.Principal != nil {
-			var popts []envelope.PrincipalOption
+			var popts []toolcall.PrincipalOption
 			if tc.Principal.Role != "" {
-				popts = append(popts, envelope.WithRole(tc.Principal.Role))
+				popts = append(popts, toolcall.WithRole(tc.Principal.Role))
 			}
 			if tc.Principal.UserID != "" {
-				popts = append(popts, envelope.WithUserID(tc.Principal.UserID))
+				popts = append(popts, toolcall.WithUserID(tc.Principal.UserID))
 			}
 			if tc.Principal.TicketRef != "" {
-				popts = append(popts, envelope.WithTicketRef(tc.Principal.TicketRef))
+				popts = append(popts, toolcall.WithTicketRef(tc.Principal.TicketRef))
 			}
-			p := envelope.NewPrincipal(popts...)
+			p := toolcall.NewPrincipal(popts...)
 			evalOpts = append(evalOpts, guard.WithEvalPrincipal(&p))
 		}
 
 		result := g.Evaluate(ctx, tc.Tool, tc.Args, evalOpts...)
-		ok := result.Verdict == tc.Expect
+		ok := result.Decision == tc.Expect
 
 		if tc.MatchContract != "" && ok {
 			ok = matchesDenyContract(result, tc.MatchContract)
@@ -149,10 +149,10 @@ func runTestCases(cmd *cobra.Command, bundlePath, casesPath, env string, jsonOut
 		cr := caseResult{
 			ID:       tc.ID,
 			Tool:     tc.Tool,
-			Verdict:  result.Verdict,
+			Decision:  result.Decision,
 			Expected: tc.Expect,
 			Passed:   ok,
-			Contract: denyContract,
+			Rule: denyContract,
 		}
 
 		if !ok {
@@ -175,12 +175,12 @@ func runTestCases(cmd *cobra.Command, bundlePath, casesPath, env string, jsonOut
 			mark = "-"
 		}
 		var line string
-		if cr.Contract != "" {
+		if cr.Rule != "" {
 			line = fmt.Sprintf("%s: %s → %s (%s) %s",
-				cr.ID, cr.Tool, strings.ToUpper(cr.Verdict), cr.Contract, mark)
+				cr.ID, cr.Tool, strings.ToUpper(cr.Decision), cr.Rule, mark)
 		} else {
 			line = fmt.Sprintf("%s: %s → %s %s",
-				cr.ID, cr.Tool, strings.ToUpper(cr.Verdict), mark)
+				cr.ID, cr.Tool, strings.ToUpper(cr.Decision), mark)
 		}
 		if !cr.Passed {
 			line += fmt.Sprintf(" (expected %s)", cr.Expected)
@@ -229,7 +229,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 	hasDenials := false
 
 	type callResult struct {
-		Verdict            string   `json:"verdict"`
+		Decision            string   `json:"decision"`
 		ToolName           string   `json:"tool_name"`
 		ContractsEvaluated int      `json:"contracts_evaluated"`
 		DenyReasons        []string `json:"deny_reasons"`
@@ -241,12 +241,12 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 		result := g.Evaluate(ctx, call.Tool, call.Args,
 			guard.WithEvalEnvironment(env))
 
-		if result.Verdict == "deny" {
+		if result.Decision == "block" {
 			hasDenials = true
 		}
 
 		results = append(results, callResult{
-			Verdict:            result.Verdict,
+			Decision:            result.Decision,
 			ToolName:           call.Tool,
 			ContractsEvaluated: result.ContractsEvaluated,
 			DenyReasons:        nonNilStrings(result.DenyReasons),
@@ -258,14 +258,14 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 		return writeJSONTo(w, results)
 	}
 
-	fmt.Fprintf(w, "%-3s %-12s %-8s %-10s %s\n", "#", "Tool", "Verdict", "Contracts", "Details")
+	fmt.Fprintf(w, "%-3s %-12s %-8s %-10s %s\n", "#", "Tool", "Decision", "Contracts", "Details")
 	for i, r := range results {
 		details := ""
 		if len(r.DenyReasons) > 0 {
 			details = strings.Join(r.DenyReasons, "; ")
 		}
 		fmt.Fprintf(w, "%-3d %-12s %-8s %-10d %s\n",
-			i+1, r.ToolName, strings.ToUpper(r.Verdict), r.ContractsEvaluated, details)
+			i+1, r.ToolName, strings.ToUpper(r.Decision), r.ContractsEvaluated, details)
 	}
 
 	if hasDenials {
@@ -274,9 +274,9 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 	return nil
 }
 
-func matchesDenyContract(result guard.EvaluationResult, contractID string) bool {
+func matchesDenyContract(result guard.EvaluationResult, ruleID string) bool {
 	for _, c := range result.Contracts {
-		if !c.Passed && c.ContractID == contractID {
+		if !c.Passed && c.ContractID == ruleID {
 			return true
 		}
 	}

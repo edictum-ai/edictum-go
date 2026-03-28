@@ -133,7 +133,7 @@ func (s *AuditSink) mapEvent(event *audit.Event) map[string]any {
 		"call_id":   event.CallID,
 		"agent_id":  s.client.agentID,
 		"tool_name": event.ToolName,
-		"verdict":   string(event.Action),
+		"decision":   string(event.Action),
 		"mode":      event.Mode,
 		"timestamp": event.Timestamp.Format(time.RFC3339Nano),
 		"payload": map[string]any{

@@ -24,7 +24,7 @@ func applyOperator(op string, fieldValue any, opValue any, selector string, ec *
 		return fail()
 	}
 
-	// All other operators: missing field -> false (contract does not fire).
+	// All other operators: missing field -> false (rule does not fire).
 	if fieldValue == missing || fieldValue == nil {
 		return fail()
 	}

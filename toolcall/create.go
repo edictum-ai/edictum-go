@@ -1,4 +1,4 @@
-package envelope
+package toolcall
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"github.com/edictum-ai/edictum-go/internal/deepcopy"
 )
 
-// CreateEnvelopeOptions configures envelope creation.
-type CreateEnvelopeOptions struct {
+// CreateToolCallOptions configures envelope creation.
+type CreateToolCallOptions struct {
 	ToolName    string
 	Args        map[string]any
 	CallID      string
@@ -23,10 +23,10 @@ type CreateEnvelopeOptions struct {
 	Registry    *ToolRegistry
 }
 
-// CreateEnvelope creates a new frozen ToolEnvelope.
-func CreateEnvelope(_ context.Context, opts CreateEnvelopeOptions) (ToolEnvelope, error) {
+// CreateToolCall creates a new frozen ToolCall.
+func CreateToolCall(_ context.Context, opts CreateToolCallOptions) (ToolCall, error) {
 	if err := ValidateToolName(opts.ToolName); err != nil {
-		return ToolEnvelope{}, err
+		return ToolCall{}, err
 	}
 
 	// Deep copy args and metadata for immutability
@@ -54,7 +54,7 @@ func CreateEnvelope(_ context.Context, opts CreateEnvelopeOptions) (ToolEnvelope
 		filePath = extractFilePath(args)
 	}
 
-	return ToolEnvelope{
+	return ToolCall{
 		toolName:    opts.ToolName,
 		args:        args,
 		callID:      opts.CallID,

@@ -8,10 +8,10 @@ import (
 	"testing"
 )
 
-// Minimal contract bundle for security tests. Denies rm -rf commands.
-const testContractBundle = `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+// Minimal rule bundle for security tests. Denies rm -rf commands.
+const testRuleset = `apiVersion: edictum/v1
+kind: Ruleset
+rules:
   - id: deny-rm-rf
     type: pre
     tool: Bash
@@ -22,13 +22,13 @@ contracts:
     message: "rm -rf is not allowed"
 `
 
-// writeTestBundle writes a minimal contract bundle to a temp directory
+// writeTestBundle writes a minimal rule bundle to a temp directory
 // and returns its path.
 func writeTestBundle(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "contracts.yaml")
-	if err := os.WriteFile(path, []byte(testContractBundle), 0o600); err != nil {
+	path := filepath.Join(dir, "rules.yaml")
+	if err := os.WriteFile(path, []byte(testRuleset), 0o600); err != nil {
 		t.Fatalf("writing test bundle: %v", err)
 	}
 	return path
@@ -42,8 +42,8 @@ func TestSecurityGateCheckEmptyStdin(t *testing.T) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stdout)
 
-	// Use raw format with explicit contracts path.
-	cmd.SetArgs([]string{"--format", "raw", "--contracts", bundlePath})
+	// Use raw format with explicit rules path.
+	cmd.SetArgs([]string{"--format", "raw", "--rules", bundlePath})
 	err := cmd.Execute()
 
 	// Must not panic. Must return an error (empty stdin is not valid JSON).
@@ -74,7 +74,7 @@ func TestSecurityGateCheckMalformedStdin(t *testing.T) {
 			var stdout bytes.Buffer
 			cmd.SetOut(&stdout)
 			cmd.SetErr(&stdout)
-			cmd.SetArgs([]string{"--format", "raw", "--contracts", bundlePath})
+			cmd.SetArgs([]string{"--format", "raw", "--rules", bundlePath})
 
 			// Must not panic.
 			_ = cmd.Execute()
@@ -91,7 +91,7 @@ func TestSecurityGateCheckUnknownFormat(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stdout)
-	cmd.SetArgs([]string{"--format", "nonexistent-format", "--contracts", bundlePath})
+	cmd.SetArgs([]string{"--format", "nonexistent-format", "--rules", bundlePath})
 
 	// Must not panic. Unknown format should be rejected with an error.
 	err := cmd.Execute()
@@ -121,14 +121,14 @@ func TestSecurityGateCheckToolNameWithControlChars(t *testing.T) {
 			var stdout bytes.Buffer
 			cmd.SetOut(&stdout)
 			cmd.SetErr(&stdout)
-			cmd.SetArgs([]string{"--format", "raw", "--contracts", bundlePath})
+			cmd.SetArgs([]string{"--format", "raw", "--rules", bundlePath})
 
 			// Must not panic, and must not allow.
 			err := cmd.Execute()
 			if err == nil {
-				// Check stdout — if verdict is "allow", that's a bypass.
+				// Check stdout — if decision is "allow", that's a bypass.
 				if strings.Contains(stdout.String(), `"allow"`) {
-					t.Fatal("empty/malformed tool_name must not produce allow verdict")
+					t.Fatal("empty/malformed tool_name must not produce allow decision")
 				}
 			}
 		})
