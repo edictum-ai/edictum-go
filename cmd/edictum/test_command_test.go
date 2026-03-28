@@ -20,7 +20,7 @@ rules:
         contains_any: [".env"]
     then:
       action: block
-      message: "Sensitive file denied."
+      message: "Sensitive file blocked."
 
   - id: require-ticket
     type: pre

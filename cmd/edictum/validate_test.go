@@ -25,7 +25,7 @@ rules:
         contains_any: [".env", ".secret"]
     then:
       action: block
-      message: "Sensitive file denied."
+      message: "Sensitive file blocked."
 
   - id: bash-safety
     type: pre
@@ -35,7 +35,7 @@ rules:
         matches: '\brm\s+-rf\b'
     then:
       action: block
-      message: "Destructive command denied."
+      message: "Destructive command blocked."
 
   - id: pii-check
     type: post
@@ -71,7 +71,7 @@ rules:
         contains_any: [".env", ".secret", ".pem"]
     then:
       action: block
-      message: "Sensitive file denied."
+      message: "Sensitive file blocked."
 
   - id: require-ticket
     type: pre

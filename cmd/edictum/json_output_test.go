@@ -25,7 +25,7 @@ rules:
         contains_any: [".env", ".secret"]
     then:
       action: block
-      message: "Sensitive file '{args.path}' denied."
+      message: "Sensitive file '{args.path}' blocked."
   - id: bash-safety
     type: pre
     tool: bash
@@ -34,7 +34,7 @@ rules:
         matches: "\\brm\\s+-rf\\b"
     then:
       action: block
-      message: "Destructive command denied."
+      message: "Destructive command blocked."
   - id: pii-check
     type: post
     tool: "*"
@@ -69,7 +69,7 @@ rules:
         contains_any: [".env", ".secret", ".pem"]
     then:
       action: block
-      message: "Sensitive file '{args.path}' denied."
+      message: "Sensitive file '{args.path}' blocked."
   - id: require-ticket
     type: pre
     tool: deploy_service
