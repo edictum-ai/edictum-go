@@ -39,7 +39,7 @@ func TestParity_1_23_PreDecisionShape(t *testing.T) {
 	_ = dec.DecisionSource
 	_ = dec.DecisionName
 	_ = dec.HooksEvaluated
-	_ = dec.ContractsEvaluated
+	_ = dec.RulesEvaluated
 	_ = dec.Observed
 	_ = dec.PolicyError
 	_ = dec.ObserveResults
@@ -50,8 +50,8 @@ func TestParity_1_23_PreDecisionShape(t *testing.T) {
 	if dec.HooksEvaluated == nil {
 		t.Fatal("HooksEvaluated should be non-nil slice")
 	}
-	if dec.ContractsEvaluated == nil {
-		t.Fatal("ContractsEvaluated should be non-nil slice")
+	if dec.RulesEvaluated == nil {
+		t.Fatal("RulesEvaluated should be non-nil slice")
 	}
 }
 

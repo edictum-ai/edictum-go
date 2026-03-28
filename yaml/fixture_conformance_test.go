@@ -80,15 +80,15 @@ func TestConformanceFixtures_Security_SandboxCommandAllowlist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
 	}
-	if len(compiled.SandboxContracts) != 1 {
-		t.Fatalf("SandboxContracts len = %d, want 1", len(compiled.SandboxContracts))
+	if len(compiled.SandboxRules) != 1 {
+		t.Fatalf("SandboxRules len = %d, want 1", len(compiled.SandboxRules))
 	}
 
 	passEnv := makeEnv(t, toolcall.CreateToolCallOptions{
 		ToolName: "Bash",
 		Args:     map[string]any{"command": "echo $HOME"},
 	})
-	decision, err := compiled.SandboxContracts[0].Check(t.Context(), passEnv)
+	decision, err := compiled.SandboxRules[0].Check(t.Context(), passEnv)
 	if err != nil {
 		t.Fatalf("Check(passEnv): %v", err)
 	}
@@ -100,7 +100,7 @@ func TestConformanceFixtures_Security_SandboxCommandAllowlist(t *testing.T) {
 		ToolName: "Bash",
 		Args:     map[string]any{"command": "echo $(rm -rf /)"},
 	})
-	decision, err = compiled.SandboxContracts[0].Check(t.Context(), denyEnv)
+	decision, err = compiled.SandboxRules[0].Check(t.Context(), denyEnv)
 	if err != nil {
 		t.Fatalf("Check(denyEnv): %v", err)
 	}
@@ -139,7 +139,7 @@ func TestConformanceFixtures_Security_SymlinkMissingLeaf(t *testing.T) {
 		ToolName: "ReadFile",
 		Args:     map[string]any{"file_path": filepath.Join(linkDir, "nested", "file.txt")},
 	})
-	decision, err := compiled.SandboxContracts[0].Check(t.Context(), env)
+	decision, err := compiled.SandboxRules[0].Check(t.Context(), env)
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}

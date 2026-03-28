@@ -113,13 +113,13 @@ func buildPrincipal(role, user, ticket string) toolcall.Principal {
 }
 
 type checkOutput struct {
-	Tool               string         `json:"tool"`
-	Args               map[string]any `json:"args"`
-	Decision           string         `json:"decision"`
-	Reason             string         `json:"reason,omitempty"`
-	ContractsEvaluated int            `json:"contracts_evaluated"`
-	Environment        string         `json:"environment"`
-	ContractID         string         `json:"contract_id,omitempty"`
+	Tool           string         `json:"tool"`
+	Args           map[string]any `json:"args"`
+	Decision       string         `json:"decision"`
+	Reason         string         `json:"reason,omitempty"`
+	RulesEvaluated int            `json:"rules_evaluated"`
+	Environment    string         `json:"environment"`
+	RuleID         string         `json:"rule_id,omitempty"`
 }
 
 func printCheckJSON(cmd *cobra.Command, ca checkArgs, r guard.EvaluationResult) error {
@@ -127,11 +127,11 @@ func printCheckJSON(cmd *cobra.Command, ca checkArgs, r guard.EvaluationResult) 
 	_ = json.Unmarshal([]byte(ca.argsJSON), &args)
 
 	out := checkOutput{
-		Tool:               ca.toolName,
-		Args:               args,
-		Decision:           r.Decision,
-		ContractsEvaluated: r.ContractsEvaluated,
-		Environment:        ca.environment,
+		Tool:           ca.toolName,
+		Args:           args,
+		Decision:       r.Decision,
+		RulesEvaluated: r.RulesEvaluated,
+		Environment:    ca.environment,
 	}
 
 	if r.Decision == "block" && len(r.DenyReasons) > 0 {
@@ -143,7 +143,7 @@ func printCheckJSON(cmd *cobra.Command, ca checkArgs, r guard.EvaluationResult) 
 	// Find the first failing rule ID.
 	for _, c := range r.Contracts {
 		if !c.Passed {
-			out.ContractID = c.ContractID
+			out.RuleID = c.RuleID
 			break
 		}
 	}
@@ -166,7 +166,7 @@ func printCheckText(cmd *cobra.Command, r guard.EvaluationResult) error { //noli
 	if r.Decision == "block" {
 		for _, c := range r.Contracts {
 			if !c.Passed {
-				fmt.Fprintf(w, "\u2717 DENIED by %s", c.ContractID)
+				fmt.Fprintf(w, "\u2717 BLOCKED by %s", c.RuleID)
 				if c.Message != "" {
 					fmt.Fprintf(w, " \u2014 %s", c.Message)
 				}
@@ -182,6 +182,6 @@ func printCheckText(cmd *cobra.Command, r guard.EvaluationResult) error { //noli
 		}
 	}
 
-	fmt.Fprintf(w, "\u2713 ALLOWED (%d rules evaluated)\n", r.ContractsEvaluated)
+	fmt.Fprintf(w, "\u2713 ALLOWED (%d rules evaluated)\n", r.RulesEvaluated)
 	return nil
 }

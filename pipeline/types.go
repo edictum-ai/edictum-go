@@ -7,7 +7,7 @@ type PreDecision struct {
 	DecisionSource     string
 	DecisionName       string
 	HooksEvaluated     []map[string]any
-	ContractsEvaluated []map[string]any
+	RulesEvaluated     []map[string]any
 	Observed           bool
 	PolicyError        bool
 	ObserveResults     []map[string]any
@@ -21,7 +21,7 @@ type PostDecision struct {
 	ToolSuccess          bool
 	PostconditionsPassed bool
 	Warnings             []string
-	ContractsEvaluated   []map[string]any
+	RulesEvaluated       []map[string]any
 	PolicyError          bool
 	RedactedResponse     any
 	OutputSuppressed     bool

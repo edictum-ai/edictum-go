@@ -166,7 +166,7 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 	ctx := context.Background()
 	result := g.Evaluate(ctx, toolName, toolArgs)
 
-	ruleID := extractContractID(result)
+	ruleID := extractRuleID(result)
 	reason := ""
 	if len(result.DenyReasons) > 0 {
 		reason = result.DenyReasons[0]

@@ -271,11 +271,11 @@ func TestPostExecute_ObservePostconditionsEvaluated(t *testing.T) {
 		t.Fatalf("PostExecute error: %v", err)
 	}
 
-	// Observe postcondition must appear in ContractsEvaluated
-	if len(dec.ContractsEvaluated) != 1 {
-		t.Fatalf("expected 1 rule evaluated, got %d", len(dec.ContractsEvaluated))
+	// Observe postcondition must appear in RulesEvaluated
+	if len(dec.RulesEvaluated) != 1 {
+		t.Fatalf("expected 1 rule evaluated, got %d", len(dec.RulesEvaluated))
 	}
-	rec := dec.ContractsEvaluated[0]
+	rec := dec.RulesEvaluated[0]
 	if rec["name"] != "observe_scan" {
 		t.Fatalf("expected name=observe_scan, got %v", rec["name"])
 	}
@@ -323,10 +323,10 @@ func TestPostExecute_ObservePostconditionPassDoesNotWarn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(dec.ContractsEvaluated) != 1 {
-		t.Fatalf("expected 1 rule, got %d", len(dec.ContractsEvaluated))
+	if len(dec.RulesEvaluated) != 1 {
+		t.Fatalf("expected 1 rule, got %d", len(dec.RulesEvaluated))
 	}
-	if dec.ContractsEvaluated[0]["observed"] != true {
+	if dec.RulesEvaluated[0]["observed"] != true {
 		t.Fatal("expected observed=true even for passing observe postcondition")
 	}
 	if len(dec.Warnings) != 0 {
@@ -348,7 +348,7 @@ func TestParity_1_24_PostDecisionShape(t *testing.T) {
 	_ = dec.ToolSuccess
 	_ = dec.PostconditionsPassed
 	_ = dec.Warnings
-	_ = dec.ContractsEvaluated
+	_ = dec.RulesEvaluated
 	_ = dec.PolicyError
 	_ = dec.RedactedResponse
 	_ = dec.OutputSuppressed

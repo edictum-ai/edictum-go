@@ -40,19 +40,19 @@ func (g *Guard) GetPostconditions(env toolcall.ToolCall) []rule.Postcondition {
 	return filterPostconditions(g.state.postconditions, env)
 }
 
-// GetSandboxContracts returns enforce-mode sandbox rules matching the tool.
-func (g *Guard) GetSandboxContracts(env toolcall.ToolCall) []rule.Precondition {
+// GetSandboxRules returns enforce-mode sandbox rules matching the tool.
+func (g *Guard) GetSandboxRules(env toolcall.ToolCall) []rule.Precondition {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return filterSandbox(g.state.sandboxContracts, env)
+	return filterSandbox(g.state.sandboxRules, env)
 }
 
 // GetSessionRules returns all enforce-mode session rules.
 func (g *Guard) GetSessionRules() []rule.SessionRule {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	result := make([]rule.SessionRule, len(g.state.sessionContracts))
-	copy(result, g.state.sessionContracts)
+	result := make([]rule.SessionRule, len(g.state.sessionRules))
+	copy(result, g.state.sessionRules)
 	return result
 }
 
@@ -70,11 +70,11 @@ func (g *Guard) GetObservePostconditions(env toolcall.ToolCall) []rule.Postcondi
 	return filterPostconditions(g.state.observePostconditions, env)
 }
 
-// GetObserveSandboxContracts returns observe-mode sandbox rules matching the tool.
-func (g *Guard) GetObserveSandboxContracts(env toolcall.ToolCall) []rule.Precondition {
+// GetObserveSandboxRules returns observe-mode sandbox rules matching the tool.
+func (g *Guard) GetObserveSandboxRules(env toolcall.ToolCall) []rule.Precondition {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return filterSandbox(g.state.observeSandboxContracts, env)
+	return filterSandbox(g.state.observeSandboxRules, env)
 }
 
 // GetObserveSessionRules returns all observe-mode session rules.

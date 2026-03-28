@@ -8,13 +8,13 @@ import (
 
 // CompiledRuleset is the result of compiling a YAML rule bundle.
 type CompiledRuleset struct {
-	Preconditions    []rule.Precondition
-	Postconditions   []rule.Postcondition
-	SessionRules     []rule.SessionRule
-	SandboxContracts []rule.Precondition
-	Limits           pipeline.OperationLimits
-	DefaultMode      string
-	Tools            map[string]map[string]any
+	Preconditions  []rule.Precondition
+	Postconditions []rule.Postcondition
+	SessionRules   []rule.SessionRule
+	SandboxRules   []rule.Precondition
+	Limits         pipeline.OperationLimits
+	DefaultMode    string
+	Tools          map[string]map[string]any
 }
 
 // CompileOption configures rule compilation.
@@ -84,7 +84,7 @@ func Compile(bundle map[string]any, opts ...CompileOption) (CompiledRuleset, err
 			if err != nil {
 				return CompiledRuleset{}, err
 			}
-			result.SandboxContracts = append(result.SandboxContracts, sb)
+			result.SandboxRules = append(result.SandboxRules, sb)
 		case "session":
 			isObserve, _ := raw["_observe"].(bool)
 			if !isObserve {

@@ -50,12 +50,12 @@ func (p *CheckPipeline) PreExecute(
 	// This matches Python parity: increment_attempts() before pre_execute().
 	if counters["attempts"] >= limits.MaxAttempts {
 		return PreDecision{
-			Action:             "block",
-			Reason:             fmt.Sprintf("Attempt limit reached (%d). Agent may be stuck in a retry loop. Stop and reassess.", limits.MaxAttempts),
-			DecisionSource:     "attempt_limit",
-			DecisionName:       "max_attempts",
-			HooksEvaluated:     hooks,
-			ContractsEvaluated: rules,
+			Action:         "block",
+			Reason:         fmt.Sprintf("Attempt limit reached (%d). Agent may be stuck in a retry loop. Stop and reassess.", limits.MaxAttempts),
+			DecisionSource: "attempt_limit",
+			DecisionName:   "max_attempts",
+			HooksEvaluated: hooks,
+			RulesEvaluated: rules,
 		}, nil
 	}
 
@@ -79,13 +79,13 @@ func (p *CheckPipeline) PreExecute(
 		hooks = append(hooks, hookRecord)
 		if decision.Result == HookResultDeny {
 			return PreDecision{
-				Action:             "block",
-				Reason:             decision.Reason,
-				DecisionSource:     "hook",
-				DecisionName:       hook.HookName(),
-				HooksEvaluated:     hooks,
-				ContractsEvaluated: rules,
-				PolicyError:        hookRaisedException,
+				Action:         "block",
+				Reason:         decision.Reason,
+				DecisionSource: "hook",
+				DecisionName:   hook.HookName(),
+				HooksEvaluated: hooks,
+				RulesEvaluated: rules,
+				PolicyError:    hookRaisedException,
 			}, nil
 		}
 	}
@@ -98,7 +98,7 @@ func (p *CheckPipeline) PreExecute(
 	}
 
 	// 3.5. Sandbox rules
-	deny, done = p.evalPreconditions(ctx, env, p.provider.GetSandboxContracts(env),
+	deny, done = p.evalPreconditions(ctx, env, p.provider.GetSandboxRules(env),
 		"yaml_sandbox", hooks, &rules, &hasObservedDeny)
 	if done {
 		return deny, nil
@@ -130,13 +130,13 @@ func (p *CheckPipeline) PreExecute(
 				source = "session_rule"
 			}
 			return PreDecision{
-				Action:             "block",
-				Reason:             decision.Message(),
-				DecisionSource:     source,
-				DecisionName:       ruleName(sc.Name),
-				HooksEvaluated:     hooks,
-				ContractsEvaluated: rules,
-				PolicyError:        hasPolicyError(rules),
+				Action:         "block",
+				Reason:         decision.Message(),
+				DecisionSource: source,
+				DecisionName:   ruleName(sc.Name),
+				HooksEvaluated: hooks,
+				RulesEvaluated: rules,
+				PolicyError:    hasPolicyError(rules),
 			}, nil
 		}
 	}
@@ -144,12 +144,12 @@ func (p *CheckPipeline) PreExecute(
 	// 5. Execution limits
 	if counters["execs"] >= limits.MaxToolCalls {
 		return PreDecision{
-			Action:             "block",
-			Reason:             fmt.Sprintf("Execution limit reached (%d calls). Summarize progress and stop.", limits.MaxToolCalls),
-			DecisionSource:     "operation_limit",
-			DecisionName:       "max_tool_calls",
-			HooksEvaluated:     hooks,
-			ContractsEvaluated: rules,
+			Action:         "block",
+			Reason:         fmt.Sprintf("Execution limit reached (%d calls). Summarize progress and stop.", limits.MaxToolCalls),
+			DecisionSource: "operation_limit",
+			DecisionName:   "max_tool_calls",
+			HooksEvaluated: hooks,
+			RulesEvaluated: rules,
 		}, nil
 	}
 
@@ -159,12 +159,12 @@ func (p *CheckPipeline) PreExecute(
 		toolCount := counters[toolKey]
 		if toolCount >= toolLimit {
 			return PreDecision{
-				Action:             "block",
-				Reason:             fmt.Sprintf("Per-tool limit: %s called %d times (limit: %d).", env.ToolName(), toolCount, toolLimit),
-				DecisionSource:     "operation_limit",
-				DecisionName:       "max_calls_per_tool:" + env.ToolName(),
-				HooksEvaluated:     hooks,
-				ContractsEvaluated: rules,
+				Action:         "block",
+				Reason:         fmt.Sprintf("Per-tool limit: %s called %d times (limit: %d).", env.ToolName(), toolCount, toolLimit),
+				DecisionSource: "operation_limit",
+				DecisionName:   "max_calls_per_tool:" + env.ToolName(),
+				HooksEvaluated: hooks,
+				RulesEvaluated: rules,
 			}, nil
 		}
 	}
@@ -174,11 +174,11 @@ func (p *CheckPipeline) PreExecute(
 	observeResults := p.evaluateObserveContracts(ctx, env, sess)
 
 	return PreDecision{
-		Action:             "allow",
-		HooksEvaluated:     hooks,
-		ContractsEvaluated: rules,
-		Observed:           hasObservedDeny,
-		PolicyError:        hasPolicyError(rules),
-		ObserveResults:     observeResults,
+		Action:         "allow",
+		HooksEvaluated: hooks,
+		RulesEvaluated: rules,
+		Observed:       hasObservedDeny,
+		PolicyError:    hasPolicyError(rules),
+		ObserveResults: observeResults,
 	}, nil
 }

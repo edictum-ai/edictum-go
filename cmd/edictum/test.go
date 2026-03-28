@@ -145,7 +145,7 @@ func runTestCases(cmd *cobra.Command, bundlePath, casesPath, env string, jsonOut
 			ok = matchesDenyContract(result, tc.MatchContract)
 		}
 
-		denyContract := extractContractID(result)
+		denyContract := extractRuleID(result)
 		cr := caseResult{
 			ID:       tc.ID,
 			Tool:     tc.Tool,
@@ -229,11 +229,11 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 	hasDenials := false
 
 	type callResult struct {
-		Decision           string   `json:"decision"`
-		ToolName           string   `json:"tool_name"`
-		ContractsEvaluated int      `json:"contracts_evaluated"`
-		DenyReasons        []string `json:"deny_reasons"`
-		WarnReasons        []string `json:"warn_reasons"`
+		Decision       string   `json:"decision"`
+		ToolName       string   `json:"tool_name"`
+		RulesEvaluated int      `json:"rules_evaluated"`
+		DenyReasons    []string `json:"deny_reasons"`
+		WarnReasons    []string `json:"warn_reasons"`
 	}
 	var results []callResult
 
@@ -246,11 +246,11 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 		}
 
 		results = append(results, callResult{
-			Decision:           result.Decision,
-			ToolName:           call.Tool,
-			ContractsEvaluated: result.ContractsEvaluated,
-			DenyReasons:        nonNilStrings(result.DenyReasons),
-			WarnReasons:        nonNilStrings(result.WarnReasons),
+			Decision:       result.Decision,
+			ToolName:       call.Tool,
+			RulesEvaluated: result.RulesEvaluated,
+			DenyReasons:    nonNilStrings(result.DenyReasons),
+			WarnReasons:    nonNilStrings(result.WarnReasons),
 		})
 	}
 
@@ -265,7 +265,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 			details = strings.Join(r.DenyReasons, "; ")
 		}
 		fmt.Fprintf(w, "%-3d %-12s %-8s %-10d %s\n",
-			i+1, r.ToolName, strings.ToUpper(r.Decision), r.ContractsEvaluated, details)
+			i+1, r.ToolName, strings.ToUpper(r.Decision), r.RulesEvaluated, details)
 	}
 
 	if hasDenials {
@@ -276,7 +276,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 
 func matchesDenyContract(result guard.EvaluationResult, ruleID string) bool {
 	for _, c := range result.Contracts {
-		if !c.Passed && c.ContractID == ruleID {
+		if !c.Passed && c.RuleID == ruleID {
 			return true
 		}
 	}

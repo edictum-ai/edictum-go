@@ -90,8 +90,8 @@ func TestNewGuardAllParams(t *testing.T) {
 	if len(g.state.postconditions) != 1 {
 		t.Errorf("postconditions: got %d, want 1", len(g.state.postconditions))
 	}
-	if len(g.state.sessionContracts) != 1 {
-		t.Errorf("session_rules: got %d, want 1", len(g.state.sessionContracts))
+	if len(g.state.sessionRules) != 1 {
+		t.Errorf("session_rules: got %d, want 1", len(g.state.sessionRules))
 	}
 	if len(g.beforeHooks) != 1 {
 		t.Errorf("before_hooks: got %d, want 1", len(g.beforeHooks))

@@ -13,7 +13,7 @@ func evalPrecondition(
 	ctx context.Context,
 	c rule.Precondition,
 	env2 toolcall.ToolCall,
-	contractType string,
+	ruleType string,
 	rules *[]RuleResult,
 	denyReasons *[]string,
 ) {
@@ -31,11 +31,11 @@ func evalPrecondition(
 	if err != nil {
 		log.Printf("Rule %s raised: %v", name, err)
 		cr := RuleResult{
-			ContractID:   name,
-			ContractType: contractType,
-			Passed:       false,
-			Message:      fmt.Sprintf("Precondition error: %s", err),
-			PolicyError:  true,
+			RuleID:      name,
+			RuleType:    ruleType,
+			Passed:      false,
+			Message:     fmt.Sprintf("Precondition error: %s", err),
+			PolicyError: true,
 		}
 		*rules = append(*rules, cr)
 		*denyReasons = append(*denyReasons, cr.Message)
@@ -51,12 +51,12 @@ func evalPrecondition(
 	}
 
 	cr := RuleResult{
-		ContractID:   name,
-		ContractType: contractType,
-		Passed:       decision.Passed(),
-		Message:      decision.Message(),
-		Observed:     isObserved,
-		PolicyError:  pe,
+		RuleID:      name,
+		RuleType:    ruleType,
+		Passed:      decision.Passed(),
+		Message:     decision.Message(),
+		Observed:    isObserved,
+		PolicyError: pe,
 	}
 	*rules = append(*rules, cr)
 	if !decision.Passed() && !isObserved {
@@ -86,11 +86,11 @@ func evalPostcondition(
 	if err != nil {
 		log.Printf("Postcondition %s raised: %v", name, err)
 		cr := RuleResult{
-			ContractID:   name,
-			ContractType: "postcondition",
-			Passed:       false,
-			Message:      fmt.Sprintf("Postcondition error: %s", err),
-			PolicyError:  true,
+			RuleID:      name,
+			RuleType:    "postcondition",
+			Passed:      false,
+			Message:     fmt.Sprintf("Postcondition error: %s", err),
+			PolicyError: true,
 		}
 		*rules = append(*rules, cr)
 		*warnReasons = append(*warnReasons, cr.Message)
@@ -111,13 +111,13 @@ func evalPostcondition(
 	}
 
 	cr := RuleResult{
-		ContractID:   name,
-		ContractType: "postcondition",
-		Passed:       decision.Passed(),
-		Message:      decision.Message(),
-		Observed:     isObserved,
-		Effect:       effect,
-		PolicyError:  pe,
+		RuleID:      name,
+		RuleType:    "postcondition",
+		Passed:      decision.Passed(),
+		Message:     decision.Message(),
+		Observed:    isObserved,
+		Effect:      effect,
+		PolicyError: pe,
 	}
 	*rules = append(*rules, cr)
 	if !decision.Passed() && !isObserved {

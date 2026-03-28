@@ -70,7 +70,7 @@ func TestPreExecute_ApprovalPending(t *testing.T) {
 	}
 }
 
-func TestPreExecute_ObserveContractsEvaluated(t *testing.T) {
+func TestPreExecute_ObserveRulesEvaluated(t *testing.T) {
 	sess, _ := newTestSession(t)
 	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
 		t.Fatal(err)
@@ -107,7 +107,7 @@ func TestPreExecute_SandboxContractDeny(t *testing.T) {
 	}
 
 	prov := defaultProvider()
-	prov.sandboxContracts = []rule.Precondition{{
+	prov.sandboxRules = []rule.Precondition{{
 		Name: "path_sandbox", Tool: "*", Source: "yaml_sandbox",
 		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
 			return rule.Fail("path not allowed"), nil

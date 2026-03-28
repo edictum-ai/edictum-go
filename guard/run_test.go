@@ -365,8 +365,8 @@ func TestRun_DenialAuditIncludesPythonStyleFields(t *testing.T) {
 	if event.Mode != "enforce" {
 		t.Fatalf("Mode = %q, want enforce", event.Mode)
 	}
-	if len(event.ContractsEvaluated) != 1 {
-		t.Fatalf("ContractsEvaluated len = %d, want 1", len(event.ContractsEvaluated))
+	if len(event.RulesEvaluated) != 1 {
+		t.Fatalf("RulesEvaluated len = %d, want 1", len(event.RulesEvaluated))
 	}
 	if len(event.HooksEvaluated) != 0 {
 		t.Fatalf("HooksEvaluated len = %d, want 0", len(event.HooksEvaluated))

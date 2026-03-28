@@ -126,8 +126,8 @@ func compiledToGuardOpts(c yamlpkg.CompiledRuleset, env string) []guard.Option {
 	if len(contractArgs) > 0 {
 		opts = append(opts, guard.WithRules(contractArgs...))
 	}
-	if len(c.SandboxContracts) > 0 {
-		opts = append(opts, guard.WithSandboxContracts(c.SandboxContracts...))
+	if len(c.SandboxRules) > 0 {
+		opts = append(opts, guard.WithSandboxRules(c.SandboxRules...))
 	}
 	return opts
 }

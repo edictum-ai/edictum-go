@@ -25,8 +25,8 @@ func TestEvaluateAllow(t *testing.T) {
 	if result.Decision != "allow" {
 		t.Errorf("decision: got %q, want 'allow'", result.Decision)
 	}
-	if result.ContractsEvaluated != 1 {
-		t.Errorf("contracts_evaluated: got %d, want 1", result.ContractsEvaluated)
+	if result.RulesEvaluated != 1 {
+		t.Errorf("contracts_evaluated: got %d, want 1", result.RulesEvaluated)
 	}
 	if len(result.DenyReasons) != 0 {
 		t.Errorf("deny_reasons: got %v, want empty", result.DenyReasons)
@@ -76,8 +76,8 @@ func TestEvaluateExhaustive(t *testing.T) {
 	if result.Decision != "block" {
 		t.Errorf("decision: got %q, want 'deny'", result.Decision)
 	}
-	if result.ContractsEvaluated != 2 {
-		t.Errorf("contracts_evaluated: got %d, want 2", result.ContractsEvaluated)
+	if result.RulesEvaluated != 2 {
+		t.Errorf("contracts_evaluated: got %d, want 2", result.RulesEvaluated)
 	}
 	if len(result.DenyReasons) != 2 {
 		t.Errorf("deny_reasons: got %d, want 2", len(result.DenyReasons))
@@ -104,8 +104,8 @@ func TestEvaluateWithPostconditions(t *testing.T) {
 	if result1.Decision != "allow" {
 		t.Errorf("without output: decision=%q, want 'allow'", result1.Decision)
 	}
-	if result1.ContractsEvaluated != 0 {
-		t.Errorf("without output: rules=%d, want 0", result1.ContractsEvaluated)
+	if result1.RulesEvaluated != 0 {
+		t.Errorf("without output: rules=%d, want 0", result1.RulesEvaluated)
 	}
 
 	// With output: postconditions evaluated
@@ -157,8 +157,8 @@ func TestEvaluateObserveContractNotDeny(t *testing.T) {
 	if result.Decision != "allow" {
 		t.Errorf("decision: got %q, want 'allow' (observe rule)", result.Decision)
 	}
-	if result.ContractsEvaluated != 1 {
-		t.Errorf("contracts_evaluated: got %d, want 1", result.ContractsEvaluated)
+	if result.RulesEvaluated != 1 {
+		t.Errorf("contracts_evaluated: got %d, want 1", result.RulesEvaluated)
 	}
 	if len(result.Contracts) != 1 || !result.Contracts[0].Observed {
 		t.Error("rule should be marked as observed")
@@ -231,9 +231,9 @@ func TestEvaluateEnvironmentOverride(t *testing.T) {
 	}
 }
 
-func TestEvaluateSandboxContracts(t *testing.T) {
+func TestEvaluateSandboxRules(t *testing.T) {
 	g := New(
-		WithSandboxContracts(
+		WithSandboxRules(
 			rule.Precondition{Name: "sandbox-deny", Tool: "*",
 				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
 					return rule.Fail("sandbox blocked"), nil
@@ -246,7 +246,7 @@ func TestEvaluateSandboxContracts(t *testing.T) {
 	if result.Decision != "block" {
 		t.Errorf("decision: got %q, want 'deny'", result.Decision)
 	}
-	if len(result.Contracts) != 1 || result.Contracts[0].ContractType != "sandbox" {
+	if len(result.Contracts) != 1 || result.Contracts[0].RuleType != "sandbox" {
 		t.Error("sandbox rule should be evaluated with type 'sandbox'")
 	}
 }
@@ -299,7 +299,7 @@ func TestEvaluateWithWhenPredicate(t *testing.T) {
 	if result.Decision != "allow" {
 		t.Errorf("decision: got %q, want 'allow' (when=false)", result.Decision)
 	}
-	if result.ContractsEvaluated != 0 {
-		t.Errorf("contracts_evaluated: got %d, want 0", result.ContractsEvaluated)
+	if result.RulesEvaluated != 0 {
+		t.Errorf("contracts_evaluated: got %d, want 0", result.RulesEvaluated)
 	}
 }

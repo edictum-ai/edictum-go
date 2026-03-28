@@ -46,13 +46,13 @@ type composedOutput struct {
 }
 
 type overrideOutput struct {
-	ContractID     string `json:"contract_id"`
+	RuleID         string `json:"rule_id"`
 	OverriddenBy   string `json:"overridden_by"`
 	OriginalSource string `json:"original_source"`
 }
 
 type observeOutput struct {
-	ContractID     string `json:"contract_id"`
+	RuleID         string `json:"rule_id"`
 	EnforcedSource string `json:"enforced_source"`
 	ObservedSource string `json:"observed_source"`
 }
@@ -119,14 +119,14 @@ func buildComposedOutput(report yamlpkg.CompositionReport) *composedOutput {
 	out := &composedOutput{}
 	for _, o := range report.Overrides {
 		out.Overrides = append(out.Overrides, overrideOutput{
-			ContractID:     o.ContractID,
+			RuleID:         o.RuleID,
 			OverriddenBy:   o.OverriddenBy,
 			OriginalSource: o.OriginalSource,
 		})
 	}
 	for _, o := range report.Observes {
 		out.Observes = append(out.Observes, observeOutput{
-			ContractID:     o.ContractID,
+			RuleID:         o.RuleID,
 			EnforcedSource: o.EnforcedSource,
 			ObservedSource: o.ObservedSource,
 		})
@@ -177,11 +177,11 @@ func printValidateText(
 		fmt.Fprintln(w, "Composition report:")
 		for _, o := range composed.Overrides {
 			fmt.Fprintf(w, "  override: %s (%s replaces %s)\n",
-				o.ContractID, o.OverriddenBy, o.OriginalSource)
+				o.RuleID, o.OverriddenBy, o.OriginalSource)
 		}
 		for _, o := range composed.Observes {
 			fmt.Fprintf(w, "  observe: %s (enforced=%s, observed=%s)\n",
-				o.ContractID, o.EnforcedSource, o.ObservedSource)
+				o.RuleID, o.EnforcedSource, o.ObservedSource)
 		}
 	}
 

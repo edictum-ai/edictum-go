@@ -189,9 +189,9 @@ func buildDenyReason(ruleID, reason string) string {
 		return reason
 	}
 	if ruleID != "" {
-		return fmt.Sprintf("Denied by rule '%s'", ruleID)
+		return fmt.Sprintf("Blocked by rule '%s'", ruleID)
 	}
-	return "Denied"
+	return "Blocked"
 }
 
 func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason string) error {

@@ -59,7 +59,7 @@ type Event struct {
 	DecisionName          string           `json:"decision_name,omitempty"`
 	Reason                string           `json:"reason,omitempty"`
 	HooksEvaluated        []map[string]any `json:"hooks_evaluated"`
-	ContractsEvaluated    []map[string]any `json:"contracts_evaluated"`
+	RulesEvaluated        []map[string]any `json:"rules_evaluated"`
 	ToolSuccess           *bool            `json:"tool_success,omitempty"`
 	PostconditionsPassed  *bool            `json:"postconditions_passed,omitempty"`
 	DurationMs            *float64         `json:"duration_ms,omitempty"`
@@ -77,13 +77,13 @@ const schemaVersion = "0.3.0"
 // NewEvent creates a new Event with defaults.
 func NewEvent() Event {
 	return Event{
-		SchemaVersion:      schemaVersion,
-		Timestamp:          time.Now().UTC(),
-		ToolArgs:           map[string]any{},
-		HooksEvaluated:     []map[string]any{},
-		ContractsEvaluated: []map[string]any{},
-		Mode:               "enforce",
-		Action:             ActionCallDenied,
+		SchemaVersion:  schemaVersion,
+		Timestamp:      time.Now().UTC(),
+		ToolArgs:       map[string]any{},
+		HooksEvaluated: []map[string]any{},
+		RulesEvaluated: []map[string]any{},
+		Mode:           "enforce",
+		Action:         ActionCallDenied,
 	}
 }
 
@@ -133,8 +133,8 @@ func (c *CompositeSink) Emit(ctx context.Context, event *Event) error {
 		if event.HooksEvaluated != nil {
 			cp.HooksEvaluated = deepCopyRecordSlice(event.HooksEvaluated)
 		}
-		if event.ContractsEvaluated != nil {
-			cp.ContractsEvaluated = deepCopyRecordSlice(event.ContractsEvaluated)
+		if event.RulesEvaluated != nil {
+			cp.RulesEvaluated = deepCopyRecordSlice(event.RulesEvaluated)
 		}
 		if err := s.Emit(ctx, &cp); err != nil {
 			errs = append(errs, err)

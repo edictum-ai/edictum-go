@@ -67,8 +67,8 @@ func WithRules(rules ...any) Option {
 					g.state.observeSessionRules = append(
 						g.state.observeSessionRules, v)
 				} else {
-					g.state.sessionContracts = append(
-						g.state.sessionContracts, v)
+					g.state.sessionRules = append(
+						g.state.sessionRules, v)
 				}
 			default:
 				panic(fmt.Sprintf("WithRules: unsupported type %T", c))
@@ -170,17 +170,17 @@ func WithTools(tools map[string]map[string]any) Option {
 	}
 }
 
-// WithSandboxContracts adds sandbox rules (preconditions matched
+// WithSandboxRules adds sandbox rules (preconditions matched
 // against multiple tool patterns).
-func WithSandboxContracts(rules ...rule.Precondition) Option {
+func WithSandboxRules(rules ...rule.Precondition) Option {
 	return func(g *Guard) {
 		for _, c := range rules {
 			if c.Mode == "observe" {
-				g.state.observeSandboxContracts = append(
-					g.state.observeSandboxContracts, c)
+				g.state.observeSandboxRules = append(
+					g.state.observeSandboxRules, c)
 			} else {
-				g.state.sandboxContracts = append(
-					g.state.sandboxContracts, c)
+				g.state.sandboxRules = append(
+					g.state.sandboxRules, c)
 			}
 		}
 	}

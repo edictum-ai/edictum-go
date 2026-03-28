@@ -27,7 +27,7 @@ func TestPreExecute_SessionRuleDeny(t *testing.T) {
 	}
 
 	prov := defaultProvider()
-	prov.sessionContracts = []rule.SessionRule{{
+	prov.sessionRules = []rule.SessionRule{{
 		Name: "max_3_execs",
 		Check: func(ctx context.Context, s any) (rule.Decision, error) {
 			sess := s.(*session.Session)
@@ -148,7 +148,7 @@ func TestPreExecute_EvaluationOrder(t *testing.T) {
 	}
 }
 
-func TestPreExecute_ContractsEvaluatedPopulated(t *testing.T) {
+func TestPreExecute_RulesEvaluatedPopulated(t *testing.T) {
 	sess, _ := newTestSession(t)
 	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
 		t.Fatal(err)
@@ -167,13 +167,13 @@ func TestPreExecute_ContractsEvaluatedPopulated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(dec.ContractsEvaluated) != 1 {
-		t.Fatalf("expected 1 rule, got %d", len(dec.ContractsEvaluated))
+	if len(dec.RulesEvaluated) != 1 {
+		t.Fatalf("expected 1 rule, got %d", len(dec.RulesEvaluated))
 	}
-	if dec.ContractsEvaluated[0]["type"] != "precondition" {
-		t.Fatalf("expected precondition type, got %v", dec.ContractsEvaluated[0]["type"])
+	if dec.RulesEvaluated[0]["type"] != "precondition" {
+		t.Fatalf("expected precondition type, got %v", dec.RulesEvaluated[0]["type"])
 	}
-	if dec.ContractsEvaluated[0]["passed"] != true {
+	if dec.RulesEvaluated[0]["passed"] != true {
 		t.Fatalf("expected passed=true")
 	}
 }

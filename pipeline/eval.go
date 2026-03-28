@@ -74,7 +74,7 @@ func (p *CheckPipeline) evalPreconditions(
 					DecisionSource:     source,
 					DecisionName:       ruleName(c.Name),
 					HooksEvaluated:     hooks,
-					ContractsEvaluated: *rules,
+					RulesEvaluated:     *rules,
 					PolicyError:        pe,
 					ApprovalTimeout:    timeout,
 					ApprovalTimeoutEff: timeoutEff,
@@ -82,13 +82,13 @@ func (p *CheckPipeline) evalPreconditions(
 				}, true
 			}
 			return PreDecision{
-				Action:             "block",
-				Reason:             decision.Message(),
-				DecisionSource:     source,
-				DecisionName:       ruleName(c.Name),
-				HooksEvaluated:     hooks,
-				ContractsEvaluated: *rules,
-				PolicyError:        pe,
+				Action:         "block",
+				Reason:         decision.Message(),
+				DecisionSource: source,
+				DecisionName:   ruleName(c.Name),
+				HooksEvaluated: hooks,
+				RulesEvaluated: *rules,
+				PolicyError:    pe,
 			}, true
 		}
 	}

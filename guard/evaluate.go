@@ -9,24 +9,24 @@ import (
 
 // RuleResult is the result of evaluating a single rule.
 type RuleResult struct {
-	ContractID   string
-	ContractType string // "precondition" | "postcondition" | "sandbox"
-	Passed       bool
-	Message      string
-	Observed     bool
-	Effect       string
-	PolicyError  bool
+	RuleID      string
+	RuleType    string // "precondition" | "postcondition" | "sandbox"
+	Passed      bool
+	Message     string
+	Observed    bool
+	Effect      string
+	PolicyError bool
 }
 
 // EvaluationResult is the result of offline rule evaluation.
 type EvaluationResult struct {
-	Decision           string // "allow" | "block" | "warn"
-	ToolName           string
-	Contracts          []RuleResult
-	DenyReasons        []string
-	WarnReasons        []string
-	ContractsEvaluated int
-	PolicyError        bool
+	Decision       string // "allow" | "block" | "warn"
+	ToolName       string
+	Contracts      []RuleResult
+	DenyReasons    []string
+	WarnReasons    []string
+	RulesEvaluated int
+	PolicyError    bool
 }
 
 // EvalOption configures a single Evaluate() call.
@@ -94,8 +94,8 @@ func (g *Guard) Evaluate(
 			DenyReasons: []string{
 				fmt.Sprintf("Envelope creation error: %s", err),
 			},
-			ContractsEvaluated: 0,
-			PolicyError:        true,
+			RulesEvaluated: 0,
+			PolicyError:    true,
 		}
 	}
 
@@ -117,8 +117,8 @@ func (g *Guard) Evaluate(
 
 	// Evaluate sandbox rules (exhaustive, no short-circuit)
 	g.mu.RLock()
-	sandboxes := filterSandbox(g.state.sandboxContracts, env2)
-	obsSandboxes := filterSandbox(g.state.observeSandboxContracts, env2)
+	sandboxes := filterSandbox(g.state.sandboxRules, env2)
+	obsSandboxes := filterSandbox(g.state.observeSandboxRules, env2)
 	g.mu.RUnlock()
 	for _, c := range sandboxes {
 		evalPrecondition(ctx, c, env2, "sandbox", &rules, &denyReasons)
@@ -158,12 +158,12 @@ func (g *Guard) Evaluate(
 	}
 
 	return EvaluationResult{
-		Decision:           decision,
-		ToolName:           toolName,
-		Contracts:          rules,
-		DenyReasons:        denyReasons,
-		WarnReasons:        warnReasons,
-		ContractsEvaluated: len(rules),
-		PolicyError:        policyError,
+		Decision:       decision,
+		ToolName:       toolName,
+		Contracts:      rules,
+		DenyReasons:    denyReasons,
+		WarnReasons:    warnReasons,
+		RulesEvaluated: len(rules),
+		PolicyError:    policyError,
 	}
 }

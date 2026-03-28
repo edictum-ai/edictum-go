@@ -113,7 +113,7 @@ func runReplay(cmd *cobra.Command, bundlePath, auditLogPath, outputPath string, 
 				NowVerdict: strings.ToUpper(result.Decision),
 			}
 			if result.Decision == "block" && len(result.DenyReasons) > 0 {
-				change.DenyContract = extractContractID(result)
+				change.DenyContract = extractRuleID(result)
 			}
 			changes = append(changes, change)
 		}
@@ -178,10 +178,10 @@ func actionToVerdict(action string) string {
 	}
 }
 
-func extractContractID(result guard.EvaluationResult) string {
+func extractRuleID(result guard.EvaluationResult) string {
 	for _, c := range result.Contracts {
-		if !c.Passed && c.ContractID != "" {
-			return c.ContractID
+		if !c.Passed && c.RuleID != "" {
+			return c.RuleID
 		}
 	}
 	return ""

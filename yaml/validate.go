@@ -455,7 +455,7 @@ func validateThenMap(v any, path, contractType string) error {
 		}
 		if timeoutEffect, ok := m["timeout_action"].(string); ok {
 			if timeoutEffect != "block" && timeoutEffect != "allow" {
-				return schemaError("%s.timeout_action must be one of deny or allow", path)
+				return schemaError("%s.timeout_action must be one of block or allow", path)
 			}
 		} else if _, ok := m["timeout_action"]; ok {
 			return schemaError("%s.timeout_action must be a string", path)
@@ -757,7 +757,7 @@ func validateSandboxStructural(contractMap map[string]any, index int) error {
 	}
 	if timeoutEffect, ok := contractMap["timeout_action"].(string); ok {
 		if timeoutEffect != "block" && timeoutEffect != "allow" {
-			return schemaError("rules[%d].timeout_action must be one of deny or allow", index)
+			return schemaError("rules[%d].timeout_action must be one of block or allow", index)
 		}
 	} else if _, ok := contractMap["timeout_action"]; ok {
 		return schemaError("rules[%d].timeout_action must be a string", index)

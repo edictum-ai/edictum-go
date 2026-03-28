@@ -34,7 +34,7 @@ func TestEvent_Defaults(t *testing.T) {
 	if e.ToolArgs == nil {
 		t.Fatal("ToolArgs should default to an empty map")
 	}
-	if e.HooksEvaluated == nil || e.ContractsEvaluated == nil {
+	if e.HooksEvaluated == nil || e.RulesEvaluated == nil {
 		t.Fatal("evaluated lists should default to non-nil slices")
 	}
 	if e.PolicyError {
@@ -223,7 +223,7 @@ func TestCompositeSink_DeepCopiesEvaluatedRecords(t *testing.T) {
 	first := &mutatingSink{
 		mutate: func(event *Event) {
 			event.HooksEvaluated[0]["status"] = "mutated"
-			event.ContractsEvaluated[0]["details"].(map[string]any)["value"] = "changed"
+			event.RulesEvaluated[0]["details"].(map[string]any)["value"] = "changed"
 		},
 	}
 	second := &captureSink{}
@@ -231,7 +231,7 @@ func TestCompositeSink_DeepCopiesEvaluatedRecords(t *testing.T) {
 
 	event := NewEvent()
 	event.HooksEvaluated = []map[string]any{{"status": "original"}}
-	event.ContractsEvaluated = []map[string]any{{
+	event.RulesEvaluated = []map[string]any{{
 		"details": map[string]any{"value": "kept"},
 	}}
 
@@ -241,9 +241,9 @@ func TestCompositeSink_DeepCopiesEvaluatedRecords(t *testing.T) {
 	if got := second.last.HooksEvaluated[0]["status"]; got != "original" {
 		t.Fatalf("HooksEvaluated leaked mutation: got %v, want original", got)
 	}
-	details := second.last.ContractsEvaluated[0]["details"].(map[string]any)
+	details := second.last.RulesEvaluated[0]["details"].(map[string]any)
 	if got := details["value"]; got != "kept" {
-		t.Fatalf("ContractsEvaluated leaked mutation: got %v, want kept", got)
+		t.Fatalf("RulesEvaluated leaked mutation: got %v, want kept", got)
 	}
 }
 

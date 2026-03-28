@@ -77,14 +77,14 @@ func buildCompiledState(compiled yamlpkg.CompiledRuleset, policyVersion string) 
 		if sc.Mode == "observe" {
 			s.observeSessionRules = append(s.observeSessionRules, sc)
 		} else {
-			s.sessionContracts = append(s.sessionContracts, sc)
+			s.sessionRules = append(s.sessionRules, sc)
 		}
 	}
-	for _, sb := range compiled.SandboxContracts {
+	for _, sb := range compiled.SandboxRules {
 		if sb.Mode == "observe" {
-			s.observeSandboxContracts = append(s.observeSandboxContracts, sb)
+			s.observeSandboxRules = append(s.observeSandboxRules, sb)
 		} else {
-			s.sandboxContracts = append(s.sandboxContracts, sb)
+			s.sandboxRules = append(s.sandboxRules, sb)
 		}
 	}
 	return s
@@ -121,8 +121,8 @@ func compiledOpts(compiled yamlpkg.CompiledRuleset, policyVersion string) []Opti
 	if len(contractArgs) > 0 {
 		opts = append(opts, WithRules(contractArgs...))
 	}
-	if len(compiled.SandboxContracts) > 0 {
-		opts = append(opts, WithSandboxContracts(compiled.SandboxContracts...))
+	if len(compiled.SandboxRules) > 0 {
+		opts = append(opts, WithSandboxRules(compiled.SandboxRules...))
 	}
 	return opts
 }

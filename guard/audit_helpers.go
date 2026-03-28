@@ -36,7 +36,7 @@ func (g *Guard) emitPreAudit(
 	event.DecisionName = pre.DecisionName
 	event.Reason = pre.Reason
 	event.HooksEvaluated = deepCopyRecords(pre.HooksEvaluated)
-	event.ContractsEvaluated = deepCopyRecords(pre.ContractsEvaluated)
+	event.RulesEvaluated = deepCopyRecords(pre.RulesEvaluated)
 	event.SessionAttemptCount = &attempts
 	event.SessionExecutionCount = &execs
 	event.Mode = mode
@@ -72,7 +72,7 @@ func (g *Guard) emitPostAudit(
 	event.Action = action
 	event.ToolSuccess = &post.ToolSuccess
 	event.PostconditionsPassed = &post.PostconditionsPassed
-	event.ContractsEvaluated = deepCopyRecords(post.ContractsEvaluated)
+	event.RulesEvaluated = deepCopyRecords(post.RulesEvaluated)
 	event.SessionAttemptCount = &attempts
 	event.SessionExecutionCount = &execs
 	event.Mode = mode
@@ -91,7 +91,7 @@ func (g *Guard) emitObservedDenials(
 	pre pipeline.PreDecision,
 	policyVersion string,
 ) {
-	for _, cr := range pre.ContractsEvaluated {
+	for _, cr := range pre.RulesEvaluated {
 		observed, _ := cr["observed"].(bool)
 		passed, _ := cr["passed"].(bool)
 		if observed && !passed {

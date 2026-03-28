@@ -33,16 +33,16 @@ type sseCloser interface {
 // in Reload(), ensuring concurrent evaluations never see a mix
 // of old and new rules.
 type compiledState struct {
-	preconditions           []rule.Precondition
-	postconditions          []rule.Postcondition
-	sessionContracts        []rule.SessionRule
-	sandboxContracts        []rule.Precondition
-	observePreconditions    []rule.Precondition
-	observePostconditions   []rule.Postcondition
-	observeSessionRules     []rule.SessionRule
-	observeSandboxContracts []rule.Precondition
-	limits                  pipeline.OperationLimits
-	policyVersion           string
+	preconditions         []rule.Precondition
+	postconditions        []rule.Postcondition
+	sessionRules          []rule.SessionRule
+	sandboxRules          []rule.Precondition
+	observePreconditions  []rule.Precondition
+	observePostconditions []rule.Postcondition
+	observeSessionRules   []rule.SessionRule
+	observeSandboxRules   []rule.Precondition
+	limits                pipeline.OperationLimits
+	policyVersion         string
 }
 
 // Guard is the main entry point for runtime rule enforcement.

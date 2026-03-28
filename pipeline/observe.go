@@ -19,7 +19,7 @@ func (p *CheckPipeline) evaluateObserveContracts(
 ) []map[string]any {
 	// Pre-allocate results slice based on total observe rule count.
 	observePres := p.provider.GetObservePreconditions(env)
-	observeSandbox := p.provider.GetObserveSandboxContracts(env)
+	observeSandbox := p.provider.GetObserveSandboxRules(env)
 	observeSession := p.provider.GetObserveSessionRules()
 	results := make([]map[string]any, 0, len(observePres)+len(observeSandbox)+len(observeSession))
 

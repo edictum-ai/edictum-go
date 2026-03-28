@@ -17,8 +17,8 @@ type mockProvider struct {
 	hooks                 []pipeline.HookRegistration
 	preconditions         []rule.Precondition
 	postconditions        []rule.Postcondition
-	sandboxContracts      []rule.Precondition
-	sessionContracts      []rule.SessionRule
+	sandboxRules          []rule.Precondition
+	sessionRules          []rule.SessionRule
 	observePostconditions []rule.Postcondition
 	observePreconditions  []rule.Precondition
 	observeSandbox        []rule.Precondition
@@ -56,16 +56,16 @@ func (m *mockProvider) GetObservePostconditions(env toolcall.ToolCall) []rule.Po
 	}
 	return out
 }
-func (m *mockProvider) GetSandboxContracts(env toolcall.ToolCall) []rule.Precondition {
-	return filterPreconditions(m.sandboxContracts, env)
+func (m *mockProvider) GetSandboxRules(env toolcall.ToolCall) []rule.Precondition {
+	return filterPreconditions(m.sandboxRules, env)
 }
 func (m *mockProvider) GetSessionRules() []rule.SessionRule {
-	return m.sessionContracts
+	return m.sessionRules
 }
 func (m *mockProvider) GetObservePreconditions(env toolcall.ToolCall) []rule.Precondition {
 	return filterPreconditions(m.observePreconditions, env)
 }
-func (m *mockProvider) GetObserveSandboxContracts(env toolcall.ToolCall) []rule.Precondition {
+func (m *mockProvider) GetObserveSandboxRules(env toolcall.ToolCall) []rule.Precondition {
 	return filterPreconditions(m.observeSandbox, env)
 }
 func (m *mockProvider) GetObserveSessionRules() []rule.SessionRule {

@@ -147,7 +147,7 @@ func (p *CheckPipeline) PostExecute(
 		ToolSuccess:          toolSuccess,
 		PostconditionsPassed: postconditionsPassed,
 		Warnings:             warnings,
-		ContractsEvaluated:   rules,
+		RulesEvaluated:       rules,
 		PolicyError:          hasPolicyError(rules),
 		RedactedResponse:     redactedResponse,
 		OutputSuppressed:     outputSuppressed,

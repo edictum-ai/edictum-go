@@ -8,14 +8,14 @@ import (
 
 // CompositionOverride records a rule replaced during composition.
 type CompositionOverride struct {
-	ContractID     string
+	RuleID         string
 	OverriddenBy   string // Source label of the winning layer.
 	OriginalSource string // Source label of the replaced layer.
 }
 
 // ObserveContract records a rule added as observe-mode via observe_alongside.
 type ObserveContract struct {
-	ContractID     string
+	RuleID         string
 	EnforcedSource string
 	ObservedSource string
 }
@@ -159,7 +159,7 @@ func mergeStandard(
 		if idx, found := existingByID[cid]; found {
 			orig := sources[cid]
 			*overrides = append(*overrides, CompositionOverride{
-				ContractID: cid, OverriddenBy: label, OriginalSource: orig,
+				RuleID: cid, OverriddenBy: label, OriginalSource: orig,
 			})
 			raw[idx] = cp
 			sources[cid] = label
@@ -190,7 +190,7 @@ func mergeObserveAlongside(
 		merged["rules"] = append(raw, cp)
 
 		*observes = append(*observes, ObserveContract{
-			ContractID: cid, EnforcedSource: sources[cid], ObservedSource: label,
+			RuleID: cid, EnforcedSource: sources[cid], ObservedSource: label,
 		})
 	}
 

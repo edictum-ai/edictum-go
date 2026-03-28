@@ -274,8 +274,8 @@ rules:
 	}
 
 	ov := report.Overrides[0]
-	if ov.ContractID != "shared-id" {
-		t.Errorf("override contract_id: got %q, want %q", ov.ContractID, "shared-id")
+	if ov.RuleID != "shared-id" {
+		t.Errorf("override contract_id: got %q, want %q", ov.RuleID, "shared-id")
 	}
 	// Canonicalize expected paths — t.TempDir() may not be canonical
 	// (e.g. /var → /private/var on macOS).
@@ -370,7 +370,7 @@ rules:
 	}
 	// Only the legit file's rules (1 pre + 1 post) should load.
 	// The escaping symlink's session rule must be skipped.
-	if len(g.state.sessionContracts) != 0 {
+	if len(g.state.sessionRules) != 0 {
 		t.Error("escaping symlink was not skipped — session rule loaded from outside")
 	}
 }
@@ -398,7 +398,7 @@ rules:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(g.state.sessionContracts) != 0 {
+	if len(g.state.sessionRules) != 0 {
 		t.Error("parent-directory symlink was not skipped — session rule loaded")
 	}
 }
@@ -472,8 +472,8 @@ func TestFromYAMLString_SandboxWithinAllows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(g.state.sandboxContracts) != 1 {
-		t.Fatalf("sandbox rules: got %d, want 1", len(g.state.sandboxContracts))
+	if len(g.state.sandboxRules) != 1 {
+		t.Fatalf("sandbox rules: got %d, want 1", len(g.state.sandboxRules))
 	}
 
 	ctx := context.Background()
@@ -593,7 +593,7 @@ func TestFromYAMLString_SandboxCommandAllowDeny(t *testing.T) {
 	}
 }
 
-func TestReloadFromYAML_SandboxContractsWired(t *testing.T) {
+func TestReloadFromYAML_SandboxRulesWired(t *testing.T) {
 	dir := t.TempDir()
 
 	// Start with no sandbox rules.
@@ -601,16 +601,16 @@ func TestReloadFromYAML_SandboxContractsWired(t *testing.T) {
 	if err != nil {
 		t.Fatalf("initial load: %v", err)
 	}
-	if len(g.state.sandboxContracts) != 0 {
-		t.Fatalf("initial sandbox: got %d, want 0", len(g.state.sandboxContracts))
+	if len(g.state.sandboxRules) != 0 {
+		t.Fatalf("initial sandbox: got %d, want 0", len(g.state.sandboxRules))
 	}
 
 	// Reload with sandbox rules — they must be wired with real Check logic.
 	if err := g.ReloadFromYAML([]byte(sandboxWithinYAML(dir))); err != nil {
 		t.Fatalf("reload: %v", err)
 	}
-	if len(g.state.sandboxContracts) != 1 {
-		t.Fatalf("reloaded sandbox: got %d, want 1", len(g.state.sandboxContracts))
+	if len(g.state.sandboxRules) != 1 {
+		t.Fatalf("reloaded sandbox: got %d, want 1", len(g.state.sandboxRules))
 	}
 
 	ctx := context.Background()

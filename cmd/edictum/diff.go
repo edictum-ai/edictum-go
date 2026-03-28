@@ -174,14 +174,14 @@ func printComposeText(w io.Writer, r yamlpkg.CompositionReport) {
 		fmt.Fprintln(w, "Overrides:")
 		for _, o := range r.Overrides {
 			fmt.Fprintf(w, "  %s: %s overrides %s\n",
-				o.ContractID, o.OverriddenBy, o.OriginalSource)
+				o.RuleID, o.OverriddenBy, o.OriginalSource)
 		}
 	}
 	if len(r.Observes) > 0 {
 		fmt.Fprintln(w, "Observe rules:")
 		for _, o := range r.Observes {
 			fmt.Fprintf(w, "  %s: enforced=%s, observed=%s\n",
-				o.ContractID, o.EnforcedSource, o.ObservedSource)
+				o.RuleID, o.EnforcedSource, o.ObservedSource)
 		}
 	}
 	if len(r.Overrides) == 0 && len(r.Observes) == 0 {
