@@ -1,1 +1,1 @@
-{"error_contains":"effect must be one of warn, redact, deny"}
+{"error_contains":"action must be one of warn, redact, block"}

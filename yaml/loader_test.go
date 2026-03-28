@@ -10,25 +10,30 @@ import (
 )
 
 const validBundle = `apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
+metadata:
+  name: test-bundle
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: no-rm
     type: pre
     tool: Bash
     when:
       "args.command":
         contains: "rm -rf"
-    action: deny
-    message: "Cannot run rm -rf"
+    then:
+      action: block
+      message: "Cannot run rm -rf"
   - id: redact-keys
     type: post
     tool: Bash
     when:
       "output.text":
         matches: "sk-[a-zA-Z0-9]+"
-    action: redact
+    then:
+      action: redact
+      message: "Sensitive key detected"
 `
 
 // Cat 3.1 — Bundle size limit 1MB
@@ -61,7 +66,7 @@ func TestLoadBundle_FileSizeLimit(t *testing.T) {
 
 // Cat 3.2 — Basic schema validation: apiVersion
 func TestLoadBundleString_MissingApiVersion(t *testing.T) {
-	_, _, err := LoadBundleString("kind: ContractBundle\ncontracts: []\n")
+	_, _, err := LoadBundleString("kind: Ruleset\nrules: []\n")
 	if err == nil {
 		t.Fatal("expected error for missing apiVersion")
 	}
@@ -72,7 +77,7 @@ func TestLoadBundleString_MissingApiVersion(t *testing.T) {
 
 // Cat 3.2 — Basic schema validation: kind
 func TestLoadBundleString_MissingKind(t *testing.T) {
-	_, _, err := LoadBundleString("apiVersion: edictum/v1\ncontracts: []\n")
+	_, _, err := LoadBundleString("apiVersion: edictum/v1\nrules: []\n")
 	if err == nil {
 		t.Fatal("expected error for missing kind")
 	}
@@ -94,7 +99,7 @@ func TestLoadBundleString_NonMapping(t *testing.T) {
 
 // Cat 3.2 — defaults.mode validation
 func TestLoadBundleString_InvalidMode(t *testing.T) {
-	y := "apiVersion: edictum/v1\nkind: ContractBundle\ndefaults:\n  mode: shadow\ncontracts: []\n"
+	y := "apiVersion: edictum/v1\nkind: Ruleset\ndefaults:\n  mode: shadow\nrules: []\n"
 	_, _, err := LoadBundleString(y)
 	if err == nil {
 		t.Fatal("expected error for invalid mode")
@@ -104,71 +109,71 @@ func TestLoadBundleString_InvalidMode(t *testing.T) {
 	}
 }
 
-// Cat 3.2 — Contract missing id
+// Cat 3.2 — Rule missing id
 func TestLoadBundleString_ContractMissingID(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 metadata:
   name: test-bundle
 defaults:
   mode: enforce
-contracts:
+rules:
   - type: pre
     tool: Bash
     when:
       "args.command":
         contains: "rm"
     then:
-      effect: deny
+      action: block
       message: "Denied"
 `
 	_, _, err := LoadBundleString(y)
 	if err == nil {
-		t.Fatal("expected error for missing contract id")
+		t.Fatal("expected error for missing rule id")
 	}
 	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "id is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-// Cat 3.2 — Contract invalid type
+// Cat 3.2 — Rule invalid type
 func TestLoadBundleString_ContractInvalidType(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 metadata:
   name: test-bundle
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: bad
     type: invalid
     tool: Bash
 `
 	_, _, err := LoadBundleString(y)
 	if err == nil {
-		t.Fatal("expected error for invalid contract type")
+		t.Fatal("expected error for invalid rule type")
 	}
 	if !strings.Contains(err.Error(), "schema validation failed") || !strings.Contains(err.Error(), "type") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-// Cat 3.2 — Contract missing tool for non-session type
+// Cat 3.2 — Rule missing tool for non-session type
 func TestLoadBundleString_ContractMissingTool(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 metadata:
   name: test-bundle
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: no-tool
     type: pre
     when:
       "args.command":
         contains: "rm"
     then:
-      effect: deny
+      action: block
       message: "Denied"
 `
 	_, _, err := LoadBundleString(y)
@@ -180,21 +185,21 @@ contracts:
 	}
 }
 
-// Cat 3.2 — Session contracts do not require tool
+// Cat 3.2 — Session rules do not require tool
 func TestLoadBundleString_SessionNoTool(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 metadata:
   name: test-bundle
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: sess-limit
     type: session
     limits:
       max_tool_calls: 10
     then:
-      effect: deny
+      action: block
       message: "limit hit"
 `
 	data, _, err := LoadBundleString(y)
@@ -206,15 +211,15 @@ contracts:
 	}
 }
 
-// Cat 3.3 — Unique contract ID
+// Cat 3.3 — Unique rule ID
 func TestLoadBundleString_DuplicateID(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 metadata:
   name: test-bundle
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: same-id
     type: pre
     tool: Bash
@@ -222,7 +227,7 @@ contracts:
       "args.command":
         contains: "rm"
     then:
-      effect: deny
+      action: block
       message: "Denied"
   - id: same-id
     type: post
@@ -231,14 +236,14 @@ contracts:
       "output.text":
         contains: "secret"
     then:
-      effect: warn
+      action: warn
       message: "Warn"
 `
 	_, _, err := LoadBundleString(y)
 	if err == nil {
 		t.Fatal("expected error for duplicate id")
 	}
-	if !strings.Contains(err.Error(), "duplicate contract id") {
+	if !strings.Contains(err.Error(), "duplicate rule id") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -246,8 +251,8 @@ contracts:
 // Cat 3.4 — Regex pre-compilation: invalid regex at load time
 func TestLoadBundleString_InvalidRegex(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: bad-regex
     type: post
     tool: Bash
@@ -267,8 +272,8 @@ contracts:
 // Cat 3.4 — Invalid regex in matches_any
 func TestLoadBundleString_InvalidRegexMatchesAny(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: bad-regex-any
     type: post
     tool: Bash
@@ -290,8 +295,8 @@ contracts:
 // Cat 3.4 — Regex inside boolean combinator
 func TestLoadBundleString_InvalidRegexNested(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: nested-bad
     type: post
     tool: Bash
@@ -309,11 +314,11 @@ contracts:
 	}
 }
 
-// Cat 3.5 — Pre-contract output.text rejection
+// Cat 3.5 — Pre-rule output.text rejection
 func TestLoadBundleString_PreOutputTextRejected(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: pre-output
     type: pre
     tool: Bash
@@ -323,7 +328,7 @@ contracts:
 `
 	_, _, err := LoadBundleString(y)
 	if err == nil {
-		t.Fatal("expected error for output.text in pre contract")
+		t.Fatal("expected error for output.text in pre rule")
 	}
 	if !strings.Contains(err.Error(), "output.text") {
 		t.Fatalf("unexpected error: %v", err)
@@ -333,8 +338,8 @@ contracts:
 // Cat 3.5 — output.text nested in boolean combinator for pre
 func TestLoadBundleString_PreOutputTextNestedRejected(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: pre-nested
     type: pre
     tool: Bash
@@ -345,18 +350,18 @@ contracts:
 `
 	_, _, err := LoadBundleString(y)
 	if err == nil {
-		t.Fatal("expected error for output.text nested in pre contract")
+		t.Fatal("expected error for output.text nested in pre rule")
 	}
 	if !strings.Contains(err.Error(), "output.text") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-// Cat 3.5 — output.text in post contract is allowed
+// Cat 3.5 — output.text in post rule is allowed
 func TestLoadBundleString_PostOutputTextAllowed(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: post-ok
     type: post
     tool: Bash
@@ -373,8 +378,8 @@ contracts:
 // Cat 3.6 — Sandbox: not_within without within (no primary constraint)
 func TestLoadBundleString_SandboxNotWithinRequiresWithin(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: sb1
     type: sandbox
     tool: Bash
@@ -393,8 +398,8 @@ contracts:
 // Cat 3.6 — Sandbox: not_allows without allows (no primary constraint)
 func TestLoadBundleString_SandboxNotAllowsRequiresAllows(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: sb2
     type: sandbox
     tool: Bash
@@ -414,8 +419,8 @@ contracts:
 // Cat 3.6 — Sandbox: not_allows.domains requires allows.domains
 func TestLoadBundleString_SandboxNotAllowsDomainsRequiresAllowsDomains(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: sb3
     type: sandbox
     tool: Bash
@@ -438,8 +443,8 @@ contracts:
 // Cat 3.6 — Sandbox: not_allows.commands is rejected (only domains valid)
 func TestLoadBundleString_SandboxNotAllowsCommandsRejected(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: sb4
     type: sandbox
     tool: Bash
@@ -462,8 +467,8 @@ contracts:
 // Cat 3.6 — Sandbox: non-string entries in within are rejected
 func TestLoadBundleString_SandboxNonStringWithinRejected(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: bad-within
     type: sandbox
     tool: read_file
@@ -482,8 +487,8 @@ contracts:
 // Cat 3.6 — Sandbox: valid with both within and not_within
 func TestLoadBundleString_SandboxValidWithBothWithin(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: sb-ok
     type: sandbox
     tool: Bash
@@ -501,8 +506,8 @@ contracts:
 // Cat 3.6 — Sandbox: empty sandbox (no constraints) is rejected
 func TestLoadBundleString_SandboxEmptyRejected(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: empty-sb
     type: sandbox
     tool: Bash
@@ -519,8 +524,8 @@ contracts:
 // Cat 3.6 — Sandbox: within: [] (empty list) is rejected
 func TestLoadBundleString_SandboxEmptyWithinRejected(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: empty-within
     type: sandbox
     tool: read_file
@@ -538,8 +543,8 @@ contracts:
 // Cat 3.6 — Sandbox: allows: {} (empty map) is rejected
 func TestLoadBundleString_SandboxEmptyAllowsRejected(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: empty-allows
     type: sandbox
     tool: Bash
@@ -579,12 +584,12 @@ func TestLoadBundleString_ValidBundle(t *testing.T) {
 	if data["apiVersion"] != "edictum/v1" {
 		t.Fatal("wrong apiVersion")
 	}
-	if data["kind"] != "ContractBundle" {
+	if data["kind"] != "Ruleset" {
 		t.Fatal("wrong kind")
 	}
-	contracts, ok := data["contracts"].([]any)
-	if !ok || len(contracts) != 2 {
-		t.Fatalf("expected 2 contracts, got %v", data["contracts"])
+	rules, ok := data["rules"].([]any)
+	if !ok || len(rules) != 2 {
+		t.Fatalf("expected 2 rules, got %v", data["rules"])
 	}
 	if hash.Hex == "" {
 		t.Fatal("hash should not be empty")
@@ -621,8 +626,8 @@ func TestLoadBundle_FileNotFound(t *testing.T) {
 // Cat 3.6 — Sandbox: non-string entries in allows.commands are rejected
 func TestLoadBundleString_SandboxNonStringCommandsRejected(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: bad-cmds
     type: sandbox
     tool: Bash
@@ -642,8 +647,8 @@ contracts:
 // Cat 3.6 — Sandbox: non-string entries in allows.domains are rejected
 func TestLoadBundleString_SandboxNonStringDomainsRejected(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: bad-doms
     type: sandbox
     tool: fetch
@@ -663,8 +668,8 @@ contracts:
 // Cat 3.6 — Sandbox: non-string entries in not_allows.domains are rejected
 func TestLoadBundleString_SandboxNonStringNotAllowsDomainsRejected(t *testing.T) {
 	y := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: bad-not-allows-doms
     type: sandbox
     tool: fetch
@@ -686,14 +691,14 @@ contracts:
 
 func TestSecurity_ShadowInjection(t *testing.T) {
 	// A user-supplied YAML bundle must not be able to set _observe: true
-	// on a contract. This internal key is reserved for observe_alongside
+	// on a rule. This internal key is reserved for observe_alongside
 	// composition — if accepted, it silently downgrades enforce→observe.
 	bundle := `
 apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: injected
     type: pre
     tool: "*"

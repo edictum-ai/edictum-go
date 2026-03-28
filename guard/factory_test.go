@@ -12,10 +12,10 @@ import (
 )
 
 const validBundle = `apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: no-rm
     type: pre
     tool: Bash
@@ -23,7 +23,7 @@ contracts:
       "args.command":
         contains: "rm -rf"
     then:
-      effect: deny
+      action: block
       message: "Cannot run rm -rf"
   - id: redact-keys
     type: post
@@ -32,11 +32,11 @@ contracts:
       "output.text":
         matches: "sk-[a-zA-Z0-9]+"
     then:
-      effect: redact`
+      action: redact`
 
 const toolsMergeBundle = `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: t1
     type: pre
     tool: Bash
@@ -44,7 +44,7 @@ contracts:
       "args.command":
         contains: "test"
     then:
-      effect: deny
+      action: block
       message: "test"
 tools:
   Bash:
@@ -105,7 +105,7 @@ func TestFromYAMLString_PolicyVersion(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := "7309d1f48f8de3b7ed49d288b5e5354da6043c03e144e4564fdd28bd5b827f43"
+	want := "073db7922fe4e4b2f0e4220c47c53b876ed0ee48b60fa38ad596b658b2705c85"
 	if g.PolicyVersion() != want {
 		t.Errorf("policy_version:\n  got  %q\n  want %q", g.PolicyVersion(), want)
 	}
@@ -161,8 +161,8 @@ func TestFromYAML_Directory(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "01-base.yaml"), validBundle)
 	writeFile(t, filepath.Join(dir, "02-extra.yaml"), `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: extra-pre
     type: pre
     tool: ReadFile
@@ -170,7 +170,7 @@ contracts:
       "args.path":
         contains: "/etc"
     then:
-      effect: deny
+      action: block
       message: "no /etc reads"`)
 
 	g, err := FromYAML(dir)
@@ -227,10 +227,10 @@ func TestFromYAML_NonexistentPath(t *testing.T) {
 func TestFromYAMLWithReport_MultiFile(t *testing.T) {
 	dir := t.TempDir()
 
-	// File 1: defines contract "shared-id"
+	// File 1: defines rule "shared-id"
 	writeFile(t, filepath.Join(dir, "01-base.yaml"), `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: shared-id
     type: pre
     tool: Bash
@@ -238,13 +238,13 @@ contracts:
       "args.command":
         contains: "echo"
     then:
-      effect: deny
+      action: block
       message: "base version"`)
 
 	// File 2: overrides "shared-id" with a different message
 	writeFile(t, filepath.Join(dir, "02-override.yaml"), `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: shared-id
     type: pre
     tool: Bash
@@ -252,7 +252,7 @@ contracts:
       "args.command":
         contains: "echo override"
     then:
-      effect: deny
+      action: block
       message: "override version"`)
 
 	g, report, err := FromYAMLWithReport(dir)
@@ -274,8 +274,8 @@ contracts:
 	}
 
 	ov := report.Overrides[0]
-	if ov.ContractID != "shared-id" {
-		t.Errorf("override contract_id: got %q, want %q", ov.ContractID, "shared-id")
+	if ov.RuleID != "shared-id" {
+		t.Errorf("override contract_id: got %q, want %q", ov.RuleID, "shared-id")
 	}
 	// Canonicalize expected paths — t.TempDir() may not be canonical
 	// (e.g. /var → /private/var on macOS).
@@ -309,25 +309,25 @@ func TestReloadFromYAML_SwapsContracts(t *testing.T) {
 
 	// Reload with a different bundle that has 2 preconditions and 0 postconditions.
 	newYAML := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
-  - id: contract-a
+kind: Ruleset
+rules:
+  - id: rule-a
     type: pre
     tool: Bash
     when:
       "args.command":
         contains: "ls"
     then:
-      effect: deny
+      action: block
       message: "no ls"
-  - id: contract-b
+  - id: rule-b
     type: pre
     tool: ReadFile
     when:
       "args.path":
         contains: "/tmp"
     then:
-      effect: deny
+      action: block
       message: "no tmp reads"`
 
 	if err := g.ReloadFromYAML([]byte(newYAML)); err != nil {
@@ -355,8 +355,8 @@ func TestSecurityResolvePaths_SymlinkEscape(t *testing.T) {
 	// Create an escaping symlink to a file outside the directory.
 	externalDir := t.TempDir()
 	writeFile(t, filepath.Join(externalDir, "evil.yaml"), `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: injected
     type: session`)
 	link := filepath.Join(dir, "02-escape.yaml")
@@ -368,22 +368,22 @@ contracts:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Only the legit file's contracts (1 pre + 1 post) should load.
-	// The escaping symlink's session contract must be skipped.
-	if len(g.state.sessionContracts) != 0 {
-		t.Error("escaping symlink was not skipped — session contract loaded from outside")
+	// Only the legit file's rules (1 pre + 1 post) should load.
+	// The escaping symlink's session rule must be skipped.
+	if len(g.state.sessionRules) != 0 {
+		t.Error("escaping symlink was not skipped — session rule loaded from outside")
 	}
 }
 
 func TestSecurityResolvePaths_SymlinkToParent(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "secret.yaml"), `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: parent-secret
     type: session`)
 
-	dir := filepath.Join(root, "contracts")
+	dir := filepath.Join(root, "rules")
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -398,15 +398,15 @@ contracts:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(g.state.sessionContracts) != 0 {
-		t.Error("parent-directory symlink was not skipped — session contract loaded")
+	if len(g.state.sessionRules) != 0 {
+		t.Error("parent-directory symlink was not skipped — session rule loaded")
 	}
 }
 
 func TestReloadFromYAML_ToolRegistryReplaced(t *testing.T) {
 	yamlWithTools := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: t1
     type: pre
     tool: Bash
@@ -414,7 +414,7 @@ contracts:
       "args.command":
         contains: "ls"
     then:
-      effect: deny
+      action: block
       message: "no ls"
 tools:
   OldTool:
@@ -431,8 +431,8 @@ tools:
 
 	// Reload with bundle that has no tools section — OldTool should be gone.
 	newYAML := `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: t2
     type: pre
     tool: Bash
@@ -440,7 +440,7 @@ contracts:
       "args.command":
         contains: "rm"
     then:
-      effect: deny
+      action: block
       message: "no rm"`
 	if err := g.ReloadFromYAML([]byte(newYAML)); err != nil {
 		t.Fatal(err)
@@ -456,8 +456,8 @@ contracts:
 
 func sandboxWithinYAML(dir string) string {
 	return fmt.Sprintf(`apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: safe-file-paths
     type: sandbox
     tool: read_file
@@ -472,8 +472,8 @@ func TestFromYAMLString_SandboxWithinAllows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(g.state.sandboxContracts) != 1 {
-		t.Fatalf("sandbox contracts: got %d, want 1", len(g.state.sandboxContracts))
+	if len(g.state.sandboxRules) != 1 {
+		t.Fatalf("sandbox rules: got %d, want 1", len(g.state.sandboxRules))
 	}
 
 	ctx := context.Background()
@@ -500,9 +500,9 @@ func TestFromYAMLString_SandboxWithinDenies(t *testing.T) {
 		t.Fatal("callable should not be invoked on deny")
 		return nil, nil
 	})
-	var denied *edictum.DeniedError
+	var denied *edictum.BlockedError
 	if !errors.As(err, &denied) {
-		t.Fatalf("expected DeniedError for path outside boundary, got %T: %v", err, err)
+		t.Fatalf("expected BlockedError for path outside boundary, got %T: %v", err, err)
 	}
 }
 
@@ -516,8 +516,8 @@ func TestFromYAMLString_SandboxNotWithinDenies(t *testing.T) {
 	resolvedExcluded, _ := filepath.EvalSymlinks(excluded)
 
 	yamlStr := fmt.Sprintf(`apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: safe-but-no-secret
     type: sandbox
     tool: read_file
@@ -536,9 +536,9 @@ contracts:
 		t.Fatal("callable should not be invoked on deny")
 		return nil, nil
 	})
-	var denied *edictum.DeniedError
+	var denied *edictum.BlockedError
 	if !errors.As(err, &denied) {
-		t.Fatalf("expected DeniedError for path in not_within, got %T: %v", err, err)
+		t.Fatalf("expected BlockedError for path in not_within, got %T: %v", err, err)
 	}
 
 	// Path within dir and not excluded
@@ -554,8 +554,8 @@ contracts:
 }
 
 const sandboxCommandsBundle = `apiVersion: edictum/v1
-kind: ContractBundle
-contracts:
+kind: Ruleset
+rules:
   - id: safe-commands
     type: sandbox
     tool: Bash
@@ -587,30 +587,30 @@ func TestFromYAMLString_SandboxCommandAllowDeny(t *testing.T) {
 		t.Fatal("callable should not be invoked on deny")
 		return nil, nil
 	})
-	var denied *edictum.DeniedError
+	var denied *edictum.BlockedError
 	if !errors.As(err, &denied) {
-		t.Fatalf("expected DeniedError for 'rm', got %T: %v", err, err)
+		t.Fatalf("expected BlockedError for 'rm', got %T: %v", err, err)
 	}
 }
 
-func TestReloadFromYAML_SandboxContractsWired(t *testing.T) {
+func TestReloadFromYAML_SandboxRulesWired(t *testing.T) {
 	dir := t.TempDir()
 
-	// Start with no sandbox contracts.
+	// Start with no sandbox rules.
 	g, err := FromYAMLString(validBundle)
 	if err != nil {
 		t.Fatalf("initial load: %v", err)
 	}
-	if len(g.state.sandboxContracts) != 0 {
-		t.Fatalf("initial sandbox: got %d, want 0", len(g.state.sandboxContracts))
+	if len(g.state.sandboxRules) != 0 {
+		t.Fatalf("initial sandbox: got %d, want 0", len(g.state.sandboxRules))
 	}
 
-	// Reload with sandbox contracts — they must be wired with real Check logic.
+	// Reload with sandbox rules — they must be wired with real Check logic.
 	if err := g.ReloadFromYAML([]byte(sandboxWithinYAML(dir))); err != nil {
 		t.Fatalf("reload: %v", err)
 	}
-	if len(g.state.sandboxContracts) != 1 {
-		t.Fatalf("reloaded sandbox: got %d, want 1", len(g.state.sandboxContracts))
+	if len(g.state.sandboxRules) != 1 {
+		t.Fatalf("reloaded sandbox: got %d, want 1", len(g.state.sandboxRules))
 	}
 
 	ctx := context.Background()
@@ -618,9 +618,9 @@ func TestReloadFromYAML_SandboxContractsWired(t *testing.T) {
 		t.Fatal("callable should not be invoked on deny")
 		return nil, nil
 	})
-	var denied *edictum.DeniedError
+	var denied *edictum.BlockedError
 	if !errors.As(err, &denied) {
-		t.Fatalf("expected DeniedError after reload, got %T: %v", err, err)
+		t.Fatalf("expected BlockedError after reload, got %T: %v", err, err)
 	}
 }
 

@@ -1,10 +1,10 @@
 apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 metadata:
   description: missing-name
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: c1
     type: pre
     tool: Bash
@@ -12,5 +12,5 @@ contracts:
       "args.command":
         contains: "rm"
     then:
-      effect: deny
+      action: block
       message: "Denied"

@@ -62,8 +62,8 @@ func (c *CollectingSink) Emit(_ context.Context, event *Event) error {
 	if event.HooksEvaluated != nil {
 		cp.HooksEvaluated = deepCopyRecordSlice(event.HooksEvaluated)
 	}
-	if event.ContractsEvaluated != nil {
-		cp.ContractsEvaluated = deepCopyRecordSlice(event.ContractsEvaluated)
+	if event.RulesEvaluated != nil {
+		cp.RulesEvaluated = deepCopyRecordSlice(event.RulesEvaluated)
 	}
 
 	c.events = append(c.events, cp)
@@ -170,8 +170,8 @@ func deepCopyEvent(e Event) Event {
 	if e.HooksEvaluated != nil {
 		e.HooksEvaluated = deepCopyRecordSlice(e.HooksEvaluated)
 	}
-	if e.ContractsEvaluated != nil {
-		e.ContractsEvaluated = deepCopyRecordSlice(e.ContractsEvaluated)
+	if e.RulesEvaluated != nil {
+		e.RulesEvaluated = deepCopyRecordSlice(e.RulesEvaluated)
 	}
 	return e
 }

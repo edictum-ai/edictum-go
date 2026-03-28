@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/telemetry"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func TestApprovalGranted_RecordsAllowedCounter(t *testing.T) {
@@ -17,16 +17,16 @@ func TestApprovalGranted_RecordsAllowedCounter(t *testing.T) {
 		telemetry.WithTracerProvider(tp),
 		telemetry.WithMeterProvider(mp),
 	)
-	pre := contract.Precondition{
+	pre := rule.Precondition{
 		Name:   "needs-approval",
-		Effect: "approve",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("needs approval"), nil
+		Effect: "ask",
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("needs approval"), nil
 		},
 	}
 	g := New(
 		WithTelemetry(tel),
-		WithContracts(pre),
+		WithRules(pre),
 		WithApprovalBackend(&autoApproveBackend{}),
 	)
 
@@ -58,17 +58,17 @@ func TestApprovalNilBackend_RecordsDenialCounter(t *testing.T) {
 		telemetry.WithTracerProvider(tp),
 		telemetry.WithMeterProvider(mp),
 	)
-	pre := contract.Precondition{
+	pre := rule.Precondition{
 		Name:   "needs-approval",
-		Effect: "approve",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("needs approval"), nil
+		Effect: "ask",
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("needs approval"), nil
 		},
 	}
 	// No approval backend — should deny immediately.
 	g := New(
 		WithTelemetry(tel),
-		WithContracts(pre),
+		WithRules(pre),
 	)
 
 	_, err := g.Run(context.Background(), "Bash",
@@ -99,16 +99,16 @@ func TestApprovalDenied_RecordsDenialCounter(t *testing.T) {
 		telemetry.WithTracerProvider(tp),
 		telemetry.WithMeterProvider(mp),
 	)
-	pre := contract.Precondition{
+	pre := rule.Precondition{
 		Name:   "needs-approval",
-		Effect: "approve",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("needs approval"), nil
+		Effect: "ask",
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("needs approval"), nil
 		},
 	}
 	g := New(
 		WithTelemetry(tel),
-		WithContracts(pre),
+		WithRules(pre),
 		WithApprovalBackend(&autoDenyBackend{}),
 	)
 
@@ -140,18 +140,18 @@ func TestApprovalTimeoutDeny_RecordsDenialCounter(t *testing.T) {
 		telemetry.WithTracerProvider(tp),
 		telemetry.WithMeterProvider(mp),
 	)
-	pre := contract.Precondition{
+	pre := rule.Precondition{
 		Name:          "needs-approval",
-		Effect:        "approve",
+		Effect:        "ask",
 		Timeout:       1,
-		TimeoutEffect: "deny",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("needs approval"), nil
+		TimeoutEffect: "block",
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("needs approval"), nil
 		},
 	}
 	g := New(
 		WithTelemetry(tel),
-		WithContracts(pre),
+		WithRules(pre),
 		WithApprovalBackend(&blockingApprovalBackend{}),
 	)
 

@@ -10,9 +10,9 @@ import (
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/pipeline"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func nopCallable(_ map[string]any) (any, error) {
@@ -30,21 +30,21 @@ func TestRunLifecycle(t *testing.T) {
 	hookCalled := false
 
 	g := New(
-		WithContracts(
-			contract.Precondition{Name: "lifecycle-pre", Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
+		WithRules(
+			rule.Precondition{Name: "lifecycle-pre", Tool: "*",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
 					preCalled = true
-					return contract.Pass(), nil
+					return rule.Pass(), nil
 				}},
-			contract.Postcondition{Name: "lifecycle-post", Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
+			rule.Postcondition{Name: "lifecycle-post", Tool: "*",
+				Check: func(_ context.Context, _ toolcall.ToolCall, _ any) (rule.Decision, error) {
 					postCalled = true
-					return contract.Pass(), nil
+					return rule.Pass(), nil
 				}},
 		),
 		WithHooks(pipeline.HookRegistration{
 			Phase: "before", Tool: "*", Name: "lifecycle-hook",
-			Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+			Before: func(_ context.Context, _ toolcall.ToolCall) (pipeline.HookDecision, error) {
 				hookCalled = true
 				return pipeline.AllowHook(), nil
 			},
@@ -84,13 +84,13 @@ func TestRunLifecycle(t *testing.T) {
 
 func TestRunDeny(t *testing.T) {
 	g := New(
-		WithContracts(
-			contract.Precondition{Name: "deny-rm", Tool: "Bash",
-				Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+		WithRules(
+			rule.Precondition{Name: "deny-rm", Tool: "Bash",
+				Check: func(_ context.Context, env toolcall.ToolCall) (rule.Decision, error) {
 					if strings.Contains(env.BashCommand(), "rm -rf") {
-						return contract.Fail("Cannot run rm -rf"), nil
+						return rule.Fail("Cannot run rm -rf"), nil
 					}
-					return contract.Pass(), nil
+					return rule.Pass(), nil
 				}},
 		),
 	)
@@ -98,11 +98,11 @@ func TestRunDeny(t *testing.T) {
 	ctx := context.Background()
 	_, err := g.Run(ctx, "Bash", map[string]any{"command": "rm -rf /"}, nopCallable)
 	if err == nil {
-		t.Fatal("expected DeniedError")
+		t.Fatal("expected BlockedError")
 	}
-	var denied *edictum.DeniedError
+	var denied *edictum.BlockedError
 	if !errors.As(err, &denied) {
-		t.Fatalf("expected DeniedError, got %T: %v", err, err)
+		t.Fatalf("expected BlockedError, got %T: %v", err, err)
 	}
 	if denied.DecisionName != "deny-rm" {
 		t.Errorf("decision_name: got %q, want %q", denied.DecisionName, "deny-rm")
@@ -112,10 +112,10 @@ func TestRunDeny(t *testing.T) {
 func TestRunObserveModeFallthrough(t *testing.T) {
 	g := New(
 		WithMode("observe"),
-		WithContracts(
-			contract.Precondition{Name: "observe-deny", Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("would deny"), nil
+		WithRules(
+			rule.Precondition{Name: "observe-deny", Tool: "*",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("would deny"), nil
 				}},
 		),
 	)
@@ -129,16 +129,16 @@ func TestRunObserveModeFallthrough(t *testing.T) {
 		t.Errorf("result: got %v, want 'ok'", result)
 	}
 
-	// Should have CALL_WOULD_DENY
+	// Should have CALL_WOULD_BLOCK
 	events := g.LocalSink().Events()
 	hasWouldDeny := false
 	for _, e := range events {
-		if e.Action == audit.ActionCallWouldDeny {
+		if e.Action == audit.ActionCallWouldBlock {
 			hasWouldDeny = true
 		}
 	}
 	if !hasWouldDeny {
-		t.Error("expected CALL_WOULD_DENY in observe mode")
+		t.Error("expected CALL_WOULD_BLOCK in observe mode")
 	}
 }
 
@@ -168,18 +168,18 @@ func TestRunWithSessionID(t *testing.T) {
 }
 
 func TestRunWithPrincipalOverride(t *testing.T) {
-	var captured *envelope.Principal
+	var captured *toolcall.Principal
 	g := New(
-		WithContracts(
-			contract.Precondition{Name: "capture", Tool: "*",
-				Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+		WithRules(
+			rule.Precondition{Name: "capture", Tool: "*",
+				Check: func(_ context.Context, env toolcall.ToolCall) (rule.Decision, error) {
 					captured = env.Principal()
-					return contract.Pass(), nil
+					return rule.Pass(), nil
 				}},
 		),
 	)
 
-	p := envelope.NewPrincipal(envelope.WithUserID("run-override"))
+	p := toolcall.NewPrincipal(toolcall.WithUserID("run-override"))
 	ctx := context.Background()
 	_, err := g.Run(ctx, "Bash", map[string]any{"command": "ls"}, nopCallable,
 		WithRunPrincipal(&p))
@@ -196,13 +196,13 @@ func TestRunPostconditionRedact(t *testing.T) {
 		WithTools(map[string]map[string]any{
 			"ReadFile": {"side_effect": "read", "idempotent": true},
 		}),
-		WithContracts(
-			contract.Postcondition{
+		WithRules(
+			rule.Postcondition{
 				Name:   "redact-secret",
 				Tool:   "ReadFile",
 				Effect: "redact",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
-					return contract.Fail("contains secret"), nil
+				Check: func(_ context.Context, _ toolcall.ToolCall, _ any) (rule.Decision, error) {
+					return rule.Fail("contains secret"), nil
 				},
 			},
 		),
@@ -243,13 +243,13 @@ func TestRun_ObserveMode_ApprovalUsesBackend(t *testing.T) {
 
 	g := New(
 		WithMode("observe"),
-		WithContracts(
-			contract.Precondition{
+		WithRules(
+			rule.Precondition{
 				Name:   "needs-approval",
 				Tool:   "*",
-				Effect: "approve",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("requires human approval"), nil
+				Effect: "ask",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("requires human approval"), nil
 				},
 			},
 		),
@@ -284,7 +284,7 @@ func TestRun_ObserveMode_ApprovalUsesBackend(t *testing.T) {
 	}
 }
 
-// TestRun_ApprovalTimeoutPropagated proves that per-contract
+// TestRun_ApprovalTimeoutPropagated proves that per-rule
 // ApprovalTimeout and ApprovalTimeoutEff are passed to the approval backend.
 func TestRun_ApprovalTimeoutPropagated(t *testing.T) {
 	var capturedReq approval.Request
@@ -303,15 +303,15 @@ func TestRun_ApprovalTimeoutPropagated(t *testing.T) {
 	}
 
 	g := New(
-		WithContracts(
-			contract.Precondition{
+		WithRules(
+			rule.Precondition{
 				Name:          "approval-timeout",
 				Tool:          "*",
-				Effect:        "approve",
+				Effect:        "ask",
 				Timeout:       60,
 				TimeoutEffect: "allow",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("needs approval"), nil
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("needs approval"), nil
 				},
 			},
 		),
@@ -328,24 +328,24 @@ func TestRun_ApprovalTimeoutPropagated(t *testing.T) {
 		t.Errorf("timeout: got %v, want 60s", capturedReq.Timeout())
 	}
 	if capturedReq.TimeoutEffect() != "allow" {
-		t.Errorf("timeout_effect: got %q, want 'allow'", capturedReq.TimeoutEffect())
+		t.Errorf("timeout_action: got %q, want 'allow'", capturedReq.TimeoutEffect())
 	}
 }
 
 func TestRun_DenialAuditIncludesPythonStyleFields(t *testing.T) {
 	g := New(
-		WithContracts(contract.Precondition{
+		WithRules(rule.Precondition{
 			Name: "deny-all",
 			Tool: "*",
-			Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-				return contract.Fail("blocked"), nil
+			Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+				return rule.Fail("blocked"), nil
 			},
 		}),
 	)
 
-	principal := envelope.NewPrincipal(
-		envelope.WithUserID("u-123"),
-		envelope.WithClaims(map[string]any{"team": "security"}),
+	principal := toolcall.NewPrincipal(
+		toolcall.WithUserID("u-123"),
+		toolcall.WithClaims(map[string]any{"team": "security"}),
 	)
 
 	_, err := g.Run(context.Background(), "Bash", map[string]any{"command": "ls"}, nopCallable,
@@ -359,14 +359,14 @@ func TestRun_DenialAuditIncludesPythonStyleFields(t *testing.T) {
 		t.Fatal("expected audit events")
 	}
 	event := events[0]
-	if event.Action != audit.ActionCallDenied {
-		t.Fatalf("Action = %q, want %q", event.Action, audit.ActionCallDenied)
+	if event.Action != audit.ActionCallBlocked {
+		t.Fatalf("Action = %q, want %q", event.Action, audit.ActionCallBlocked)
 	}
 	if event.Mode != "enforce" {
 		t.Fatalf("Mode = %q, want enforce", event.Mode)
 	}
-	if len(event.ContractsEvaluated) != 1 {
-		t.Fatalf("ContractsEvaluated len = %d, want 1", len(event.ContractsEvaluated))
+	if len(event.RulesEvaluated) != 1 {
+		t.Fatalf("RulesEvaluated len = %d, want 1", len(event.RulesEvaluated))
 	}
 	if len(event.HooksEvaluated) != 0 {
 		t.Fatalf("HooksEvaluated len = %d, want 0", len(event.HooksEvaluated))
@@ -418,14 +418,14 @@ func TestRunAttemptsIncrement(t *testing.T) {
 
 func TestRun_ApprovalContextTimeout(t *testing.T) {
 	// When context expires during approval polling, the guard should
-	// treat it as a timeout and apply timeout_effect, not return raw error.
+	// treat it as a timeout and apply timeout_action, not return raw error.
 	g := New(
-		WithContracts(
-			contract.Precondition{
-				Name: "needs-approval", Tool: "*", Effect: "approve",
+		WithRules(
+			rule.Precondition{
+				Name: "needs-approval", Tool: "*", Effect: "ask",
 				Timeout: 1, TimeoutEffect: "allow",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("needs approval"), nil
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("needs approval"), nil
 				},
 			},
 		),
@@ -435,7 +435,7 @@ func TestRun_ApprovalContextTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	// Should succeed because timeout_effect="allow"
+	// Should succeed because timeout_action="allow"
 	result, err := g.Run(ctx, "TestTool", map[string]any{},
 		func(_ map[string]any) (any, error) { return "executed", nil })
 	if err != nil {

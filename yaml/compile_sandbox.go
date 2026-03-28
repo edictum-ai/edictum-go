@@ -5,18 +5,18 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/sandbox"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
-// compileSandbox creates a Precondition for sandbox contracts with the
+// compileSandbox creates a Precondition for sandbox rules with the
 // sandbox evaluation logic baked into the Check closure.
 //
-// Sandbox contracts use within/not_within/allows/not_allows — not when/then —
+// Sandbox rules use within/not_within/allows/not_allows — not when/then —
 // so they cannot go through compilePre. The YAML fields are parsed into a
 // sandbox.Config and the Check function calls sandbox.Check directly.
-func compileSandbox(raw map[string]any, mode string) (contract.Precondition, error) {
+func compileSandbox(raw map[string]any, mode string) (rule.Precondition, error) {
 	cid, _ := raw["id"].(string)
 	tool := "*"
 	if t, ok := raw["tool"].(string); ok {
@@ -26,24 +26,24 @@ func compileSandbox(raw map[string]any, mode string) (contract.Precondition, err
 
 	cfg, err := parseSandboxConfig(raw)
 	if err != nil {
-		return contract.Precondition{}, fmt.Errorf("contract %q: %w", cid, err)
+		return rule.Precondition{}, fmt.Errorf("rule %q: %w", cid, err)
 	}
 
-	pre := contract.Precondition{
+	pre := rule.Precondition{
 		Name:   cid,
 		Tool:   tool,
 		Mode:   mode,
 		Source: "yaml_sandbox",
-		Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
-			verdict, err := sandbox.Check(env, cfg)
-			if err != nil || verdict.Passed() {
-				return verdict, err
+		Check: func(_ context.Context, env toolcall.ToolCall) (rule.Decision, error) {
+			decision, err := sandbox.Check(env, cfg)
+			if err != nil || decision.Passed() {
+				return decision, err
 			}
 			template := cfg.Message
 			if template == "" {
-				template = verdict.Message()
+				template = decision.Message()
 			}
-			return contract.Fail(expandMessage(template, env, "", nil, false)), nil
+			return rule.Fail(expandMessage(template, env, "", nil, false)), nil
 		},
 	}
 	if isObserve {
@@ -52,7 +52,7 @@ func compileSandbox(raw map[string]any, mode string) (contract.Precondition, err
 	return pre, nil
 }
 
-// parseSandboxConfig extracts sandbox boundaries from a raw YAML contract map.
+// parseSandboxConfig extracts sandbox boundaries from a raw YAML rule map.
 // Path prefixes (within/not_within) are resolved via filepath.EvalSymlinks to
 // match the resolution performed by sandbox.ExtractPaths on incoming tool calls.
 func parseSandboxConfig(raw map[string]any) (sandbox.Config, error) {
@@ -84,7 +84,7 @@ func parseSandboxConfig(raw map[string]any) (sandbox.Config, error) {
 
 // resolvePaths resolves each path via filepath.EvalSymlinks. Returns an
 // error if any path cannot be resolved — a typo or non-existent boundary
-// path would silently produce a broken sandbox contract otherwise.
+// path would silently produce a broken sandbox rule otherwise.
 func resolvePaths(paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return paths, nil

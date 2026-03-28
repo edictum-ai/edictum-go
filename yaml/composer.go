@@ -6,16 +6,16 @@ import (
 	"github.com/edictum-ai/edictum-go/internal/deepcopy"
 )
 
-// CompositionOverride records a contract replaced during composition.
+// CompositionOverride records a rule replaced during composition.
 type CompositionOverride struct {
-	ContractID     string
+	RuleID         string
 	OverriddenBy   string // Source label of the winning layer.
 	OriginalSource string // Source label of the replaced layer.
 }
 
-// ObserveContract records a contract added as observe-mode via observe_alongside.
+// ObserveContract records a rule added as observe-mode via observe_alongside.
 type ObserveContract struct {
-	ContractID     string
+	RuleID         string
 	EnforcedSource string
 	ObservedSource string
 }
@@ -83,7 +83,7 @@ func isObserveAlongside(data map[string]any) bool {
 }
 
 func contractList(bundle map[string]any) []map[string]any {
-	raw, ok := bundle["contracts"].([]any)
+	raw, ok := bundle["rules"].([]any)
 	if !ok {
 		return nil
 	}
@@ -139,7 +139,7 @@ func mergeStandard(
 		merged["observability"] = deepcopy.Value(obs)
 	}
 
-	// contracts: same ID replaces, unique appends
+	// rules: same ID replaces, unique appends
 	layerContracts := contractList(layer)
 	if len(layerContracts) == 0 {
 		return
@@ -152,14 +152,14 @@ func mergeStandard(
 		}
 	}
 
-	raw, _ := merged["contracts"].([]any)
+	raw, _ := merged["rules"].([]any)
 	for _, c := range layerContracts {
 		cid, _ := c["id"].(string)
 		cp := deepcopy.Map(c)
 		if idx, found := existingByID[cid]; found {
 			orig := sources[cid]
 			*overrides = append(*overrides, CompositionOverride{
-				ContractID: cid, OverriddenBy: label, OriginalSource: orig,
+				RuleID: cid, OverriddenBy: label, OriginalSource: orig,
 			})
 			raw[idx] = cp
 			sources[cid] = label
@@ -169,7 +169,7 @@ func mergeStandard(
 			sources[cid] = label
 		}
 	}
-	merged["contracts"] = raw
+	merged["rules"] = raw
 }
 
 func mergeObserveAlongside(
@@ -186,11 +186,11 @@ func mergeObserveAlongside(
 		cp["mode"] = "observe"
 		cp["_observe"] = true
 
-		raw, _ := merged["contracts"].([]any)
-		merged["contracts"] = append(raw, cp)
+		raw, _ := merged["rules"].([]any)
+		merged["rules"] = append(raw, cp)
 
 		*observes = append(*observes, ObserveContract{
-			ContractID: cid, EnforcedSource: sources[cid], ObservedSource: label,
+			RuleID: cid, EnforcedSource: sources[cid], ObservedSource: label,
 		})
 	}
 

@@ -6,14 +6,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
-// testEnv creates a ToolEnvelope for testing. Uses the real CreateEnvelope
+// testEnv creates a ToolCall for testing. Uses the real CreateToolCall
 // to match production behavior (bash_command extraction, filePath extraction).
-func testEnv(t *testing.T, toolName string, args map[string]any) envelope.ToolEnvelope {
+func testEnv(t *testing.T, toolName string, args map[string]any) toolcall.ToolCall {
 	t.Helper()
-	env, err := envelope.CreateEnvelope(context.Background(), envelope.CreateEnvelopeOptions{
+	env, err := toolcall.CreateToolCall(context.Background(), toolcall.CreateToolCallOptions{
 		ToolName: toolName,
 		Args:     args,
 	})

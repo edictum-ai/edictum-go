@@ -1,13 +1,13 @@
 package guard
 
 import (
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/pipeline"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
-// Compile-time check that Guard implements ContractProvider.
-var _ pipeline.ContractProvider = (*Guard)(nil)
+// Compile-time check that Guard implements RuleProvider.
+var _ pipeline.RuleProvider = (*Guard)(nil)
 
 // GetLimits returns the current operation limits.
 func (g *Guard) GetLimits() pipeline.OperationLimits {
@@ -16,8 +16,8 @@ func (g *Guard) GetLimits() pipeline.OperationLimits {
 	return g.state.limits
 }
 
-// GetHooks returns hooks matching the given phase and tool envelope.
-func (g *Guard) GetHooks(phase string, env envelope.ToolEnvelope) []pipeline.HookRegistration {
+// GetHooks returns hooks matching the given phase and ToolCall.
+func (g *Guard) GetHooks(phase string, env toolcall.ToolCall) []pipeline.HookRegistration {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	if phase == "before" {
@@ -27,61 +27,61 @@ func (g *Guard) GetHooks(phase string, env envelope.ToolEnvelope) []pipeline.Hoo
 }
 
 // GetPreconditions returns enforce-mode preconditions matching the tool.
-func (g *Guard) GetPreconditions(env envelope.ToolEnvelope) []contract.Precondition {
+func (g *Guard) GetPreconditions(env toolcall.ToolCall) []rule.Precondition {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return filterPreconditions(g.state.preconditions, env)
 }
 
 // GetPostconditions returns enforce-mode postconditions matching the tool.
-func (g *Guard) GetPostconditions(env envelope.ToolEnvelope) []contract.Postcondition {
+func (g *Guard) GetPostconditions(env toolcall.ToolCall) []rule.Postcondition {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return filterPostconditions(g.state.postconditions, env)
 }
 
-// GetSandboxContracts returns enforce-mode sandbox contracts matching the tool.
-func (g *Guard) GetSandboxContracts(env envelope.ToolEnvelope) []contract.Precondition {
+// GetSandboxRules returns enforce-mode sandbox rules matching the tool.
+func (g *Guard) GetSandboxRules(env toolcall.ToolCall) []rule.Precondition {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return filterSandbox(g.state.sandboxContracts, env)
+	return filterSandbox(g.state.sandboxRules, env)
 }
 
-// GetSessionContracts returns all enforce-mode session contracts.
-func (g *Guard) GetSessionContracts() []contract.SessionContract {
+// GetSessionRules returns all enforce-mode session rules.
+func (g *Guard) GetSessionRules() []rule.SessionRule {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	result := make([]contract.SessionContract, len(g.state.sessionContracts))
-	copy(result, g.state.sessionContracts)
+	result := make([]rule.SessionRule, len(g.state.sessionRules))
+	copy(result, g.state.sessionRules)
 	return result
 }
 
 // GetObservePreconditions returns observe-mode preconditions matching the tool.
-func (g *Guard) GetObservePreconditions(env envelope.ToolEnvelope) []contract.Precondition {
+func (g *Guard) GetObservePreconditions(env toolcall.ToolCall) []rule.Precondition {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return filterPreconditions(g.state.observePreconditions, env)
 }
 
 // GetObservePostconditions returns observe-mode postconditions matching the tool.
-func (g *Guard) GetObservePostconditions(env envelope.ToolEnvelope) []contract.Postcondition {
+func (g *Guard) GetObservePostconditions(env toolcall.ToolCall) []rule.Postcondition {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return filterPostconditions(g.state.observePostconditions, env)
 }
 
-// GetObserveSandboxContracts returns observe-mode sandbox contracts matching the tool.
-func (g *Guard) GetObserveSandboxContracts(env envelope.ToolEnvelope) []contract.Precondition {
+// GetObserveSandboxRules returns observe-mode sandbox rules matching the tool.
+func (g *Guard) GetObserveSandboxRules(env toolcall.ToolCall) []rule.Precondition {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return filterSandbox(g.state.observeSandboxContracts, env)
+	return filterSandbox(g.state.observeSandboxRules, env)
 }
 
-// GetObserveSessionContracts returns all observe-mode session contracts.
-func (g *Guard) GetObserveSessionContracts() []contract.SessionContract {
+// GetObserveSessionRules returns all observe-mode session rules.
+func (g *Guard) GetObserveSessionRules() []rule.SessionRule {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	result := make([]contract.SessionContract, len(g.state.observeSessionContracts))
-	copy(result, g.state.observeSessionContracts)
+	result := make([]rule.SessionRule, len(g.state.observeSessionRules))
+	copy(result, g.state.observeSessionRules)
 	return result
 }

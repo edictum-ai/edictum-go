@@ -7,11 +7,11 @@ import (
 
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/redaction"
+	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // 7.1: Constructor with 15 params
@@ -19,14 +19,14 @@ func TestNewGuardAllParams(t *testing.T) {
 	backend := session.NewMemoryBackend()
 	sink := &audit.StdoutSink{}
 	pol := redaction.NewPolicy()
-	principal := envelope.NewPrincipal(envelope.WithUserID("user-1"))
+	principal := toolcall.NewPrincipal(toolcall.WithUserID("user-1"))
 	limits := pipeline.OperationLimits{
 		MaxAttempts:     100,
 		MaxToolCalls:    50,
 		MaxCallsPerTool: map[string]int{"Bash": 10},
 	}
 
-	denyCalled := false
+	blockCalled := false
 	allowCalled := false
 	postWarnCalled := false
 	var approvalBe approval.Backend
@@ -35,34 +35,34 @@ func TestNewGuardAllParams(t *testing.T) {
 		WithEnvironment("staging"),
 		WithMode("observe"),
 		WithLimits(limits),
-		WithContracts(
-			contract.Precondition{Name: "pre1", Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Pass(), nil
+		WithRules(
+			rule.Precondition{Name: "pre1", Tool: "*",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Pass(), nil
 				}},
-			contract.Postcondition{Name: "post1", Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
-					return contract.Pass(), nil
+			rule.Postcondition{Name: "post1", Tool: "*",
+				Check: func(_ context.Context, _ toolcall.ToolCall, _ any) (rule.Decision, error) {
+					return rule.Pass(), nil
 				}},
-			contract.SessionContract{Name: "sess1",
-				Check: func(_ context.Context, _ any) (contract.Verdict, error) {
-					return contract.Pass(), nil
+			rule.SessionRule{Name: "sess1",
+				Check: func(_ context.Context, _ any) (rule.Decision, error) {
+					return rule.Pass(), nil
 				}},
 		),
 		WithHooks(pipeline.HookRegistration{Phase: "before", Tool: "*", Name: "h1",
-			Before: func(_ context.Context, _ envelope.ToolEnvelope) (pipeline.HookDecision, error) {
+			Before: func(_ context.Context, _ toolcall.ToolCall) (pipeline.HookDecision, error) {
 				return pipeline.AllowHook(), nil
 			}}),
 		WithAuditSink(sink),
 		WithRedaction(pol),
 		WithBackend(backend),
 		WithPolicyVersion("v1.0"),
-		WithOnDeny(func(_ envelope.ToolEnvelope, _ string, _ string) { denyCalled = true }),
-		WithOnAllow(func(_ envelope.ToolEnvelope) { allowCalled = true }),
-		WithOnPostWarn(func(_ envelope.ToolEnvelope, _ []string) { postWarnCalled = true }),
+		WithOnBlock(func(_ toolcall.ToolCall, _ string, _ string) { blockCalled = true }),
+		WithOnAllow(func(_ toolcall.ToolCall) { allowCalled = true }),
+		WithOnPostWarn(func(_ toolcall.ToolCall, _ []string) { postWarnCalled = true }),
 		WithSuccessCheck(func(_ string, _ any) bool { return true }),
 		WithPrincipal(&principal),
-		WithPrincipalResolver(func(_ string, _ map[string]any) *envelope.Principal { return nil }),
+		WithPrincipalResolver(func(_ string, _ map[string]any) *toolcall.Principal { return nil }),
 		WithApprovalBackend(approvalBe),
 		WithTools(map[string]map[string]any{
 			"ReadFile": {"side_effect": "read", "idempotent": true},
@@ -90,15 +90,15 @@ func TestNewGuardAllParams(t *testing.T) {
 	if len(g.state.postconditions) != 1 {
 		t.Errorf("postconditions: got %d, want 1", len(g.state.postconditions))
 	}
-	if len(g.state.sessionContracts) != 1 {
-		t.Errorf("session_contracts: got %d, want 1", len(g.state.sessionContracts))
+	if len(g.state.sessionRules) != 1 {
+		t.Errorf("session_rules: got %d, want 1", len(g.state.sessionRules))
 	}
 	if len(g.beforeHooks) != 1 {
 		t.Errorf("before_hooks: got %d, want 1", len(g.beforeHooks))
 	}
 
 	// Verify callbacks are set (not called yet)
-	_ = denyCalled
+	_ = blockCalled
 	_ = allowCalled
 	_ = postWarnCalled
 }
@@ -128,7 +128,7 @@ func TestNewGuardDefaults(t *testing.T) {
 // 7.15: SetPrincipal
 func TestSetPrincipal(t *testing.T) {
 	g := New()
-	p := envelope.NewPrincipal(envelope.WithUserID("u-new"))
+	p := toolcall.NewPrincipal(toolcall.WithUserID("u-new"))
 	g.SetPrincipal(&p)
 	if g.principal == nil || g.principal.UserID() != "u-new" {
 		t.Error("SetPrincipal did not update")
@@ -143,16 +143,16 @@ func TestToolRegistryFromDict(t *testing.T) {
 	}))
 
 	se, idem := g.toolRegistry.Classify("ReadFile")
-	if se != envelope.SideEffectRead {
-		t.Errorf("ReadFile side_effect: got %q, want %q", se, envelope.SideEffectRead)
+	if se != toolcall.SideEffectRead {
+		t.Errorf("ReadFile side_effect: got %q, want %q", se, toolcall.SideEffectRead)
 	}
 	if !idem {
 		t.Error("ReadFile idempotent: got false, want true")
 	}
 
 	se2, idem2 := g.toolRegistry.Classify("WriteFile")
-	if se2 != envelope.SideEffectWrite {
-		t.Errorf("WriteFile side_effect: got %q, want %q", se2, envelope.SideEffectWrite)
+	if se2 != toolcall.SideEffectWrite {
+		t.Errorf("WriteFile side_effect: got %q, want %q", se2, toolcall.SideEffectWrite)
 	}
 	if idem2 {
 		t.Error("WriteFile idempotent: got true, want false")
@@ -180,12 +180,12 @@ func TestGenerateUUID(t *testing.T) {
 
 // 7.14: Principal resolver overrides static principal
 func TestPrincipalResolverOverridesStatic(t *testing.T) {
-	static := envelope.NewPrincipal(envelope.WithUserID("static"))
-	resolved := envelope.NewPrincipal(envelope.WithUserID("resolved"))
+	static := toolcall.NewPrincipal(toolcall.WithUserID("static"))
+	resolved := toolcall.NewPrincipal(toolcall.WithUserID("resolved"))
 
 	g := New(
 		WithPrincipal(&static),
-		WithPrincipalResolver(func(_ string, _ map[string]any) *envelope.Principal {
+		WithPrincipalResolver(func(_ string, _ map[string]any) *toolcall.Principal {
 			return &resolved
 		}),
 	)
@@ -197,7 +197,7 @@ func TestPrincipalResolverOverridesStatic(t *testing.T) {
 }
 
 func TestPrincipalStaticFallback(t *testing.T) {
-	static := envelope.NewPrincipal(envelope.WithUserID("static"))
+	static := toolcall.NewPrincipal(toolcall.WithUserID("static"))
 	g := New(WithPrincipal(&static))
 
 	got := g.resolvePrincipal("Bash", nil)
@@ -206,22 +206,22 @@ func TestPrincipalStaticFallback(t *testing.T) {
 	}
 }
 
-func TestContractProviderInterface(t *testing.T) {
+func TestRuleProviderInterface(t *testing.T) {
 	g := New(
-		WithContracts(
-			contract.Precondition{Name: "pre1", Tool: "Bash",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Pass(), nil
+		WithRules(
+			rule.Precondition{Name: "pre1", Tool: "Bash",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Pass(), nil
 				}},
-			contract.Precondition{Name: "pre2", Tool: "Read",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Pass(), nil
+			rule.Precondition{Name: "pre2", Tool: "Read",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Pass(), nil
 				}},
 		),
 	)
 
 	ctx := context.Background()
-	bashEnv, _ := envelope.CreateEnvelope(ctx, envelope.CreateEnvelopeOptions{
+	bashEnv, _ := toolcall.CreateToolCall(ctx, toolcall.CreateToolCallOptions{
 		ToolName: "Bash",
 		Args:     map[string]any{"command": "ls"},
 	})
@@ -231,7 +231,7 @@ func TestContractProviderInterface(t *testing.T) {
 		t.Errorf("GetPreconditions: got %d, want 1 matching Bash", len(pres))
 	}
 
-	readEnv, _ := envelope.CreateEnvelope(ctx, envelope.CreateEnvelopeOptions{
+	readEnv, _ := toolcall.CreateToolCall(ctx, toolcall.CreateToolCallOptions{
 		ToolName: "Read",
 	})
 	pres2 := g.GetPreconditions(readEnv)
@@ -242,28 +242,28 @@ func TestContractProviderInterface(t *testing.T) {
 
 func TestObserveContracts(t *testing.T) {
 	g := New(
-		WithContracts(
-			contract.Precondition{Name: "observe-pre", Tool: "*", Mode: "observe",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("observed"), nil
+		WithRules(
+			rule.Precondition{Name: "observe-pre", Tool: "*", Mode: "observe",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("observed"), nil
 				}},
 		),
 	)
 
 	if len(g.state.preconditions) != 0 {
-		t.Error("observe contract should not be in enforce list")
+		t.Error("observe rule should not be in enforce list")
 	}
 	if len(g.state.observePreconditions) != 1 {
-		t.Error("observe contract should be in observe list")
+		t.Error("observe rule should be in observe list")
 	}
 
 	ctx := context.Background()
-	env2, _ := envelope.CreateEnvelope(ctx, envelope.CreateEnvelopeOptions{
+	env2, _ := toolcall.CreateToolCall(ctx, toolcall.CreateToolCallOptions{
 		ToolName: "Bash",
 	})
 	obs := g.GetObservePreconditions(env2)
 	if len(obs) != 1 || obs[0].Name != "observe-pre" {
-		t.Error("GetObservePreconditions should return observe contracts")
+		t.Error("GetObservePreconditions should return observe rules")
 	}
 }
 
@@ -312,7 +312,7 @@ func TestAuditSinkComposite(t *testing.T) {
 	ctx := context.Background()
 	event := audit.NewEvent()
 	event.ToolName = "test"
-	event.Action = audit.ActionCallDenied
+	event.Action = audit.ActionCallBlocked
 	if err := g.auditSink.Emit(ctx, &event); err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +360,7 @@ func TestFilterHooksGlob(t *testing.T) {
 		{Phase: "before", Tool: "Read*", Name: "read-hook"},
 	}
 	ctx := context.Background()
-	env2, _ := envelope.CreateEnvelope(ctx, envelope.CreateEnvelopeOptions{
+	env2, _ := toolcall.CreateToolCall(ctx, toolcall.CreateToolCallOptions{
 		ToolName: "Bash",
 	})
 

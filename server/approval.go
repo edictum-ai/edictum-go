@@ -50,7 +50,7 @@ func (b *ApprovalBackend) RequestApproval(
 	}
 	timeoutEffect := tmp.TimeoutEffect()
 	if timeoutEffect == "" {
-		timeoutEffect = "deny"
+		timeoutEffect = "block"
 	}
 
 	body := map[string]any{
@@ -59,7 +59,7 @@ func (b *ApprovalBackend) RequestApproval(
 		"tool_args":      toolArgs,
 		"message":        message,
 		"timeout":        timeout,
-		"timeout_effect": timeoutEffect,
+		"timeout_action": timeoutEffect,
 	}
 
 	resp, err := b.client.Post(ctx, "/api/v1/approvals", body)

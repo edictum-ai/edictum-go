@@ -1,10 +1,10 @@
 apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 metadata:
   name: bad-post-effect
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: c1
     type: post
     tool: Bash
@@ -12,5 +12,5 @@ contracts:
       "output.text":
         contains: "secret"
     then:
-      effect: approve
+      action: ask
       message: "Denied"

@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // ExtractURLs extracts URL strings from envelope args (shell-aware).
@@ -12,7 +12,7 @@ import (
 // For values that contain "://" but are not bare URLs (e.g. command
 // strings like "curl https://evil.com"), tokenizes the value and
 // extracts individual URL tokens.
-func ExtractURLs(env envelope.ToolEnvelope) []string {
+func ExtractURLs(env toolcall.ToolCall) []string {
 	var urls []string
 	seen := make(map[string]bool)
 

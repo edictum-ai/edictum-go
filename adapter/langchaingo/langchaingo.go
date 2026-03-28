@@ -3,7 +3,7 @@
 // LangChainGo tools take a string input and return a string result.
 // The adapter parses input as JSON into map[string]any when possible,
 // falling back to {"input": rawString} for non-JSON input.
-// On deny, returns an error wrapping edictum.DeniedError.
+// On deny, returns an error wrapping edictum.BlockedError.
 package langchaingo
 
 import (
@@ -28,7 +28,7 @@ func New(g *guard.Guard) *Adapter {
 }
 
 // WrapTool wraps a LangChainGo tool function with governance.
-// On deny, returns an error wrapping edictum.DeniedError.
+// On deny, returns an error wrapping edictum.BlockedError.
 func (a *Adapter) WrapTool(
 	toolName string,
 	fn func(ctx context.Context, input string) (string, error),

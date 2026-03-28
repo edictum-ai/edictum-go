@@ -116,7 +116,7 @@ func TestRecordAllowed_IncrementsAllowedCounter(t *testing.T) {
 func TestSetSpanError_SetsErrorStatus(t *testing.T) {
 	tp := newTestTracerProvider()
 	_, span := tp.tracer.Start(context.Background(), "error-span")
-	telemetry.SetSpanError(span, "contract denied")
+	telemetry.SetSpanError(span, "rule denied")
 	span.End()
 
 	spans := tp.tracer.getSpans()
@@ -127,8 +127,8 @@ func TestSetSpanError_SetsErrorStatus(t *testing.T) {
 	if s.StatusCode != codes.Error {
 		t.Errorf("expected status code Error, got %v", s.StatusCode)
 	}
-	if s.StatusDesc != "contract denied" {
-		t.Errorf("expected status description %q, got %q", "contract denied", s.StatusDesc)
+	if s.StatusDesc != "rule denied" {
+		t.Errorf("expected status description %q, got %q", "rule denied", s.StatusDesc)
 	}
 }
 

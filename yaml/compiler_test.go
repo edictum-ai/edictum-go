@@ -5,13 +5,13 @@ import (
 )
 
 // TestCompile_ExplicitObserveSessionLimitsMerged verifies that a
-// user-authored mode: observe session contract still contributes its limits.
+// user-authored mode: observe session rule still contributes its limits.
 func TestCompile_ExplicitObserveSessionLimitsMerged(t *testing.T) {
 	bundle := map[string]any{
 		"apiVersion": "edictum/v1",
-		"kind":       "ContractBundle",
+		"kind":       "Ruleset",
 		"defaults":   map[string]any{"mode": "enforce"},
-		"contracts": []any{
+		"rules": []any{
 			map[string]any{
 				"id":   "sess-observe",
 				"type": "session",
@@ -37,13 +37,13 @@ func TestCompile_ExplicitObserveSessionLimitsMerged(t *testing.T) {
 }
 
 // TestCompile_EnforceSessionLimitsMerged is the positive counterpart:
-// an enforce-mode session contract DOES merge its limits.
+// an enforce-mode session rule DOES merge its limits.
 func TestCompile_EnforceSessionLimitsMerged(t *testing.T) {
 	bundle := map[string]any{
 		"apiVersion": "edictum/v1",
-		"kind":       "ContractBundle",
+		"kind":       "Ruleset",
 		"defaults":   map[string]any{"mode": "enforce"},
-		"contracts": []any{
+		"rules": []any{
 			map[string]any{
 				"id":   "sess-enforce",
 				"type": "session",
@@ -73,9 +73,9 @@ func TestCompile_EnforceSessionLimitsMerged(t *testing.T) {
 func TestCompile_InternalObserveShadowSessionLimitsNotMerged(t *testing.T) {
 	bundle := map[string]any{
 		"apiVersion": "edictum/v1",
-		"kind":       "ContractBundle",
+		"kind":       "Ruleset",
 		"defaults":   map[string]any{"mode": "enforce"},
-		"contracts": []any{
+		"rules": []any{
 			map[string]any{
 				"id":   "sess-enforce",
 				"type": "session",

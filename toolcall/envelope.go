@@ -1,5 +1,5 @@
-// Package envelope defines the ToolEnvelope type and tool classification.
-package envelope
+// Package toolcall defines the ToolCall type and tool classification.
+package toolcall
 
 import (
 	"fmt"
@@ -20,9 +20,9 @@ const (
 	SideEffectIrreversible SideEffect = "irreversible"
 )
 
-// ToolEnvelope is an immutable snapshot of a tool call.
+// ToolCall is an immutable snapshot of a tool call.
 // Fields are unexported — use getter methods.
-type ToolEnvelope struct {
+type ToolCall struct {
 	toolName    string
 	args        map[string]any
 	callID      string
@@ -42,56 +42,56 @@ type ToolEnvelope struct {
 }
 
 // ToolName returns the tool name.
-func (e ToolEnvelope) ToolName() string { return e.toolName }
+func (e ToolCall) ToolName() string { return e.toolName }
 
 // Args returns a deep copy of the tool arguments.
 // Nested maps and slices are recursively copied to prevent mutation.
-func (e ToolEnvelope) Args() map[string]any {
+func (e ToolCall) Args() map[string]any {
 	return deepcopy.Map(e.args)
 }
 
 // CallID returns the call ID.
-func (e ToolEnvelope) CallID() string { return e.callID }
+func (e ToolCall) CallID() string { return e.callID }
 
 // RunID returns the run ID.
-func (e ToolEnvelope) RunID() string { return e.runID }
+func (e ToolCall) RunID() string { return e.runID }
 
 // CallIndex returns the call index.
-func (e ToolEnvelope) CallIndex() int { return e.callIndex }
+func (e ToolCall) CallIndex() int { return e.callIndex }
 
 // ParentCallID returns the parent call ID.
-func (e ToolEnvelope) ParentCallID() string { return e.parentCall }
+func (e ToolCall) ParentCallID() string { return e.parentCall }
 
 // SideEffect returns the classified side effect.
-func (e ToolEnvelope) SideEffect() SideEffect { return e.sideEffect }
+func (e ToolCall) SideEffect() SideEffect { return e.sideEffect }
 
 // Idempotent returns whether the tool call is idempotent.
-func (e ToolEnvelope) Idempotent() bool { return e.idempotent }
+func (e ToolCall) Idempotent() bool { return e.idempotent }
 
 // Environment returns the environment name.
-func (e ToolEnvelope) Environment() string { return e.environment }
+func (e ToolCall) Environment() string { return e.environment }
 
 // Timestamp returns the timestamp.
-func (e ToolEnvelope) Timestamp() string { return e.timestamp }
+func (e ToolCall) Timestamp() string { return e.timestamp }
 
 // Caller returns the caller identifier.
-func (e ToolEnvelope) Caller() string { return e.caller }
+func (e ToolCall) Caller() string { return e.caller }
 
 // ToolUseID returns the tool use ID.
-func (e ToolEnvelope) ToolUseID() string { return e.toolUseID }
+func (e ToolCall) ToolUseID() string { return e.toolUseID }
 
 // Principal returns the principal (nil if not set).
-func (e ToolEnvelope) Principal() *Principal { return e.principal }
+func (e ToolCall) Principal() *Principal { return e.principal }
 
 // BashCommand returns the extracted bash command.
-func (e ToolEnvelope) BashCommand() string { return e.bashCommand }
+func (e ToolCall) BashCommand() string { return e.bashCommand }
 
 // FilePath returns the extracted file path.
-func (e ToolEnvelope) FilePath() string { return e.filePath }
+func (e ToolCall) FilePath() string { return e.filePath }
 
 // Metadata returns a deep copy of the metadata.
 // Nested maps and slices are recursively copied to prevent mutation.
-func (e ToolEnvelope) Metadata() map[string]any {
+func (e ToolCall) Metadata() map[string]any {
 	return deepcopy.Map(e.metadata)
 }
 

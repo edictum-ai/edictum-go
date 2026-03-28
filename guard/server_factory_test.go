@@ -19,10 +19,10 @@ import (
 )
 
 const validBundleYAML = `apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: no-rm
     type: pre
     tool: Bash
@@ -30,7 +30,7 @@ contracts:
       "args.command":
         contains: "rm -rf"
     then:
-      effect: deny
+      action: block
       message: "Cannot run rm -rf"
 `
 
@@ -127,7 +127,7 @@ func TestFromServer_BasicConnection(t *testing.T) {
 		t.Error("expected non-empty policy version")
 	}
 
-	// The bundle contains one precondition; verify the guard has contracts.
+	// The bundle contains one precondition; verify the guard has rules.
 	g.mu.RLock()
 	nPre := len(g.state.preconditions)
 	g.mu.RUnlock()

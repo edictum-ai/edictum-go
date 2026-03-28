@@ -7,29 +7,29 @@ import (
 	"testing"
 
 	edictum "github.com/edictum-ai/edictum-go"
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/guard"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func echoTool(_ context.Context, input string) (string, error) {
 	return "echo:" + input, nil
 }
 
-func denyRmContract() contract.Precondition {
-	return contract.Precondition{
+func denyRmContract() rule.Precondition {
+	return rule.Precondition{
 		Name: "deny-rm",
 		Tool: "Bash",
-		Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, env toolcall.ToolCall) (rule.Decision, error) {
 			if strings.Contains(env.BashCommand(), "rm") {
-				return contract.Fail("rm is denied"), nil
+				return rule.Fail("rm is denied"), nil
 			}
-			return contract.Pass(), nil
+			return rule.Pass(), nil
 		},
 	}
 }
 
-// 11.1: WrapTool allows tool execution when no contracts deny.
+// 11.1: WrapTool allows tool execution when no rules deny.
 func TestWrapTool_Allow(t *testing.T) {
 	g := guard.New()
 	adapter := New(g)
@@ -46,7 +46,7 @@ func TestWrapTool_Allow(t *testing.T) {
 
 // 11.2: WrapTool denies and does not execute the tool.
 func TestWrapTool_Deny(t *testing.T) {
-	g := guard.New(guard.WithContracts(denyRmContract()))
+	g := guard.New(guard.WithRules(denyRmContract()))
 	adapter := New(g)
 
 	toolCalled := false
@@ -66,7 +66,7 @@ func TestWrapTool_Deny(t *testing.T) {
 
 // 11.3: Deny reason is preserved in the error.
 func TestWrapTool_DenyReason(t *testing.T) {
-	g := guard.New(guard.WithContracts(denyRmContract()))
+	g := guard.New(guard.WithRules(denyRmContract()))
 	adapter := New(g)
 	wrapped := adapter.WrapTool("Bash", echoTool)
 
@@ -74,9 +74,9 @@ func TestWrapTool_DenyReason(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error on deny")
 	}
-	var denied *edictum.DeniedError
+	var denied *edictum.BlockedError
 	if !errors.As(err, &denied) {
-		t.Fatalf("expected DeniedError, got %T: %v", err, err)
+		t.Fatalf("expected BlockedError, got %T: %v", err, err)
 	}
 	if denied.Reason != "rm is denied" {
 		t.Errorf("reason: got %q, want %q", denied.Reason, "rm is denied")
@@ -90,7 +90,7 @@ func TestWrapTool_DenyReason(t *testing.T) {
 func TestWrapTool_ObserveMode(t *testing.T) {
 	g := guard.New(
 		guard.WithMode("observe"),
-		guard.WithContracts(denyRmContract()),
+		guard.WithRules(denyRmContract()),
 	)
 	adapter := New(g)
 
@@ -115,13 +115,13 @@ func TestWrapTool_ObserveMode(t *testing.T) {
 // TestWrapTool_NonJSONInput verifies fallback to {"input": raw} for non-JSON.
 func TestWrapTool_NonJSONInput(t *testing.T) {
 	var capturedArgs map[string]any
-	g := guard.New(guard.WithContracts(
-		contract.Precondition{
+	g := guard.New(guard.WithRules(
+		rule.Precondition{
 			Name: "capture",
 			Tool: "*",
-			Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+			Check: func(_ context.Context, env toolcall.ToolCall) (rule.Decision, error) {
 				capturedArgs = env.Args()
-				return contract.Pass(), nil
+				return rule.Pass(), nil
 			},
 		},
 	))

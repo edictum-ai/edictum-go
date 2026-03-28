@@ -1,10 +1,10 @@
-// Package yaml provides YAML contract bundle loading and compilation.
+// Package yaml provides YAML rule bundle loading and compilation.
 package yaml
 
 import (
 	"fmt"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // EvalResult represents the outcome of expression evaluation.
@@ -32,7 +32,7 @@ type EvalOption func(*evalCtx)
 
 type evalCtx struct {
 	customOperators map[string]func(any, any) bool
-	customSelectors map[string]func(envelope.ToolEnvelope) map[string]any
+	customSelectors map[string]func(toolcall.ToolCall) map[string]any
 	outputPresent   bool
 }
 
@@ -42,12 +42,12 @@ func WithCustomOperators(ops map[string]func(any, any) bool) EvalOption {
 }
 
 // WithCustomSelectors registers custom selector prefix resolvers.
-func WithCustomSelectors(sels map[string]func(envelope.ToolEnvelope) map[string]any) EvalOption {
+func WithCustomSelectors(sels map[string]func(toolcall.ToolCall) map[string]any) EvalOption {
 	return func(ctx *evalCtx) { ctx.customSelectors = sels }
 }
 
-// EvaluateExpression evaluates a boolean expression tree against an envelope.
-func EvaluateExpression(expr map[string]any, env envelope.ToolEnvelope, outputText string, opts ...EvalOption) EvalResult {
+// EvaluateExpression evaluates a boolean expression tree against an toolcall.
+func EvaluateExpression(expr map[string]any, env toolcall.ToolCall, outputText string, opts ...EvalOption) EvalResult {
 	ec := evalCtx{outputPresent: true}
 	for _, o := range opts {
 		o(&ec)
@@ -59,7 +59,7 @@ func withOutputPresent(present bool) EvalOption {
 	return func(ctx *evalCtx) { ctx.outputPresent = present }
 }
 
-func evalExpr(expr map[string]any, env envelope.ToolEnvelope, outputText string, ec *evalCtx) EvalResult {
+func evalExpr(expr map[string]any, env toolcall.ToolCall, outputText string, ec *evalCtx) EvalResult {
 	if v, ok := expr["all"]; ok {
 		items, _ := v.([]any)
 		return evalAll(items, env, outputText, ec)
@@ -76,7 +76,7 @@ func evalExpr(expr map[string]any, env envelope.ToolEnvelope, outputText string,
 }
 
 // evalAll implements short-circuit AND. PolicyError propagates immediately.
-func evalAll(exprs []any, env envelope.ToolEnvelope, outputText string, ec *evalCtx) EvalResult {
+func evalAll(exprs []any, env toolcall.ToolCall, outputText string, ec *evalCtx) EvalResult {
 	for _, item := range exprs {
 		m, ok := item.(map[string]any)
 		if !ok {
@@ -94,7 +94,7 @@ func evalAll(exprs []any, env envelope.ToolEnvelope, outputText string, ec *eval
 }
 
 // evalAny implements short-circuit OR. PolicyError propagates immediately.
-func evalAny(exprs []any, env envelope.ToolEnvelope, outputText string, ec *evalCtx) EvalResult {
+func evalAny(exprs []any, env toolcall.ToolCall, outputText string, ec *evalCtx) EvalResult {
 	for _, item := range exprs {
 		m, ok := item.(map[string]any)
 		if !ok {
@@ -112,7 +112,7 @@ func evalAny(exprs []any, env envelope.ToolEnvelope, outputText string, ec *eval
 }
 
 // evalNot inverts the result. PolicyError propagates.
-func evalNot(expr map[string]any, env envelope.ToolEnvelope, outputText string, ec *evalCtx) EvalResult {
+func evalNot(expr map[string]any, env toolcall.ToolCall, outputText string, ec *evalCtx) EvalResult {
 	r := evalExpr(expr, env, outputText, ec)
 	if r.PolicyError {
 		return r
@@ -124,7 +124,7 @@ func evalNot(expr map[string]any, env envelope.ToolEnvelope, outputText string, 
 }
 
 // evalLeaf evaluates a leaf node: one selector key mapping to one operator block.
-func evalLeaf(leaf map[string]any, env envelope.ToolEnvelope, outputText string, ec *evalCtx) EvalResult {
+func evalLeaf(leaf map[string]any, env toolcall.ToolCall, outputText string, ec *evalCtx) EvalResult {
 	if len(leaf) != 1 {
 		return policyError(fmt.Sprintf("leaf expression must have exactly 1 selector, got %d", len(leaf)))
 	}

@@ -5,11 +5,11 @@ import (
 
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/redaction"
+	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // Option configures a Guard.
@@ -34,19 +34,19 @@ func WithLimits(limits pipeline.OperationLimits) Option {
 	return func(g *Guard) { g.state.limits = limits }
 }
 
-// WithContracts adds contracts to the guard. Accepts Precondition,
-// Postcondition, and SessionContract values. Each is sorted into
+// WithRules adds rules to the guard. Accepts Precondition,
+// Postcondition, and SessionRule values. Each is sorted into
 // enforce or observe lists based on its Mode field.
 //
 // Panics on unsupported types (construction-time programmer error,
 // like regexp.MustCompile). This is intentional: the functional option
 // signature has no error return, and silently ignoring an unknown type
 // would violate the API design rule "never silently ignore".
-func WithContracts(contracts ...any) Option {
+func WithRules(rules ...any) Option {
 	return func(g *Guard) {
-		for _, c := range contracts {
+		for _, c := range rules {
 			switch v := c.(type) {
-			case contract.Precondition:
+			case rule.Precondition:
 				if v.Mode == "observe" {
 					g.state.observePreconditions = append(
 						g.state.observePreconditions, v)
@@ -54,7 +54,7 @@ func WithContracts(contracts ...any) Option {
 					g.state.preconditions = append(
 						g.state.preconditions, v)
 				}
-			case contract.Postcondition:
+			case rule.Postcondition:
 				if v.Mode == "observe" {
 					g.state.observePostconditions = append(
 						g.state.observePostconditions, v)
@@ -62,16 +62,16 @@ func WithContracts(contracts ...any) Option {
 					g.state.postconditions = append(
 						g.state.postconditions, v)
 				}
-			case contract.SessionContract:
+			case rule.SessionRule:
 				if v.Mode == "observe" {
-					g.state.observeSessionContracts = append(
-						g.state.observeSessionContracts, v)
+					g.state.observeSessionRules = append(
+						g.state.observeSessionRules, v)
 				} else {
-					g.state.sessionContracts = append(
-						g.state.sessionContracts, v)
+					g.state.sessionRules = append(
+						g.state.sessionRules, v)
 				}
 			default:
-				panic(fmt.Sprintf("WithContracts: unsupported type %T", c))
+				panic(fmt.Sprintf("WithRules: unsupported type %T", c))
 			}
 		}
 	}
@@ -116,18 +116,18 @@ func WithPolicyVersion(v string) Option {
 	return func(g *Guard) { g.state.policyVersion = v }
 }
 
-// WithOnDeny sets the callback invoked when a tool call is denied.
-func WithOnDeny(fn func(envelope.ToolEnvelope, string, string)) Option {
-	return func(g *Guard) { g.onDeny = fn }
+// WithOnBlock sets the callback invoked when a tool call is blocked.
+func WithOnBlock(fn func(toolcall.ToolCall, string, string)) Option {
+	return func(g *Guard) { g.onBlock = fn }
 }
 
 // WithOnAllow sets the callback invoked when a tool call is allowed.
-func WithOnAllow(fn func(envelope.ToolEnvelope)) Option {
+func WithOnAllow(fn func(toolcall.ToolCall)) Option {
 	return func(g *Guard) { g.onAllow = fn }
 }
 
 // WithOnPostWarn sets the callback invoked when postconditions produce warnings.
-func WithOnPostWarn(fn func(envelope.ToolEnvelope, []string)) Option {
+func WithOnPostWarn(fn func(toolcall.ToolCall, []string)) Option {
 	return func(g *Guard) { g.onPostWarn = fn }
 }
 
@@ -137,13 +137,13 @@ func WithSuccessCheck(fn func(string, any) bool) Option {
 }
 
 // WithPrincipal sets a static principal for all tool calls.
-func WithPrincipal(p *envelope.Principal) Option {
+func WithPrincipal(p *toolcall.Principal) Option {
 	return func(g *Guard) { g.principal = p }
 }
 
 // WithPrincipalResolver sets a function that resolves a principal
 // per tool call. Overrides WithPrincipal when set.
-func WithPrincipalResolver(fn func(string, map[string]any) *envelope.Principal) Option {
+func WithPrincipalResolver(fn func(string, map[string]any) *toolcall.Principal) Option {
 	return func(g *Guard) { g.principalResolver = fn }
 }
 
@@ -157,9 +157,9 @@ func WithApprovalBackend(b approval.Backend) Option {
 func WithTools(tools map[string]map[string]any) Option {
 	return func(g *Guard) {
 		for name, cfg := range tools {
-			se := envelope.SideEffectIrreversible
+			se := toolcall.SideEffectIrreversible
 			if v, ok := cfg["side_effect"].(string); ok {
-				se = envelope.SideEffect(v)
+				se = toolcall.SideEffect(v)
 			}
 			idem := false
 			if v, ok := cfg["idempotent"].(bool); ok {
@@ -170,17 +170,17 @@ func WithTools(tools map[string]map[string]any) Option {
 	}
 }
 
-// WithSandboxContracts adds sandbox contracts (preconditions matched
+// WithSandboxRules adds sandbox rules (preconditions matched
 // against multiple tool patterns).
-func WithSandboxContracts(contracts ...contract.Precondition) Option {
+func WithSandboxRules(rules ...rule.Precondition) Option {
 	return func(g *Guard) {
-		for _, c := range contracts {
+		for _, c := range rules {
 			if c.Mode == "observe" {
-				g.state.observeSandboxContracts = append(
-					g.state.observeSandboxContracts, c)
+				g.state.observeSandboxRules = append(
+					g.state.observeSandboxRules, c)
 			} else {
-				g.state.sandboxContracts = append(
-					g.state.sandboxContracts, c)
+				g.state.sandboxRules = append(
+					g.state.sandboxRules, c)
 			}
 		}
 	}

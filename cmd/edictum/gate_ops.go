@@ -85,15 +85,15 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 	}
 
 	if jsonFlag {
-		contractNames := make([]string, 0, len(files))
+		ruleNames := make([]string, 0, len(files))
 		for _, f := range files {
-			contractNames = append(contractNames, filepath.Base(f))
+			ruleNames = append(ruleNames, filepath.Base(f))
 		}
 		if installed == nil {
 			installed = []string{}
 		}
 		out := map[string]any{
-			"contracts":      contractNames,
+			"rules":          ruleNames,
 			"server_url":     cfg.ServerURL,
 			"pending_events": pending,
 			"installed":      installed,
@@ -136,7 +136,7 @@ func newGateAuditCmd() *cobra.Command {
 	var (
 		limit    int
 		tool     string
-		verdict  string
+		decision string
 		jsonFlag bool
 	)
 
@@ -144,24 +144,24 @@ func newGateAuditCmd() *cobra.Command {
 		Use:   "audit",
 		Short: "Show recent audit events",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runGateAudit(cmd, limit, tool, verdict, jsonFlag)
+			return runGateAudit(cmd, limit, tool, decision, jsonFlag)
 		},
 	}
 
 	cmd.Flags().IntVar(&limit, "limit", 20, "number of recent events")
 	cmd.Flags().StringVar(&tool, "tool", "", "filter by tool name")
-	cmd.Flags().StringVar(&verdict, "verdict", "", "filter by verdict (allow, deny)")
+	cmd.Flags().StringVar(&decision, "decision", "", "filter by decision (allow, deny)")
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "output as JSON")
 	return cmd
 }
 
-func runGateAudit(cmd *cobra.Command, limit int, tool, verdict string, jsonFlag bool) error {
+func runGateAudit(cmd *cobra.Command, limit int, tool, decision string, jsonFlag bool) error {
 	cfg, err := loadGateConfigDefault()
 	if err != nil {
 		return fmt.Errorf("no gate config: %w", err)
 	}
 
-	events, rErr := readWALEvents(cfg.AuditPath, limit, tool, verdict)
+	events, rErr := readWALEvents(cfg.AuditPath, limit, tool, decision)
 	if rErr != nil {
 		return fmt.Errorf("reading audit events: %w", rErr)
 	}
@@ -181,14 +181,14 @@ func runGateAudit(cmd *cobra.Command, limit int, tool, verdict string, jsonFlag 
 		return nil
 	}
 
-	fmt.Fprintf(w, "%-20s %-10s %-8s %-15s %s\n", "Time", "User", "Verdict", "Tool", "Detail")
+	fmt.Fprintf(w, "%-20s %-10s %-8s %-15s %s\n", "Time", "User", "Decision", "Tool", "Detail")
 	for _, e := range events {
 		ts := e.Timestamp
 		if len(ts) > 19 {
 			ts = ts[:19]
 		}
 		fmt.Fprintf(w, "%-20s %-10s %-8s %-15s %s\n",
-			ts, e.User, strings.ToUpper(e.Verdict), e.ToolName, e.Reason)
+			ts, e.User, strings.ToUpper(e.Decision), e.ToolName, e.Reason)
 	}
 	return nil
 }

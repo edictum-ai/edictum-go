@@ -5,15 +5,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // missing is the sentinel for "field not found".
 var missing = &struct{}{}
 
-// resolveSelector resolves a dotted selector path to a value from the envelope.
+// resolveSelector resolves a dotted selector path to a value from the toolcall.
 // Returns missing if the field is not found at any level.
-func resolveSelector(selector string, env envelope.ToolEnvelope, outputText string, ec *evalCtx) any {
+func resolveSelector(selector string, env toolcall.ToolCall, outputText string, ec *evalCtx) any {
 	if selector == "environment" {
 		return env.Environment()
 	}

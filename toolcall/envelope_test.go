@@ -1,4 +1,4 @@
-package envelope
+package toolcall
 
 import (
 	"context"
@@ -10,7 +10,7 @@ func ctx() context.Context { return context.Background() }
 // --- 2.1: Envelope immutability (unexported fields, Args returns copy) ---
 
 func TestParity_2_1_EnvelopeImmutability(t *testing.T) {
-	env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName: "TestTool",
 		Args:     map[string]any{"key": "value"},
 	})
@@ -18,7 +18,7 @@ func TestParity_2_1_EnvelopeImmutability(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Args() must return a copy; mutating it must not affect the envelope.
+	// Args() must return a copy; mutating it must not affect the toolcall.
 	argsCopy := env.Args()
 	argsCopy["key"] = "mutated"
 
@@ -28,14 +28,14 @@ func TestParity_2_1_EnvelopeImmutability(t *testing.T) {
 	}
 }
 
-// --- 2.2: Deep copy via CreateEnvelope ---
+// --- 2.2: Deep copy via CreateToolCall ---
 
 func TestParity_2_2_DeepCopyIsolation(t *testing.T) {
 	original := map[string]any{
 		"nested": map[string]any{"key": "value"},
 		"list":   []any{1, 2, 3},
 	}
-	env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName: "TestTool",
 		Args:     original,
 	})
@@ -60,7 +60,7 @@ func TestParity_2_2_DeepCopyIsolation(t *testing.T) {
 
 func TestParity_2_2_MetadataDeepCopy(t *testing.T) {
 	meta := map[string]any{"info": map[string]any{"nested": true}}
-	env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName: "TestTool",
 		Args:     map[string]any{},
 		Metadata: meta,
@@ -105,7 +105,7 @@ func TestParity_2_4_PrincipalClaimsDeepCopy(t *testing.T) {
 // --- 2.5-2.8: Tool name validation ---
 
 func TestParity_2_5_ToolNameEmpty(t *testing.T) {
-	_, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{ToolName: ""})
+	_, err := CreateToolCall(ctx(), CreateToolCallOptions{ToolName: ""})
 	if err == nil {
 		t.Fatal("expected error for empty tool name, got nil")
 	}
@@ -124,7 +124,7 @@ func TestParity_2_6_ToolNameControlChars(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{ToolName: tc.toolName})
+			_, err := CreateToolCall(ctx(), CreateToolCallOptions{ToolName: tc.toolName})
 			if err == nil {
 				t.Fatalf("expected error for tool name %q, got nil", tc.toolName)
 			}
@@ -142,7 +142,7 @@ func TestParity_2_7_ToolNamePathSeparators(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{ToolName: tc.toolName})
+			_, err := CreateToolCall(ctx(), CreateToolCallOptions{ToolName: tc.toolName})
 			if err == nil {
 				t.Fatalf("expected error for tool name %q, got nil", tc.toolName)
 			}
@@ -160,7 +160,7 @@ func TestParity_2_8_ToolNameValidAccepted(t *testing.T) {
 	}
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
-			_, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+			_, err := CreateToolCall(ctx(), CreateToolCallOptions{
 				ToolName: name,
 				Args:     map[string]any{},
 			})
@@ -195,7 +195,7 @@ func TestParity_2_9_SideEffectValues(t *testing.T) {
 // --- 2.10: Unregistered tool defaults to IRREVERSIBLE ---
 
 func TestParity_2_10_UnregisteredToolIrreversible(t *testing.T) {
-	env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName: "UnknownTool",
 		Args:     map[string]any{},
 	})
@@ -238,7 +238,7 @@ func TestParity_2_11_RegistryWithEnvelope(t *testing.T) {
 	reg := NewToolRegistry()
 	reg.Register("MyTool", SideEffectRead, true)
 
-	env, err := CreateEnvelope(ctx(), CreateEnvelopeOptions{
+	env, err := CreateToolCall(ctx(), CreateToolCallOptions{
 		ToolName: "MyTool",
 		Args:     map[string]any{},
 		Registry: reg,

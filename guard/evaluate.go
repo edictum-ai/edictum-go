@@ -4,42 +4,42 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
-// ContractResult is the result of evaluating a single contract.
-type ContractResult struct {
-	ContractID   string
-	ContractType string // "precondition" | "postcondition" | "sandbox"
-	Passed       bool
-	Message      string
-	Observed     bool
-	Effect       string
-	PolicyError  bool
+// RuleResult is the result of evaluating a single rule.
+type RuleResult struct {
+	RuleID      string
+	RuleType    string // "precondition" | "postcondition" | "sandbox"
+	Passed      bool
+	Message     string
+	Observed    bool
+	Effect      string
+	PolicyError bool
 }
 
-// EvaluationResult is the result of offline contract evaluation.
+// EvaluationResult is the result of offline rule evaluation.
 type EvaluationResult struct {
-	Verdict            string // "allow" | "deny" | "warn"
-	ToolName           string
-	Contracts          []ContractResult
-	DenyReasons        []string
-	WarnReasons        []string
-	ContractsEvaluated int
-	PolicyError        bool
+	Decision       string // "allow" | "block" | "warn"
+	ToolName       string
+	Rules          []RuleResult
+	BlockReasons   []string
+	WarnReasons    []string
+	RulesEvaluated int
+	PolicyError    bool
 }
 
 // EvalOption configures a single Evaluate() call.
 type EvalOption func(*evalConfig)
 
 type evalConfig struct {
-	principal   *envelope.Principal
+	principal   *toolcall.Principal
 	output      *string
 	environment string
 }
 
 // WithEvalPrincipal overrides the principal for this evaluation.
-func WithEvalPrincipal(p *envelope.Principal) EvalOption {
+func WithEvalPrincipal(p *toolcall.Principal) EvalOption {
 	return func(c *evalConfig) { c.principal = p }
 }
 
@@ -54,9 +54,9 @@ func WithEvalEnvironment(env string) EvalOption {
 }
 
 // Evaluate performs an offline evaluation of a tool call against all
-// matching contracts. Unlike Run(), this never executes the tool and
-// evaluates all matching contracts exhaustively (no short-circuit on
-// first deny). Session contracts are skipped (no session state).
+// matching rules. Unlike Run(), this never executes the tool and
+// evaluates all matching rules exhaustively (no short-circuit on
+// first deny). Session rules are skipped (no session state).
 func (g *Guard) Evaluate(
 	ctx context.Context,
 	toolName string,
@@ -80,7 +80,7 @@ func (g *Guard) Evaluate(
 		g.mu.RUnlock()
 	}
 
-	env2, err := envelope.CreateEnvelope(ctx, envelope.CreateEnvelopeOptions{
+	env2, err := toolcall.CreateToolCall(ctx, toolcall.CreateToolCallOptions{
 		ToolName:    toolName,
 		Args:        args,
 		Environment: cfg.environment,
@@ -89,17 +89,17 @@ func (g *Guard) Evaluate(
 	})
 	if err != nil {
 		return EvaluationResult{
-			Verdict:  "deny",
+			Decision: "block",
 			ToolName: toolName,
-			DenyReasons: []string{
+			BlockReasons: []string{
 				fmt.Sprintf("Envelope creation error: %s", err),
 			},
-			ContractsEvaluated: 0,
-			PolicyError:        true,
+			RulesEvaluated: 0,
+			PolicyError:    true,
 		}
 	}
 
-	var contracts []ContractResult
+	var rules []RuleResult
 	var denyReasons []string
 	var warnReasons []string
 
@@ -109,22 +109,22 @@ func (g *Guard) Evaluate(
 	obsPres := filterPreconditions(g.state.observePreconditions, env2)
 	g.mu.RUnlock()
 	for _, c := range pres {
-		evalPrecondition(ctx, c, env2, "precondition", &contracts, &denyReasons)
+		evalPrecondition(ctx, c, env2, "precondition", &rules, &denyReasons)
 	}
 	for _, c := range obsPres {
-		evalPrecondition(ctx, c, env2, "precondition", &contracts, &denyReasons)
+		evalPrecondition(ctx, c, env2, "precondition", &rules, &denyReasons)
 	}
 
-	// Evaluate sandbox contracts (exhaustive, no short-circuit)
+	// Evaluate sandbox rules (exhaustive, no short-circuit)
 	g.mu.RLock()
-	sandboxes := filterSandbox(g.state.sandboxContracts, env2)
-	obsSandboxes := filterSandbox(g.state.observeSandboxContracts, env2)
+	sandboxes := filterSandbox(g.state.sandboxRules, env2)
+	obsSandboxes := filterSandbox(g.state.observeSandboxRules, env2)
 	g.mu.RUnlock()
 	for _, c := range sandboxes {
-		evalPrecondition(ctx, c, env2, "sandbox", &contracts, &denyReasons)
+		evalPrecondition(ctx, c, env2, "sandbox", &rules, &denyReasons)
 	}
 	for _, c := range obsSandboxes {
-		evalPrecondition(ctx, c, env2, "sandbox", &contracts, &denyReasons)
+		evalPrecondition(ctx, c, env2, "sandbox", &rules, &denyReasons)
 	}
 
 	// Evaluate postconditions only when output is provided
@@ -134,23 +134,23 @@ func (g *Guard) Evaluate(
 		obsPosts := filterPostconditions(g.state.observePostconditions, env2)
 		g.mu.RUnlock()
 		for _, c := range posts {
-			evalPostcondition(ctx, c, env2, *cfg.output, &contracts, &warnReasons)
+			evalPostcondition(ctx, c, env2, *cfg.output, &rules, &warnReasons)
 		}
 		for _, c := range obsPosts {
-			evalPostcondition(ctx, c, env2, *cfg.output, &contracts, &warnReasons)
+			evalPostcondition(ctx, c, env2, *cfg.output, &rules, &warnReasons)
 		}
 	}
 
-	// Compute verdict
-	verdict := "allow"
+	// Compute decision
+	decision := "allow"
 	if len(denyReasons) > 0 {
-		verdict = "deny"
+		decision = "block"
 	} else if len(warnReasons) > 0 {
-		verdict = "warn"
+		decision = "warn"
 	}
 
 	policyError := false
-	for _, cr := range contracts {
+	for _, cr := range rules {
 		if cr.PolicyError {
 			policyError = true
 			break
@@ -158,12 +158,12 @@ func (g *Guard) Evaluate(
 	}
 
 	return EvaluationResult{
-		Verdict:            verdict,
-		ToolName:           toolName,
-		Contracts:          contracts,
-		DenyReasons:        denyReasons,
-		WarnReasons:        warnReasons,
-		ContractsEvaluated: len(contracts),
-		PolicyError:        policyError,
+		Decision:       decision,
+		ToolName:       toolName,
+		Rules:          rules,
+		BlockReasons:   denyReasons,
+		WarnReasons:    warnReasons,
+		RulesEvaluated: len(rules),
+		PolicyError:    policyError,
 	}
 }

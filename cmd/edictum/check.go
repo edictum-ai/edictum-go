@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/guard"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/spf13/cobra"
 )
 
@@ -23,8 +23,8 @@ func newCheckCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "check <files...>",
-		Short: "Evaluate a tool call against contract bundles",
-		Long:  "Evaluate a tool call offline against one or more YAML contract bundles.",
+		Short: "Evaluate a tool call against rule bundles",
+		Long:  "Evaluate a tool call offline against one or more YAML rule bundles.",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, files []string) error {
 			return runCheck(cmd, files, checkArgs{
@@ -77,10 +77,10 @@ func runCheck(cmd *cobra.Command, files []string, ca checkArgs) error {
 	g, err := buildGuardFromFiles(files, ca.environment)
 	if err != nil {
 		if ca.jsonOutput {
-			writeErrorJSONTo(w, fmt.Sprintf("loading contracts: %s", err)) //nolint:errcheck // best-effort JSON error
+			writeErrorJSONTo(w, fmt.Sprintf("loading rules: %s", err)) //nolint:errcheck // best-effort JSON error
 			return &exitError{code: 2}
 		}
-		return fmt.Errorf("loading contracts: %w", err)
+		return fmt.Errorf("loading rules: %w", err)
 	}
 
 	var evalOpts []guard.EvalOption
@@ -98,28 +98,28 @@ func runCheck(cmd *cobra.Command, files []string, ca checkArgs) error {
 	return printCheckText(cmd, result)
 }
 
-func buildPrincipal(role, user, ticket string) envelope.Principal {
-	var opts []envelope.PrincipalOption
+func buildPrincipal(role, user, ticket string) toolcall.Principal {
+	var opts []toolcall.PrincipalOption
 	if role != "" {
-		opts = append(opts, envelope.WithRole(role))
+		opts = append(opts, toolcall.WithRole(role))
 	}
 	if user != "" {
-		opts = append(opts, envelope.WithUserID(user))
+		opts = append(opts, toolcall.WithUserID(user))
 	}
 	if ticket != "" {
-		opts = append(opts, envelope.WithTicketRef(ticket))
+		opts = append(opts, toolcall.WithTicketRef(ticket))
 	}
-	return envelope.NewPrincipal(opts...)
+	return toolcall.NewPrincipal(opts...)
 }
 
 type checkOutput struct {
-	Tool               string         `json:"tool"`
-	Args               map[string]any `json:"args"`
-	Verdict            string         `json:"verdict"`
-	Reason             string         `json:"reason,omitempty"`
-	ContractsEvaluated int            `json:"contracts_evaluated"`
-	Environment        string         `json:"environment"`
-	ContractID         string         `json:"contract_id,omitempty"`
+	Tool           string         `json:"tool"`
+	Args           map[string]any `json:"args"`
+	Decision       string         `json:"decision"`
+	Reason         string         `json:"reason,omitempty"`
+	RulesEvaluated int            `json:"rules_evaluated"`
+	Environment    string         `json:"environment"`
+	RuleID         string         `json:"rule_id,omitempty"`
 }
 
 func printCheckJSON(cmd *cobra.Command, ca checkArgs, r guard.EvaluationResult) error {
@@ -127,23 +127,23 @@ func printCheckJSON(cmd *cobra.Command, ca checkArgs, r guard.EvaluationResult) 
 	_ = json.Unmarshal([]byte(ca.argsJSON), &args)
 
 	out := checkOutput{
-		Tool:               ca.toolName,
-		Args:               args,
-		Verdict:            r.Verdict,
-		ContractsEvaluated: r.ContractsEvaluated,
-		Environment:        ca.environment,
+		Tool:           ca.toolName,
+		Args:           args,
+		Decision:       r.Decision,
+		RulesEvaluated: r.RulesEvaluated,
+		Environment:    ca.environment,
 	}
 
-	if r.Verdict == "deny" && len(r.DenyReasons) > 0 {
-		out.Reason = r.DenyReasons[0]
-	} else if r.Verdict == "warn" && len(r.WarnReasons) > 0 {
+	if r.Decision == "block" && len(r.BlockReasons) > 0 {
+		out.Reason = r.BlockReasons[0]
+	} else if r.Decision == "warn" && len(r.WarnReasons) > 0 {
 		out.Reason = r.WarnReasons[0]
 	}
 
-	// Find the first failing contract ID.
-	for _, c := range r.Contracts {
+	// Find the first failing rule ID.
+	for _, c := range r.Rules {
 		if !c.Passed {
-			out.ContractID = c.ContractID
+			out.RuleID = c.RuleID
 			break
 		}
 	}
@@ -154,7 +154,7 @@ func printCheckJSON(cmd *cobra.Command, ca checkArgs, r guard.EvaluationResult) 
 		return fmt.Errorf("json encode: %w", err)
 	}
 
-	if r.Verdict == "deny" {
+	if r.Decision == "block" {
 		return &exitError{code: 1}
 	}
 	return nil
@@ -163,10 +163,10 @@ func printCheckJSON(cmd *cobra.Command, ca checkArgs, r guard.EvaluationResult) 
 func printCheckText(cmd *cobra.Command, r guard.EvaluationResult) error { //nolint:errcheck // CLI output
 	w := cmd.OutOrStdout()
 
-	if r.Verdict == "deny" {
-		for _, c := range r.Contracts {
+	if r.Decision == "block" {
+		for _, c := range r.Rules {
 			if !c.Passed {
-				fmt.Fprintf(w, "\u2717 DENIED by %s", c.ContractID)
+				fmt.Fprintf(w, "\u2717 BLOCKED by %s", c.RuleID)
 				if c.Message != "" {
 					fmt.Fprintf(w, " \u2014 %s", c.Message)
 				}
@@ -176,12 +176,12 @@ func printCheckText(cmd *cobra.Command, r guard.EvaluationResult) error { //noli
 		return &exitError{code: 1}
 	}
 
-	if r.Verdict == "warn" {
+	if r.Decision == "warn" {
 		for _, reason := range r.WarnReasons {
 			fmt.Fprintf(w, "! WARN: %s\n", reason)
 		}
 	}
 
-	fmt.Fprintf(w, "\u2713 ALLOWED (%d contracts evaluated)\n", r.ContractsEvaluated)
+	fmt.Fprintf(w, "\u2713 ALLOWED (%d rules evaluated)\n", r.RulesEvaluated)
 	return nil
 }

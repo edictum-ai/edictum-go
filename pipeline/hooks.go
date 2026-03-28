@@ -3,7 +3,7 @@ package pipeline
 import (
 	"context"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // HookResult represents the outcome of a hook evaluation.
@@ -12,7 +12,7 @@ type HookResult string
 // HookResult values.
 const (
 	HookResultAllow HookResult = "allow"
-	HookResultDeny  HookResult = "deny"
+	HookResultBlock HookResult = "block"
 )
 
 // HookDecision is the result of a before/after hook.
@@ -26,20 +26,20 @@ func AllowHook() HookDecision {
 	return HookDecision{Result: HookResultAllow}
 }
 
-// DenyHook creates a deny decision with a reason (truncated to 500 chars).
+// BlockHook creates a block decision with a reason (truncated to 500 chars).
 // Truncation preserves readability: "xxx..." (497 chars + "...").
-func DenyHook(reason string) HookDecision {
+func BlockHook(reason string) HookDecision {
 	if len(reason) > 500 {
 		reason = reason[:497] + "..."
 	}
-	return HookDecision{Result: HookResultDeny, Reason: reason}
+	return HookDecision{Result: HookResultBlock, Reason: reason}
 }
 
 // BeforeHookFunc is the signature for before-execution hooks.
-type BeforeHookFunc func(ctx context.Context, env envelope.ToolEnvelope) (HookDecision, error)
+type BeforeHookFunc func(ctx context.Context, env toolcall.ToolCall) (HookDecision, error)
 
 // AfterHookFunc is the signature for after-execution hooks.
-type AfterHookFunc func(ctx context.Context, env envelope.ToolEnvelope, result any) error
+type AfterHookFunc func(ctx context.Context, env toolcall.ToolCall, result any) error
 
 // HookRegistration binds a hook callback to a phase and tool pattern.
 type HookRegistration struct {
@@ -47,7 +47,7 @@ type HookRegistration struct {
 	Tool   string         // Tool name, glob pattern, or "*" for all.
 	Before BeforeHookFunc // Set for phase="before".
 	After  AfterHookFunc  // Set for phase="after".
-	When   func(ctx context.Context, env envelope.ToolEnvelope) bool
+	When   func(ctx context.Context, env toolcall.ToolCall) bool
 	Name   string // Human-readable name for audit.
 }
 

@@ -14,8 +14,8 @@ func newValidateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "validate <files...>",
-		Short: "Validate YAML contract bundles",
-		Long:  "Validate one or more YAML contract bundles. Exits 1 if any are invalid.",
+		Short: "Validate YAML rule bundles",
+		Long:  "Validate one or more YAML rule bundles. Exits 1 if any are invalid.",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runValidate(cmd, args, jsonOutput)
@@ -46,13 +46,13 @@ type composedOutput struct {
 }
 
 type overrideOutput struct {
-	ContractID     string `json:"contract_id"`
+	RuleID         string `json:"rule_id"`
 	OverriddenBy   string `json:"overridden_by"`
 	OriginalSource string `json:"original_source"`
 }
 
 type observeOutput struct {
-	ContractID     string `json:"contract_id"`
+	RuleID         string `json:"rule_id"`
 	EnforcedSource string `json:"enforced_source"`
 	ObservedSource string `json:"observed_source"`
 }
@@ -119,14 +119,14 @@ func buildComposedOutput(report yamlpkg.CompositionReport) *composedOutput {
 	out := &composedOutput{}
 	for _, o := range report.Overrides {
 		out.Overrides = append(out.Overrides, overrideOutput{
-			ContractID:     o.ContractID,
+			RuleID:         o.RuleID,
 			OverriddenBy:   o.OverriddenBy,
 			OriginalSource: o.OriginalSource,
 		})
 	}
 	for _, o := range report.Observes {
 		out.Observes = append(out.Observes, observeOutput{
-			ContractID:     o.ContractID,
+			RuleID:         o.RuleID,
 			EnforcedSource: o.EnforcedSource,
 			ObservedSource: o.ObservedSource,
 		})
@@ -163,7 +163,7 @@ func printValidateText(
 	w := cmd.OutOrStdout()
 	for _, r := range results {
 		if r.Valid {
-			fmt.Fprintf(w, "\u2713 %s \u2014 %d contracts (%d pre, %d post, %d session, %d sandbox)\n",
+			fmt.Fprintf(w, "\u2713 %s \u2014 %d rules (%d pre, %d post, %d session, %d sandbox)\n",
 				r.File, r.Total,
 				r.Counts["pre"], r.Counts["post"],
 				r.Counts["session"], r.Counts["sandbox"])
@@ -177,11 +177,11 @@ func printValidateText(
 		fmt.Fprintln(w, "Composition report:")
 		for _, o := range composed.Overrides {
 			fmt.Fprintf(w, "  override: %s (%s replaces %s)\n",
-				o.ContractID, o.OverriddenBy, o.OriginalSource)
+				o.RuleID, o.OverriddenBy, o.OriginalSource)
 		}
 		for _, o := range composed.Observes {
 			fmt.Fprintf(w, "  observe: %s (enforced=%s, observed=%s)\n",
-				o.ContractID, o.EnforcedSource, o.ObservedSource)
+				o.RuleID, o.EnforcedSource, o.ObservedSource)
 		}
 	}
 

@@ -5,21 +5,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // 9.1: on_deny fires exactly once
-func TestOnDenyFiresOnce(t *testing.T) {
+func TestOnBlockFiresOnce(t *testing.T) {
 	denyCount := 0
 	g := New(
-		WithContracts(
-			contract.Precondition{Name: "deny-all", Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("denied"), nil
+		WithRules(
+			rule.Precondition{Name: "deny-all", Tool: "*",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("denied"), nil
 				}},
 		),
-		WithOnDeny(func(_ envelope.ToolEnvelope, reason string, name string) {
+		WithOnBlock(func(_ toolcall.ToolCall, reason string, name string) {
 			denyCount++
 			if reason != "denied" {
 				t.Errorf("deny reason: got %q, want %q", reason, "denied")
@@ -41,7 +41,7 @@ func TestOnDenyFiresOnce(t *testing.T) {
 func TestOnAllowFiresOnce(t *testing.T) {
 	allowCount := 0
 	g := New(
-		WithOnAllow(func(_ envelope.ToolEnvelope) {
+		WithOnAllow(func(_ toolcall.ToolCall) {
 			allowCount++
 		}),
 	)
@@ -60,13 +60,13 @@ func TestOnAllowFiresOnce(t *testing.T) {
 func TestOnPostWarn(t *testing.T) {
 	var capturedWarnings []string
 	g := New(
-		WithContracts(
-			contract.Postcondition{Name: "warn-post", Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
-					return contract.Fail("data issue"), nil
+		WithRules(
+			rule.Postcondition{Name: "warn-post", Tool: "*",
+				Check: func(_ context.Context, _ toolcall.ToolCall, _ any) (rule.Decision, error) {
+					return rule.Fail("data issue"), nil
 				}},
 		),
-		WithOnPostWarn(func(_ envelope.ToolEnvelope, warnings []string) {
+		WithOnPostWarn(func(_ toolcall.ToolCall, warnings []string) {
 			capturedWarnings = warnings
 		}),
 	)
@@ -91,17 +91,17 @@ func TestOnPostWarn(t *testing.T) {
 }
 
 // 9.4: on_deny skipped in observe mode
-func TestOnDenySkippedInObserve(t *testing.T) {
+func TestOnBlockSkippedInObserve(t *testing.T) {
 	denyCount := 0
 	g := New(
 		WithMode("observe"),
-		WithContracts(
-			contract.Precondition{Name: "deny-obs", Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("would deny"), nil
+		WithRules(
+			rule.Precondition{Name: "deny-obs", Tool: "*",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("would deny"), nil
 				}},
 		),
-		WithOnDeny(func(_ envelope.ToolEnvelope, _ string, _ string) {
+		WithOnBlock(func(_ toolcall.ToolCall, _ string, _ string) {
 			denyCount++
 		}),
 	)
@@ -119,7 +119,7 @@ func TestOnDenySkippedInObserve(t *testing.T) {
 // 9.5: callback errors don't crash
 func TestCallbackErrorsDontCrash(t *testing.T) {
 	g := New(
-		WithOnAllow(func(_ envelope.ToolEnvelope) {
+		WithOnAllow(func(_ toolcall.ToolCall) {
 			panic("on_allow panicked")
 		}),
 	)
@@ -136,34 +136,34 @@ func TestCallbackErrorsDontCrash(t *testing.T) {
 
 func TestCallbackDenyPanicDontCrash(t *testing.T) {
 	g := New(
-		WithContracts(
-			contract.Precondition{Name: "deny", Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-					return contract.Fail("denied"), nil
+		WithRules(
+			rule.Precondition{Name: "block", Tool: "*",
+				Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+					return rule.Fail("denied"), nil
 				}},
 		),
-		WithOnDeny(func(_ envelope.ToolEnvelope, _ string, _ string) {
+		WithOnBlock(func(_ toolcall.ToolCall, _ string, _ string) {
 			panic("on_deny panicked")
 		}),
 	)
 
 	ctx := context.Background()
 	_, err := g.Run(ctx, "Bash", map[string]any{"command": "ls"}, nopCallable)
-	// Should still get DeniedError, not a panic
+	// Should still get BlockedError, not a panic
 	if err == nil {
-		t.Fatal("expected DeniedError")
+		t.Fatal("expected BlockedError")
 	}
 }
 
 func TestCallbackPostWarnPanicDontCrash(t *testing.T) {
 	g := New(
-		WithContracts(
-			contract.Postcondition{Name: "warn", Tool: "*",
-				Check: func(_ context.Context, _ envelope.ToolEnvelope, _ any) (contract.Verdict, error) {
-					return contract.Fail("warning"), nil
+		WithRules(
+			rule.Postcondition{Name: "warn", Tool: "*",
+				Check: func(_ context.Context, _ toolcall.ToolCall, _ any) (rule.Decision, error) {
+					return rule.Fail("warning"), nil
 				}},
 		),
-		WithOnPostWarn(func(_ envelope.ToolEnvelope, _ []string) {
+		WithOnPostWarn(func(_ toolcall.ToolCall, _ []string) {
 			panic("on_post_warn panicked")
 		}),
 	)

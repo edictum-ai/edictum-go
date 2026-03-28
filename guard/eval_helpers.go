@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func evalPrecondition(
 	ctx context.Context,
-	c contract.Precondition,
-	env2 envelope.ToolEnvelope,
-	contractType string,
-	contracts *[]ContractResult,
+	c rule.Precondition,
+	env2 toolcall.ToolCall,
+	ruleType string,
+	rules *[]RuleResult,
 	denyReasons *[]string,
 ) {
 	name := c.Name
@@ -27,49 +27,49 @@ func evalPrecondition(
 		return
 	}
 
-	verdict, err := c.Check(ctx, env2)
+	decision, err := c.Check(ctx, env2)
 	if err != nil {
-		log.Printf("Contract %s raised: %v", name, err)
-		cr := ContractResult{
-			ContractID:   name,
-			ContractType: contractType,
-			Passed:       false,
-			Message:      fmt.Sprintf("Precondition error: %s", err),
-			PolicyError:  true,
+		log.Printf("Rule %s raised: %v", name, err)
+		cr := RuleResult{
+			RuleID:      name,
+			RuleType:    ruleType,
+			Passed:      false,
+			Message:     fmt.Sprintf("Precondition error: %s", err),
+			PolicyError: true,
 		}
-		*contracts = append(*contracts, cr)
+		*rules = append(*rules, cr)
 		*denyReasons = append(*denyReasons, cr.Message)
 		return
 	}
 
-	isObserved := c.Mode == "observe" && !verdict.Passed()
+	isObserved := c.Mode == "observe" && !decision.Passed()
 	pe := false
-	if m := verdict.Metadata(); m != nil {
+	if m := decision.Metadata(); m != nil {
 		if v, ok := m["policy_error"].(bool); ok && v {
 			pe = true
 		}
 	}
 
-	cr := ContractResult{
-		ContractID:   name,
-		ContractType: contractType,
-		Passed:       verdict.Passed(),
-		Message:      verdict.Message(),
-		Observed:     isObserved,
-		PolicyError:  pe,
+	cr := RuleResult{
+		RuleID:      name,
+		RuleType:    ruleType,
+		Passed:      decision.Passed(),
+		Message:     decision.Message(),
+		Observed:    isObserved,
+		PolicyError: pe,
 	}
-	*contracts = append(*contracts, cr)
-	if !verdict.Passed() && !isObserved {
-		*denyReasons = append(*denyReasons, verdict.Message())
+	*rules = append(*rules, cr)
+	if !decision.Passed() && !isObserved {
+		*denyReasons = append(*denyReasons, decision.Message())
 	}
 }
 
 func evalPostcondition(
 	ctx context.Context,
-	c contract.Postcondition,
-	env2 envelope.ToolEnvelope,
+	c rule.Postcondition,
+	env2 toolcall.ToolCall,
 	output string,
-	contracts *[]ContractResult,
+	rules *[]RuleResult,
 	warnReasons *[]string,
 ) {
 	name := c.Name
@@ -82,24 +82,24 @@ func evalPostcondition(
 		return
 	}
 
-	verdict, err := c.Check(ctx, env2, output)
+	decision, err := c.Check(ctx, env2, output)
 	if err != nil {
 		log.Printf("Postcondition %s raised: %v", name, err)
-		cr := ContractResult{
-			ContractID:   name,
-			ContractType: "postcondition",
-			Passed:       false,
-			Message:      fmt.Sprintf("Postcondition error: %s", err),
-			PolicyError:  true,
+		cr := RuleResult{
+			RuleID:      name,
+			RuleType:    "postcondition",
+			Passed:      false,
+			Message:     fmt.Sprintf("Postcondition error: %s", err),
+			PolicyError: true,
 		}
-		*contracts = append(*contracts, cr)
+		*rules = append(*rules, cr)
 		*warnReasons = append(*warnReasons, cr.Message)
 		return
 	}
 
-	isObserved := c.Mode == "observe" && !verdict.Passed()
+	isObserved := c.Mode == "observe" && !decision.Passed()
 	pe := false
-	if m := verdict.Metadata(); m != nil {
+	if m := decision.Metadata(); m != nil {
 		if v, ok := m["policy_error"].(bool); ok && v {
 			pe = true
 		}
@@ -110,17 +110,17 @@ func evalPostcondition(
 		effect = "warn"
 	}
 
-	cr := ContractResult{
-		ContractID:   name,
-		ContractType: "postcondition",
-		Passed:       verdict.Passed(),
-		Message:      verdict.Message(),
-		Observed:     isObserved,
-		Effect:       effect,
-		PolicyError:  pe,
+	cr := RuleResult{
+		RuleID:      name,
+		RuleType:    "postcondition",
+		Passed:      decision.Passed(),
+		Message:     decision.Message(),
+		Observed:    isObserved,
+		Effect:      effect,
+		PolicyError: pe,
 	}
-	*contracts = append(*contracts, cr)
-	if !verdict.Passed() && !isObserved {
-		*warnReasons = append(*warnReasons, verdict.Message())
+	*rules = append(*rules, cr)
+	if !decision.Passed() && !isObserved {
+		*warnReasons = append(*warnReasons, decision.Message())
 	}
 }

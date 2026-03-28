@@ -3,7 +3,7 @@ package guard
 import (
 	"log"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // factoryCfg holds options meaningful only for factory constructors
@@ -12,7 +12,7 @@ import (
 type factoryCfg struct {
 	// YAML compilation extensions
 	customOperators map[string]func(any, any) bool
-	customSelectors map[string]func(envelope.ToolEnvelope) map[string]any
+	customSelectors map[string]func(toolcall.ToolCall) map[string]any
 
 	// Server connection configuration
 	bundleName       string
@@ -44,7 +44,7 @@ func WithCustomOperators(ops map[string]func(any, any) bool) Option {
 
 // WithCustomSelectors sets custom envelope selectors for YAML compilation.
 // Factory-only: logs a warning when passed to New() directly.
-func WithCustomSelectors(sels map[string]func(envelope.ToolEnvelope) map[string]any) Option {
+func WithCustomSelectors(sels map[string]func(toolcall.ToolCall) map[string]any) Option {
 	return func(g *Guard) {
 		if g.factoryCfg != nil {
 			g.factoryCfg.customSelectors = sels
@@ -54,7 +54,7 @@ func WithCustomSelectors(sels map[string]func(envelope.ToolEnvelope) map[string]
 	}
 }
 
-// WithBundleName sets the contract bundle lineage to track on the server.
+// WithBundleName sets the rule bundle lineage to track on the server.
 // Factory-only: logs a warning when passed to New() directly.
 func WithBundleName(name string) Option {
 	return func(g *Guard) {
@@ -78,7 +78,7 @@ func WithTags(tags map[string]string) Option {
 	}
 }
 
-// WithAutoWatch controls whether the SSE watcher for contract hot-reload
+// WithAutoWatch controls whether the SSE watcher for rule hot-reload
 // starts automatically. Default: true.
 // Factory-only: logs a warning when passed to New() directly.
 func WithAutoWatch(enabled bool) Option {

@@ -50,13 +50,13 @@ func loadBundles(files []string) ([]bundleFile, []error) {
 }
 
 // composeAndCompile loads all files, optionally composes them, and compiles.
-func composeAndCompile(files []string) (yamlpkg.CompiledBundle, *yamlpkg.CompositionReport, error) {
+func composeAndCompile(files []string) (yamlpkg.CompiledRuleset, *yamlpkg.CompositionReport, error) {
 	bundles, errs := loadBundles(files)
 	if len(errs) > 0 {
-		return yamlpkg.CompiledBundle{}, nil, errs[0]
+		return yamlpkg.CompiledRuleset{}, nil, errs[0]
 	}
 	if len(bundles) == 0 {
-		return yamlpkg.CompiledBundle{}, nil, fmt.Errorf("no valid bundles loaded")
+		return yamlpkg.CompiledRuleset{}, nil, fmt.Errorf("no valid bundles loaded")
 	}
 
 	var bundleData map[string]any
@@ -71,7 +71,7 @@ func composeAndCompile(files []string) (yamlpkg.CompiledBundle, *yamlpkg.Composi
 		}
 		composed, err := yamlpkg.ComposeBundles(entries...)
 		if err != nil {
-			return yamlpkg.CompiledBundle{}, nil, fmt.Errorf("compose: %w", err)
+			return yamlpkg.CompiledRuleset{}, nil, fmt.Errorf("compose: %w", err)
 		}
 		bundleData = composed.Bundle
 		report = &composed.Report
@@ -79,7 +79,7 @@ func composeAndCompile(files []string) (yamlpkg.CompiledBundle, *yamlpkg.Composi
 
 	compiled, err := yamlpkg.Compile(bundleData)
 	if err != nil {
-		return yamlpkg.CompiledBundle{}, nil, fmt.Errorf("compile: %w", err)
+		return yamlpkg.CompiledRuleset{}, nil, fmt.Errorf("compile: %w", err)
 	}
 	return compiled, report, nil
 }
@@ -100,7 +100,7 @@ func buildGuardFromFiles(files []string, env string) (*guard.Guard, error) {
 }
 
 // compiledToGuardOpts converts a compiled bundle into guard options.
-func compiledToGuardOpts(c yamlpkg.CompiledBundle, env string) []guard.Option {
+func compiledToGuardOpts(c yamlpkg.CompiledRuleset, env string) []guard.Option {
 	opts := []guard.Option{
 		guard.WithEnvironment(env),
 		guard.WithLimits(c.Limits),
@@ -113,21 +113,21 @@ func compiledToGuardOpts(c yamlpkg.CompiledBundle, env string) []guard.Option {
 	}
 
 	contractArgs := make([]any, 0,
-		len(c.Preconditions)+len(c.Postconditions)+len(c.SessionContracts))
+		len(c.Preconditions)+len(c.Postconditions)+len(c.SessionRules))
 	for _, p := range c.Preconditions {
 		contractArgs = append(contractArgs, p)
 	}
 	for _, p := range c.Postconditions {
 		contractArgs = append(contractArgs, p)
 	}
-	for _, s := range c.SessionContracts {
+	for _, s := range c.SessionRules {
 		contractArgs = append(contractArgs, s)
 	}
 	if len(contractArgs) > 0 {
-		opts = append(opts, guard.WithContracts(contractArgs...))
+		opts = append(opts, guard.WithRules(contractArgs...))
 	}
-	if len(c.SandboxContracts) > 0 {
-		opts = append(opts, guard.WithSandboxContracts(c.SandboxContracts...))
+	if len(c.SandboxRules) > 0 {
+		opts = append(opts, guard.WithSandboxRules(c.SandboxRules...))
 	}
 	return opts
 }
@@ -142,10 +142,10 @@ func buildGuard(files []string, env string) (*guard.Guard, error) {
 	return buildGuardFromFiles(files, env)
 }
 
-// countContracts counts contracts by type from raw bundle data.
+// countContracts counts rules by type from raw bundle data.
 func countContracts(data map[string]any) map[string]int {
 	counts := map[string]int{"pre": 0, "post": 0, "session": 0, "sandbox": 0}
-	raw, ok := data["contracts"].([]any)
+	raw, ok := data["rules"].([]any)
 	if !ok {
 		return counts
 	}

@@ -28,12 +28,12 @@ Only include a section if it has content. Remove the placeholder entirely if emp
 
 | # | File | Issue | Violates |
 |---|------|-------|----------|
-| 1 | `envelope/envelope.go:42` | Description of issue | [CLAUDE.md — ONE RULE](CLAUDE.md) |
+| 1 | `toolcall/toolcall.go:42` | Description of issue | [CLAUDE.md — THE ONE RULE](CLAUDE.md) |
 
 <details>
 <summary>Details</summary>
 
-**1. `envelope/envelope.go:42` — Short title**
+**1. `toolcall/toolcall.go:42` — Short title**
 
 Description of the issue with context.
 

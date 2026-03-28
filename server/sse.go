@@ -15,13 +15,13 @@ import (
 	"time"
 )
 
-// Reloader is the interface for hot-reloading contract bundles.
+// Reloader is the interface for hot-reloading rule bundles.
 // Guard implements this via its Reload method (added by the server package).
 type Reloader interface {
 	ReloadFromYAML(yamlBytes []byte) error
 }
 
-// SSEWatcher connects to the server's SSE endpoint for contract updates.
+// SSEWatcher connects to the server's SSE endpoint for rule updates.
 // On receiving a new bundle, it calls the Reloader. Reconnects with
 // exponential backoff on disconnect.
 //
@@ -60,7 +60,7 @@ func WithMaxReconnectDelay(d time.Duration) SSEWatcherOption {
 	return func(w *SSEWatcher) { w.maxReconnectDelay = d }
 }
 
-// NewSSEWatcher creates a watcher that listens for contract updates via SSE.
+// NewSSEWatcher creates a watcher that listens for rule updates via SSE.
 // It creates a dedicated HTTP client for SSE that shares the main client's
 // transport (TLS config, proxy, etc.) but has no request-level timeout,
 // since SSE connections are long-lived streams.
@@ -170,7 +170,7 @@ func (w *SSEWatcher) connectAndListen(ctx context.Context) error {
 
 func (w *SSEWatcher) readEvents(ctx context.Context, resp *http.Response) error {
 	scanner := bufio.NewScanner(resp.Body)
-	// Contract bundles can be up to MaxBundleSize (1 MB). SSE data lines
+	// Rule bundles can be up to MaxBundleSize (1 MB). SSE data lines
 	// carry the full JSON-encoded bundle, so the scanner buffer must be
 	// large enough to hold at least that plus SSE framing overhead.
 	const sseBufSize = 1_100_000     // ~1 MB + overhead for SSE framing
@@ -248,7 +248,7 @@ func (w *SSEWatcher) handleContractUpdate(ctx context.Context, data string) {
 	}
 
 	if err := w.reloader.ReloadFromYAML(yamlBytes); err != nil {
-		log.Printf("server: failed to reload contracts: %v", err)
+		log.Printf("server: failed to reload rules: %v", err)
 	}
 }
 

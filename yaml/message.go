@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/redaction"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 var (
@@ -16,9 +16,9 @@ var (
 
 func expandMessage(
 	template string,
-	env envelope.ToolEnvelope,
+	env toolcall.ToolCall,
 	outputText string,
-	customSelectors map[string]func(envelope.ToolEnvelope) map[string]any,
+	customSelectors map[string]func(toolcall.ToolCall) map[string]any,
 	outputPresent bool,
 ) string {
 	return placeholderRe.ReplaceAllStringFunc(template, func(match string) string {

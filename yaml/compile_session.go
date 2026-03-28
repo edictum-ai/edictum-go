@@ -3,8 +3,8 @@ package yaml
 import (
 	"context"
 
-	"github.com/edictum-ai/edictum-go/contract"
 	"github.com/edictum-ai/edictum-go/pipeline"
+	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/session"
 )
 
@@ -12,7 +12,7 @@ func compileSession(
 	raw map[string]any,
 	mode string,
 	limits pipeline.OperationLimits,
-) contract.SessionContract {
+) rule.SessionRule {
 	cid, _ := raw["id"].(string)
 	then, _ := raw["then"].(map[string]any)
 	msgTemplate := ""
@@ -23,32 +23,32 @@ func compileSession(
 	isObserve, _ := raw["_observe"].(bool)
 	source := "yaml_session"
 
-	sc := contract.SessionContract{
+	sc := rule.SessionRule{
 		Name:   cid,
 		Mode:   mode,
 		Source: source,
-		Check: func(ctx context.Context, s any) (contract.Verdict, error) {
+		Check: func(ctx context.Context, s any) (rule.Decision, error) {
 			sess, ok := s.(*session.Session)
 			if !ok {
 				// Fail-closed: unknown session type cannot be evaluated safely.
-				return contract.Fail("Session contract error: unexpected session type",
+				return rule.Fail("Session rule error: unexpected session type",
 					map[string]any{"policy_error": true}), nil
 			}
 			execCount, err := sess.ExecutionCount(ctx)
 			if err != nil {
-				return contract.Fail("Session error"), err
+				return rule.Fail("Session error"), err
 			}
 			if execCount >= limits.MaxToolCalls {
-				return contract.Fail(msgTemplate), nil
+				return rule.Fail(msgTemplate), nil
 			}
 			attemptCount, err := sess.AttemptCount(ctx)
 			if err != nil {
-				return contract.Fail("Session error"), err
+				return rule.Fail("Session error"), err
 			}
 			if attemptCount >= limits.MaxAttempts {
-				return contract.Fail(msgTemplate), nil
+				return rule.Fail(msgTemplate), nil
 			}
-			return contract.Pass(), nil
+			return rule.Pass(), nil
 		},
 	}
 
@@ -59,7 +59,7 @@ func compileSession(
 	return sc
 }
 
-// mergeSessionLimits merges limits from a session contract into existing
+// mergeSessionLimits merges limits from a session rule into existing
 // limits, taking the more restrictive (lower) value.
 func mergeSessionLimits(raw map[string]any, existing pipeline.OperationLimits) pipeline.OperationLimits {
 	limitsMap, ok := raw["limits"].(map[string]any)

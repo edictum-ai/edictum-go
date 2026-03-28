@@ -15,8 +15,8 @@ func newDiffCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "diff <file1> <file2> [file3...]",
-		Short: "Compare contract bundles",
-		Long:  "Compare two or more YAML contract bundles and show differences.",
+		Short: "Compare rule bundles",
+		Long:  "Compare two or more YAML rule bundles and show differences.",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 2 {
@@ -163,7 +163,7 @@ func printDiffText(w io.Writer, r diffResult) {
 		fmt.Fprintf(w, "~ %s\n", id)
 	}
 	if len(r.Unchanged) > 0 {
-		fmt.Fprintf(w, "= %d contracts unchanged\n", len(r.Unchanged))
+		fmt.Fprintf(w, "= %d rules unchanged\n", len(r.Unchanged))
 	}
 	fmt.Fprintf(w, "\nSummary: %d added, %d removed, %d changed, %d unchanged\n",
 		len(r.Added), len(r.Removed), len(r.Changed), len(r.Unchanged))
@@ -174,14 +174,14 @@ func printComposeText(w io.Writer, r yamlpkg.CompositionReport) {
 		fmt.Fprintln(w, "Overrides:")
 		for _, o := range r.Overrides {
 			fmt.Fprintf(w, "  %s: %s overrides %s\n",
-				o.ContractID, o.OverriddenBy, o.OriginalSource)
+				o.RuleID, o.OverriddenBy, o.OriginalSource)
 		}
 	}
 	if len(r.Observes) > 0 {
-		fmt.Fprintln(w, "Observe contracts:")
+		fmt.Fprintln(w, "Observe rules:")
 		for _, o := range r.Observes {
 			fmt.Fprintf(w, "  %s: enforced=%s, observed=%s\n",
-				o.ContractID, o.EnforcedSource, o.ObservedSource)
+				o.RuleID, o.EnforcedSource, o.ObservedSource)
 		}
 	}
 	if len(r.Overrides) == 0 && len(r.Observes) == 0 {
@@ -189,11 +189,11 @@ func printComposeText(w io.Writer, r yamlpkg.CompositionReport) {
 	}
 }
 
-// indexContracts builds a map of contract ID to contract data.
+// indexContracts builds a map of rule ID to rule data.
 func indexContracts(data map[string]any) map[string]map[string]any {
 	idx := map[string]map[string]any{}
-	contracts, _ := data["contracts"].([]any)
-	for _, raw := range contracts {
+	rules, _ := data["rules"].([]any)
+	for _, raw := range rules {
 		m, ok := raw.(map[string]any)
 		if !ok {
 			continue

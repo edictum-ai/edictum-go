@@ -9,7 +9,7 @@ import (
 	yamlpkg "github.com/edictum-ai/edictum-go/yaml"
 )
 
-// FromYAML loads YAML contract bundles from a path and returns a configured Guard.
+// FromYAML loads YAML rule bundles from a path and returns a configured Guard.
 // If path is a directory, all .yaml/.yml files are loaded and composed
 // (sorted alphabetically for deterministic ordering). If path is a single
 // file, that file is loaded directly.
@@ -22,12 +22,12 @@ func FromYAML(path string, opts ...Option) (*Guard, error) {
 }
 
 // FromYAMLWithReport is like FromYAML but also returns a CompositionReport
-// describing which contracts were overridden during multi-file composition.
+// describing which rules were overridden during multi-file composition.
 func FromYAMLWithReport(path string, opts ...Option) (*Guard, *yamlpkg.CompositionReport, error) {
 	return fromYAMLInternal(path, opts)
 }
 
-// FromYAMLString loads a YAML contract bundle from a string and returns a
+// FromYAMLString loads a YAML rule bundle from a string and returns a
 // configured Guard. Follows the json.Unmarshal / json.NewDecoder convention.
 func FromYAMLString(content string, opts ...Option) (*Guard, error) {
 	fc := extractFactory(opts)
@@ -109,11 +109,11 @@ func fromYAMLInternal(path string, opts []Option) (*Guard, *yamlpkg.CompositionR
 	return g, &report, nil
 }
 
-// buildGuardFromCompiled creates a Guard from compiled YAML contracts.
+// buildGuardFromCompiled creates a Guard from compiled YAML rules.
 // Factory-derived options are applied first, then user options override.
 // suppressFactoryWarnings prevents spurious log output from factory-only
 // options that are passed through to New().
-func buildGuardFromCompiled(compiled yamlpkg.CompiledBundle, policyVersion string, compOpts []yamlpkg.CompileOption, userOpts []Option) *Guard {
+func buildGuardFromCompiled(compiled yamlpkg.CompiledRuleset, policyVersion string, compOpts []yamlpkg.CompileOption, userOpts []Option) *Guard {
 	factoryDefaults := compiledOpts(compiled, policyVersion)
 
 	allOpts := make([]Option, 0, 1+len(factoryDefaults)+len(userOpts))

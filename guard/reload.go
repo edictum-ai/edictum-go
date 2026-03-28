@@ -1,15 +1,15 @@
 package guard
 
 import (
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	yamlpkg "github.com/edictum-ai/edictum-go/yaml"
 )
 
-// ReloadFromYAML atomically replaces the guard's contracts by parsing
+// ReloadFromYAML atomically replaces the guard's rules by parsing
 // and compiling the given YAML bytes. Implements server.Reloader.
 //
-// On error the guard retains its previous contracts (fail-closed: if the
-// new bundle is invalid, the old contracts keep enforcing).
+// On error the guard retains its previous rules (fail-closed: if the
+// new bundle is invalid, the old rules keep enforcing).
 func (g *Guard) ReloadFromYAML(yamlBytes []byte) error {
 	data, hash, err := yamlpkg.LoadBundleString(string(yamlBytes))
 	if err != nil {
@@ -31,11 +31,11 @@ func (g *Guard) ReloadFromYAML(yamlBytes []byte) error {
 
 	// Build a fresh registry so tool removals take effect. Mutating
 	// the existing registry would accumulate stale entries from prior bundles.
-	newRegistry := envelope.NewToolRegistry()
+	newRegistry := toolcall.NewToolRegistry()
 	for name, cfg := range compiled.Tools {
-		se := envelope.SideEffectIrreversible
+		se := toolcall.SideEffectIrreversible
 		if v, ok := cfg["side_effect"].(string); ok {
-			se = envelope.SideEffect(v)
+			se = toolcall.SideEffect(v)
 		}
 		idem := false
 		if v, ok := cfg["idempotent"].(bool); ok {
@@ -54,7 +54,7 @@ func (g *Guard) ReloadFromYAML(yamlBytes []byte) error {
 
 // buildCompiledState creates an immutable state snapshot from a compiled
 // YAML bundle. Contracts are classified into enforce vs observe lists.
-func buildCompiledState(compiled yamlpkg.CompiledBundle, policyVersion string) *compiledState {
+func buildCompiledState(compiled yamlpkg.CompiledRuleset, policyVersion string) *compiledState {
 	s := &compiledState{
 		limits:        compiled.Limits,
 		policyVersion: policyVersion,
@@ -73,26 +73,26 @@ func buildCompiledState(compiled yamlpkg.CompiledBundle, policyVersion string) *
 			s.postconditions = append(s.postconditions, p)
 		}
 	}
-	for _, sc := range compiled.SessionContracts {
+	for _, sc := range compiled.SessionRules {
 		if sc.Mode == "observe" {
-			s.observeSessionContracts = append(s.observeSessionContracts, sc)
+			s.observeSessionRules = append(s.observeSessionRules, sc)
 		} else {
-			s.sessionContracts = append(s.sessionContracts, sc)
+			s.sessionRules = append(s.sessionRules, sc)
 		}
 	}
-	for _, sb := range compiled.SandboxContracts {
+	for _, sb := range compiled.SandboxRules {
 		if sb.Mode == "observe" {
-			s.observeSandboxContracts = append(s.observeSandboxContracts, sb)
+			s.observeSandboxRules = append(s.observeSandboxRules, sb)
 		} else {
-			s.sandboxContracts = append(s.sandboxContracts, sb)
+			s.sandboxRules = append(s.sandboxRules, sb)
 		}
 	}
 	return s
 }
 
 // compiledOpts converts a compiled YAML bundle into Guard options.
-// Used by factory functions to build the guard from compiled contracts.
-func compiledOpts(compiled yamlpkg.CompiledBundle, policyVersion string) []Option {
+// Used by factory functions to build the guard from compiled rules.
+func compiledOpts(compiled yamlpkg.CompiledRuleset, policyVersion string) []Option {
 	opts := make([]Option, 0, 6)
 	opts = append(opts,
 		WithPolicyVersion(policyVersion),
@@ -108,26 +108,26 @@ func compiledOpts(compiled yamlpkg.CompiledBundle, policyVersion string) []Optio
 	contractArgs := make([]any, 0,
 		len(compiled.Preconditions)+
 			len(compiled.Postconditions)+
-			len(compiled.SessionContracts))
+			len(compiled.SessionRules))
 	for _, p := range compiled.Preconditions {
 		contractArgs = append(contractArgs, p)
 	}
 	for _, p := range compiled.Postconditions {
 		contractArgs = append(contractArgs, p)
 	}
-	for _, s := range compiled.SessionContracts {
+	for _, s := range compiled.SessionRules {
 		contractArgs = append(contractArgs, s)
 	}
 	if len(contractArgs) > 0 {
-		opts = append(opts, WithContracts(contractArgs...))
+		opts = append(opts, WithRules(contractArgs...))
 	}
-	if len(compiled.SandboxContracts) > 0 {
-		opts = append(opts, WithSandboxContracts(compiled.SandboxContracts...))
+	if len(compiled.SandboxRules) > 0 {
+		opts = append(opts, WithSandboxRules(compiled.SandboxRules...))
 	}
 	return opts
 }
 
-// Compile-time check: Guard must satisfy the contract.Precondition type
+// Compile-time check: Guard must satisfy the rule.Precondition type
 // requirements indirectly. The explicit check here is that buildCompiledState
-// correctly handles the contract types.
+// correctly handles the rule types.
 var _ = buildCompiledState

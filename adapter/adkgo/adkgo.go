@@ -32,7 +32,7 @@ func New(g *guard.Guard) *Adapter {
 // full governance pipeline: pre-execute checks, tool execution,
 // post-execute checks, and audit emission.
 //
-// On deny, returns an *edictum.DeniedError. On tool failure, returns
+// On deny, returns an *edictum.BlockedError. On tool failure, returns
 // an *edictum.ToolError. Otherwise returns the tool result (possibly
 // redacted by postconditions).
 func (a *Adapter) WrapTool(

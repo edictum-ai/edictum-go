@@ -5,27 +5,27 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func compilePost(
 	raw map[string]any,
 	mode string,
 	cc *compileCtx,
-) (contract.Postcondition, error) {
+) (rule.Postcondition, error) {
 	cid, _ := raw["id"].(string)
 	tool, _ := raw["tool"].(string)
 	whenExpr, _ := raw["when"].(map[string]any)
 	then, _ := raw["then"].(map[string]any)
 
 	if whenExpr == nil || then == nil {
-		return contract.Postcondition{}, fmt.Errorf("contract %q: missing when or then", cid)
+		return rule.Postcondition{}, fmt.Errorf("rule %q: missing when or then", cid)
 	}
 
 	compiled := precompileRegexes(whenExpr)
 	msgTemplate, _ := then["message"].(string)
-	effect, _ := then["effect"].(string)
+	effect, _ := then["action"].(string)
 	if effect == "" {
 		effect = "warn"
 	}
@@ -36,14 +36,14 @@ func compilePost(
 	// Extract output.text regex patterns for redaction
 	redactPatterns := extractOutputPatterns(compiled)
 
-	post := contract.Postcondition{
+	post := rule.Postcondition{
 		Name:           cid,
 		Tool:           tool,
 		Mode:           mode,
 		Source:         source,
 		Effect:         effect,
 		RedactPatterns: redactPatterns,
-		Check: func(_ context.Context, env envelope.ToolEnvelope, response any) (contract.Verdict, error) {
+		Check: func(_ context.Context, env toolcall.ToolCall, response any) (rule.Decision, error) {
 			outputText := ""
 			outputPresent := response != nil
 			if response != nil {
@@ -56,14 +56,14 @@ func compilePost(
 			)
 			msg := expandMessage(msgTemplate, env, outputText, cc.customSelectors, outputPresent)
 			if result.PolicyError {
-				return contract.Fail(msg, map[string]any{
+				return rule.Fail(msg, map[string]any{
 					"policy_error": true,
 				}), nil
 			}
 			if result.Matched {
-				return contract.Fail(msg), nil
+				return rule.Fail(msg), nil
 			}
-			return contract.Pass(), nil
+			return rule.Pass(), nil
 		},
 	}
 

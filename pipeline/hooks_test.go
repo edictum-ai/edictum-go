@@ -15,17 +15,17 @@ func TestHookDecisionAllow(t *testing.T) {
 	}
 }
 
-func TestHookDecisionDeny(t *testing.T) {
-	d := DenyHook("not allowed")
-	if d.Result != HookResultDeny {
-		t.Fatalf("expected Result=%q, got %q", HookResultDeny, d.Result)
+func TestHookDecisionBlock(t *testing.T) {
+	d := BlockHook("not allowed")
+	if d.Result != HookResultBlock {
+		t.Fatalf("expected Result=%q, got %q", HookResultBlock, d.Result)
 	}
 	if d.Reason != "not allowed" {
 		t.Fatalf("expected Reason=%q, got %q", "not allowed", d.Reason)
 	}
 }
 
-func TestHookDecisionDenyTruncation(t *testing.T) {
+func TestHookDecisionBlockTruncation(t *testing.T) {
 	tests := []struct {
 		name       string
 		inputLen   int
@@ -55,7 +55,7 @@ func TestHookDecisionDenyTruncation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			input := strings.Repeat("x", tc.inputLen)
-			d := DenyHook(input)
+			d := BlockHook(input)
 
 			if len(d.Reason) != tc.wantLen {
 				t.Fatalf("expected len=%d, got %d", tc.wantLen, len(d.Reason))
@@ -76,7 +76,7 @@ func TestHookResultValues(t *testing.T) {
 		want   string
 	}{
 		{HookResultAllow, "allow"},
-		{HookResultDeny, "deny"},
+		{HookResultBlock, "block"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.want, func(t *testing.T) {

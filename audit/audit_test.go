@@ -12,8 +12,8 @@ import (
 
 func TestEvent_SchemaVersion(t *testing.T) {
 	e := NewEvent()
-	if e.SchemaVersion != "0.3.0" {
-		t.Fatalf("SchemaVersion = %q, want %q", e.SchemaVersion, "0.3.0")
+	if e.SchemaVersion != "0.4.0" {
+		t.Fatalf("SchemaVersion = %q, want %q", e.SchemaVersion, "0.4.0")
 	}
 }
 
@@ -34,7 +34,7 @@ func TestEvent_Defaults(t *testing.T) {
 	if e.ToolArgs == nil {
 		t.Fatal("ToolArgs should default to an empty map")
 	}
-	if e.HooksEvaluated == nil || e.ContractsEvaluated == nil {
+	if e.HooksEvaluated == nil || e.RulesEvaluated == nil {
 		t.Fatal("evaluated lists should default to non-nil slices")
 	}
 	if e.PolicyError {
@@ -51,15 +51,15 @@ func TestAllActions_Count(t *testing.T) {
 
 func TestAllActions_Values(t *testing.T) {
 	want := map[Action]bool{
-		ActionCallDenied:            true,
-		ActionCallWouldDeny:         true,
+		ActionCallBlocked:           true,
+		ActionCallWouldBlock:        true,
 		ActionCallAllowed:           true,
 		ActionCallExecuted:          true,
 		ActionCallFailed:            true,
 		ActionPostconditionWarning:  true,
 		ActionCallApprovalRequested: true,
 		ActionCallApprovalGranted:   true,
-		ActionCallApprovalDenied:    true,
+		ActionCallApprovalBlocked:   true,
 		ActionCallApprovalTimeout:   true,
 	}
 	for _, a := range AllActions() {
@@ -74,15 +74,15 @@ func TestAllActions_StringValues(t *testing.T) {
 		action Action
 		want   string
 	}{
-		{ActionCallDenied, "call_denied"},
-		{ActionCallWouldDeny, "call_would_deny"},
+		{ActionCallBlocked, "call_blocked"},
+		{ActionCallWouldBlock, "call_would_block"},
 		{ActionCallAllowed, "call_allowed"},
 		{ActionCallExecuted, "call_executed"},
 		{ActionCallFailed, "call_failed"},
 		{ActionPostconditionWarning, "postcondition_warning"},
 		{ActionCallApprovalRequested, "call_approval_requested"},
 		{ActionCallApprovalGranted, "call_approval_granted"},
-		{ActionCallApprovalDenied, "call_approval_denied"},
+		{ActionCallApprovalBlocked, "call_approval_blocked"},
 		{ActionCallApprovalTimeout, "call_approval_timeout"},
 	}
 	for _, tc := range cases {
@@ -223,7 +223,7 @@ func TestCompositeSink_DeepCopiesEvaluatedRecords(t *testing.T) {
 	first := &mutatingSink{
 		mutate: func(event *Event) {
 			event.HooksEvaluated[0]["status"] = "mutated"
-			event.ContractsEvaluated[0]["details"].(map[string]any)["value"] = "changed"
+			event.RulesEvaluated[0]["details"].(map[string]any)["value"] = "changed"
 		},
 	}
 	second := &captureSink{}
@@ -231,7 +231,7 @@ func TestCompositeSink_DeepCopiesEvaluatedRecords(t *testing.T) {
 
 	event := NewEvent()
 	event.HooksEvaluated = []map[string]any{{"status": "original"}}
-	event.ContractsEvaluated = []map[string]any{{
+	event.RulesEvaluated = []map[string]any{{
 		"details": map[string]any{"value": "kept"},
 	}}
 
@@ -241,9 +241,9 @@ func TestCompositeSink_DeepCopiesEvaluatedRecords(t *testing.T) {
 	if got := second.last.HooksEvaluated[0]["status"]; got != "original" {
 		t.Fatalf("HooksEvaluated leaked mutation: got %v, want original", got)
 	}
-	details := second.last.ContractsEvaluated[0]["details"].(map[string]any)
+	details := second.last.RulesEvaluated[0]["details"].(map[string]any)
 	if got := details["value"]; got != "kept" {
-		t.Fatalf("ContractsEvaluated leaked mutation: got %v, want kept", got)
+		t.Fatalf("RulesEvaluated leaked mutation: got %v, want kept", got)
 	}
 }
 
@@ -401,7 +401,7 @@ func TestCollectingSink_Filter(t *testing.T) {
 	sink := NewCollectingSink(100)
 	ctx := context.Background()
 
-	actions := []Action{ActionCallAllowed, ActionCallDenied, ActionCallAllowed}
+	actions := []Action{ActionCallAllowed, ActionCallBlocked, ActionCallAllowed}
 	for _, a := range actions {
 		e := NewEvent()
 		e.Action = a
@@ -412,7 +412,7 @@ func TestCollectingSink_Filter(t *testing.T) {
 	if len(allowed) != 2 {
 		t.Fatalf("Filter(ALLOWED) len = %d, want 2", len(allowed))
 	}
-	denied := sink.Filter(ActionCallDenied)
+	denied := sink.Filter(ActionCallBlocked)
 	if len(denied) != 1 {
 		t.Fatalf("Filter(DENIED) len = %d, want 1", len(denied))
 	}

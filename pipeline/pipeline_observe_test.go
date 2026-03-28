@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
 	"github.com/edictum-ai/edictum-go/pipeline"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func TestPreExecute_ObserveModeContractDoesNotDeny(t *testing.T) {
@@ -16,10 +16,10 @@ func TestPreExecute_ObserveModeContractDoesNotDeny(t *testing.T) {
 	}
 
 	prov := defaultProvider()
-	prov.preconditions = []contract.Precondition{{
+	prov.preconditions = []rule.Precondition{{
 		Name: "observe_only", Tool: "*", Mode: "observe",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("would deny"), nil
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("would deny"), nil
 		},
 	}}
 	p := pipeline.New(prov)
@@ -29,7 +29,7 @@ func TestPreExecute_ObserveModeContractDoesNotDeny(t *testing.T) {
 		t.Fatal(err)
 	}
 	if dec.Action != "allow" {
-		t.Fatalf("observe contract should not deny, got %s", dec.Action)
+		t.Fatalf("observe rule should not deny, got %s", dec.Action)
 	}
 	if !dec.Observed {
 		t.Fatal("expected Observed=true")
@@ -43,11 +43,11 @@ func TestPreExecute_ApprovalPending(t *testing.T) {
 	}
 
 	prov := defaultProvider()
-	prov.preconditions = []contract.Precondition{{
-		Name: "needs_approval", Tool: "*", Effect: "approve",
+	prov.preconditions = []rule.Precondition{{
+		Name: "needs_approval", Tool: "*", Effect: "ask",
 		Timeout: 60, TimeoutEffect: "allow",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("Requires human approval"), nil
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("Requires human approval"), nil
 		},
 	}}
 	p := pipeline.New(prov)
@@ -63,24 +63,24 @@ func TestPreExecute_ApprovalPending(t *testing.T) {
 		t.Fatalf("expected timeout=60, got %d", dec.ApprovalTimeout)
 	}
 	if dec.ApprovalTimeoutEff != "allow" {
-		t.Fatalf("expected timeout_effect=allow, got %s", dec.ApprovalTimeoutEff)
+		t.Fatalf("expected timeout_action=allow, got %s", dec.ApprovalTimeoutEff)
 	}
 	if dec.ApprovalMessage != "Requires human approval" {
 		t.Fatalf("expected approval message, got %q", dec.ApprovalMessage)
 	}
 }
 
-func TestPreExecute_ObserveContractsEvaluated(t *testing.T) {
+func TestPreExecute_ObserveRulesEvaluated(t *testing.T) {
 	sess, _ := newTestSession(t)
 	if _, err := sess.IncrementAttempts(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
 	prov := defaultProvider()
-	prov.observePreconditions = []contract.Precondition{{
+	prov.observePreconditions = []rule.Precondition{{
 		Name: "observe_check", Tool: "*",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("observe would deny"), nil
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("observe would deny"), nil
 		},
 	}}
 	p := pipeline.New(prov)
@@ -90,7 +90,7 @@ func TestPreExecute_ObserveContractsEvaluated(t *testing.T) {
 		t.Fatal(err)
 	}
 	if dec.Action != "allow" {
-		t.Fatalf("observe contracts should not deny, got %s", dec.Action)
+		t.Fatalf("observe rules should not deny, got %s", dec.Action)
 	}
 	if len(dec.ObserveResults) != 1 {
 		t.Fatalf("expected 1 observe result, got %d", len(dec.ObserveResults))
@@ -107,10 +107,10 @@ func TestPreExecute_SandboxContractDeny(t *testing.T) {
 	}
 
 	prov := defaultProvider()
-	prov.sandboxContracts = []contract.Precondition{{
+	prov.sandboxRules = []rule.Precondition{{
 		Name: "path_sandbox", Tool: "*", Source: "yaml_sandbox",
-		Check: func(_ context.Context, _ envelope.ToolEnvelope) (contract.Verdict, error) {
-			return contract.Fail("path not allowed"), nil
+		Check: func(_ context.Context, _ toolcall.ToolCall) (rule.Decision, error) {
+			return rule.Fail("path not allowed"), nil
 		},
 	}}
 	p := pipeline.New(prov)
@@ -119,7 +119,7 @@ func TestPreExecute_SandboxContractDeny(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dec.Action != "deny" {
+	if dec.Action != "block" {
 		t.Fatalf("expected deny, got %s", dec.Action)
 	}
 	if dec.DecisionSource != "yaml_sandbox" {

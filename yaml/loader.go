@@ -19,7 +19,7 @@ type BundleHash struct {
 
 func (h BundleHash) String() string { return h.Hex }
 
-// LoadBundle loads and validates a YAML contract bundle from a file path.
+// LoadBundle loads and validates a YAML rule bundle from a file path.
 // Size is checked after reading to avoid TOCTOU races between stat and read.
 func LoadBundle(path string) (map[string]any, BundleHash, error) {
 	raw, err := os.ReadFile(path) //nolint:gosec // Path is caller-provided; this is the intended API.
@@ -33,7 +33,7 @@ func LoadBundle(path string) (map[string]any, BundleHash, error) {
 	return parseAndValidate(raw)
 }
 
-// LoadBundleString loads and validates a YAML contract bundle from a string.
+// LoadBundleString loads and validates a YAML rule bundle from a string.
 func LoadBundleString(content string) (map[string]any, BundleHash, error) {
 	raw := []byte(content)
 	if len(raw) > MaxBundleSize {
@@ -88,8 +88,8 @@ func normalizeLegacyBundle(data map[string]any) {
 		data["defaults"] = map[string]any{"mode": "enforce"}
 	}
 
-	contracts, _ := data["contracts"].([]any)
-	for _, raw := range contracts {
+	rules, _ := data["rules"].([]any)
+	for _, raw := range rules {
 		contractMap, ok := raw.(map[string]any)
 		if !ok {
 			continue
@@ -105,8 +105,8 @@ func normalizeLegacyBundle(data map[string]any) {
 			}
 
 			if effect, ok := contractMap["action"].(string); ok {
-				if _, exists := then["effect"]; !exists {
-					then["effect"] = effect
+				if _, exists := then["action"]; !exists {
+					then["action"] = effect
 				}
 				delete(contractMap, "action")
 			}
@@ -125,11 +125,11 @@ func normalizeLegacyBundle(data map[string]any) {
 				delete(contractMap, "timeout")
 			}
 
-			if timeoutEffect, ok := contractMap["timeout_effect"]; ok {
-				if _, exists := then["timeout_effect"]; !exists {
-					then["timeout_effect"] = timeoutEffect
+			if timeoutEffect, ok := contractMap["timeout_action"]; ok {
+				if _, exists := then["timeout_action"]; !exists {
+					then["timeout_action"] = timeoutEffect
 				}
-				delete(contractMap, "timeout_effect")
+				delete(contractMap, "timeout_action")
 			}
 
 			if tags, ok := contractMap["tags"]; ok {
@@ -146,19 +146,19 @@ func normalizeLegacyBundle(data map[string]any) {
 				delete(contractMap, "then_metadata")
 			}
 
-			if _, ok := then["effect"]; !ok {
+			if _, ok := then["action"]; !ok {
 				if ctype == "post" {
-					then["effect"] = "warn"
+					then["action"] = "warn"
 				} else {
-					then["effect"] = "deny"
+					then["action"] = "block"
 				}
 			}
 			if _, ok := then["message"]; !ok {
 				switch ctype {
 				case "session":
-					then["message"] = "Session contract violated."
+					then["message"] = "Session rule violated."
 				default:
-					then["message"] = "Contract violated."
+					then["message"] = "Rule violated."
 				}
 			}
 		case "sandbox":

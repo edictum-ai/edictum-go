@@ -4,8 +4,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // Check evaluates a tool call envelope against sandbox boundaries.
@@ -15,9 +15,9 @@ import (
 //  2. Command checks: first token must be in allowed commands list.
 //  3. Domain checks: BlockedDomains deny, then AllowedDomains require match.
 //
-// Returns contract.Pass() if all checks pass, or contract.Fail(message)
+// Returns rule.Pass() if all checks pass, or rule.Fail(message)
 // on the first denial.
-func Check(env envelope.ToolEnvelope, cfg Config) (contract.Verdict, error) {
+func Check(env toolcall.ToolCall, cfg Config) (rule.Decision, error) {
 	msg := cfg.message()
 
 	// --- Path checks ---
@@ -27,14 +27,14 @@ func Check(env envelope.ToolEnvelope, cfg Config) (contract.Verdict, error) {
 			// not_within: deny if any path matches an exclusion
 			for _, p := range paths {
 				if PathNotWithin(p, cfg.NotWithin) {
-					return contract.Fail(msg), nil
+					return rule.Fail(msg), nil
 				}
 			}
 			// within: every path must be within at least one allowed prefix
 			if len(cfg.Within) > 0 {
 				for _, p := range paths {
 					if !PathWithin(p, cfg.Within) {
-						return contract.Fail(msg), nil
+						return rule.Fail(msg), nil
 					}
 				}
 			}
@@ -46,7 +46,7 @@ func Check(env envelope.ToolEnvelope, cfg Config) (contract.Verdict, error) {
 		firstToken := ExtractCommand(env)
 		if firstToken != "" {
 			if !commandAllowed(firstToken, cfg.AllowedCommands) {
-				return contract.Fail(msg), nil
+				return rule.Fail(msg), nil
 			}
 		}
 	}
@@ -61,16 +61,16 @@ func Check(env envelope.ToolEnvelope, cfg Config) (contract.Verdict, error) {
 			}
 			// BlockedDomains: deny if hostname matches any denied domain pattern
 			if len(cfg.BlockedDomains) > 0 && DomainMatches(hostname, cfg.BlockedDomains) {
-				return contract.Fail(msg), nil
+				return rule.Fail(msg), nil
 			}
 			// allowed_domains: deny if hostname doesn't match any allowed pattern
 			if len(cfg.AllowedDomains) > 0 && !DomainMatches(hostname, cfg.AllowedDomains) {
-				return contract.Fail(msg), nil
+				return rule.Fail(msg), nil
 			}
 		}
 	}
 
-	return contract.Pass(), nil
+	return rule.Pass(), nil
 }
 
 // PathWithin reports whether path is within at least one of the allowed prefixes.

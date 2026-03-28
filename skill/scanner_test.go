@@ -148,9 +148,9 @@ func TestPatternMatching(t *testing.T) {
 
 func TestClassifyRisk(t *testing.T) {
 	tests := []struct {
-		name     string
-		findings []Finding
-		want     RiskTier
+		name       string
+		violations []Finding
+		want       RiskTier
 	}{
 		{"no_findings", nil, RiskClean},
 		{"medium_only", []Finding{{Severity: SeverityMedium}}, RiskMedium},
@@ -169,7 +169,7 @@ func TestClassifyRisk(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ClassifyRisk(tt.findings)
+			got := ClassifyRisk(tt.violations)
 			if got != tt.want {
 				t.Errorf("ClassifyRisk() = %q, want %q", got, tt.want)
 			}
@@ -197,7 +197,7 @@ func TestScanSkill(t *testing.T) {
 		t.Errorf("risk tier = %q, want CRITICAL", result.RiskTier)
 	}
 	if len(result.Findings) == 0 {
-		t.Error("expected findings, got none")
+		t.Error("expected violations, got none")
 	}
 
 	// Verify specific pattern categories found
@@ -207,7 +207,7 @@ func TestScanSkill(t *testing.T) {
 	}
 	for _, want := range []string{"pipe_to_shell", "c2_indicator"} {
 		if !categories[want] {
-			t.Errorf("expected category %q in findings", want)
+			t.Errorf("expected category %q in violations", want)
 		}
 	}
 }
@@ -229,7 +229,7 @@ func TestScanSkillClean(t *testing.T) {
 		t.Errorf("risk tier = %q, want CLEAN", result.RiskTier)
 	}
 	if len(result.Findings) != 0 {
-		t.Errorf("expected no findings, got %d: %v", len(result.Findings), result.Findings)
+		t.Errorf("expected no violations, got %d: %v", len(result.Findings), result.Findings)
 	}
 }
 
@@ -257,7 +257,7 @@ func TestScanSkillStructural(t *testing.T) {
 	t.Run("with_contracts_yaml", func(t *testing.T) {
 		dir := t.TempDir()
 		writeFile(t, filepath.Join(dir, "SKILL.md"), "# Skill\n")
-		writeFile(t, filepath.Join(dir, "contracts.yaml"), "apiVersion: edictum/v1\n")
+		writeFile(t, filepath.Join(dir, "rules.yaml"), "apiVersion: edictum/v1\n")
 
 		result, err := ScanSkillStructural(dir)
 		if err != nil {
@@ -271,7 +271,7 @@ func TestScanSkillStructural(t *testing.T) {
 	t.Run("with_contracts_yml", func(t *testing.T) {
 		dir := t.TempDir()
 		writeFile(t, filepath.Join(dir, "SKILL.md"), "# Skill\n")
-		writeFile(t, filepath.Join(dir, "contracts.yml"), "apiVersion: edictum/v1\n")
+		writeFile(t, filepath.Join(dir, "rules.yml"), "apiVersion: edictum/v1\n")
 
 		result, err := ScanSkillStructural(dir)
 		if err != nil {
@@ -325,7 +325,7 @@ func TestBase64Detection(t *testing.T) {
 		}
 	}
 	if !foundBase64 {
-		t.Errorf("expected high_entropy_base64 finding, got findings: %v", result.Findings)
+		t.Errorf("expected high_entropy_base64 finding, got violations: %v", result.Findings)
 	}
 }
 
@@ -404,7 +404,7 @@ func TestFindingLineNumbers(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("expected curl_pipe_shell finding on line 5, findings: %v", result.Findings)
+		t.Errorf("expected curl_pipe_shell finding on line 5, violations: %v", result.Findings)
 	}
 }
 

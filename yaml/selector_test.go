@@ -3,13 +3,13 @@ package yaml
 import (
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // --- 3.26-3.30: Selectors ---
 
 func TestSelectorArgs(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{
 			"nested": map[string]any{
 				"deep": map[string]any{"key": "found"},
@@ -23,12 +23,12 @@ func TestSelectorArgs(t *testing.T) {
 }
 
 func TestSelectorPrincipal(t *testing.T) {
-	p := envelope.NewPrincipal(
-		envelope.WithUserID("u-123"),
-		envelope.WithRole("admin"),
-		envelope.WithClaims(map[string]any{"team": "security"}),
+	p := toolcall.NewPrincipal(
+		toolcall.WithUserID("u-123"),
+		toolcall.WithRole("admin"),
+		toolcall.WithClaims(map[string]any{"team": "security"}),
 	)
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{Principal: &p})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{Principal: &p})
 	r := EvaluateExpression(leaf("principal.user_id", "equals", "u-123"), env, "")
 	if !r.Matched {
 		t.Fatal("expected match for principal.user_id")
@@ -44,12 +44,12 @@ func TestSelectorPrincipal(t *testing.T) {
 }
 
 func TestSelectorPrincipalServiceID(t *testing.T) {
-	p := envelope.NewPrincipal(
-		envelope.WithServiceID("svc-001"),
-		envelope.WithOrgID("org-42"),
-		envelope.WithTicketRef("JIRA-100"),
+	p := toolcall.NewPrincipal(
+		toolcall.WithServiceID("svc-001"),
+		toolcall.WithOrgID("org-42"),
+		toolcall.WithTicketRef("JIRA-100"),
 	)
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{Principal: &p})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{Principal: &p})
 	r := EvaluateExpression(leaf("principal.service_id", "equals", "svc-001"), env, "")
 	if !r.Matched {
 		t.Fatal("expected match for principal.service_id")
@@ -67,7 +67,7 @@ func TestSelectorPrincipalServiceID(t *testing.T) {
 func TestSelectorEnvVar(t *testing.T) {
 	t.Setenv("EDICTUM_TEST_VAR", "true")
 	t.Setenv("EDICTUM_TEST_NUM", "42")
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{})
 
 	// Boolean coercion.
 	r := EvaluateExpression(leaf("env.EDICTUM_TEST_VAR", "equals", true), env, "")
@@ -87,7 +87,7 @@ func TestSelectorEnvVar(t *testing.T) {
 }
 
 func TestSelectorMetadata(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Metadata: map[string]any{
 			"region": "us-east-1",
 			"tags":   map[string]any{"env": "staging"},
@@ -104,7 +104,7 @@ func TestSelectorMetadata(t *testing.T) {
 }
 
 func TestSelectorOutputText(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{})
 	r := EvaluateExpression(leaf("output.text", "contains", "secret"), env, "the output has a secret in it")
 	if !r.Matched {
 		t.Fatal("expected match for output.text")
@@ -119,7 +119,7 @@ func TestSelectorOutputText(t *testing.T) {
 // --- 3.31: Custom operators ---
 
 func TestCustomOperators(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{
+	env := makeEnv(t, toolcall.CreateToolCallOptions{
 		Args: map[string]any{"level": 5},
 	})
 	ops := map[string]func(any, any) bool{
@@ -147,9 +147,9 @@ func TestCustomOperators(t *testing.T) {
 // --- 3.32: Custom selectors ---
 
 func TestCustomSelectors(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{})
-	sels := map[string]func(envelope.ToolEnvelope) map[string]any{
-		"custom": func(_ envelope.ToolEnvelope) map[string]any {
+	env := makeEnv(t, toolcall.CreateToolCallOptions{})
+	sels := map[string]func(toolcall.ToolCall) map[string]any{
+		"custom": func(_ toolcall.ToolCall) map[string]any {
 			return map[string]any{"status": "active"}
 		},
 	}
@@ -168,7 +168,7 @@ func TestCustomSelectors(t *testing.T) {
 // --- Additional: principal nil -> missing ---
 
 func TestSelectorPrincipalNil(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{})
 	r := EvaluateExpression(leaf("principal.user_id", "equals", "x"), env, "")
 	if r.Matched {
 		t.Fatal("expected false for nil principal")
@@ -181,7 +181,7 @@ func TestSelectorPrincipalNil(t *testing.T) {
 // --- Additional: environment selector ---
 
 func TestSelectorEnvironment(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{Environment: "production"})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{Environment: "production"})
 	r := EvaluateExpression(leaf("environment", "equals", "production"), env, "")
 	if !r.Matched {
 		t.Fatal("expected match for environment selector")
@@ -191,7 +191,7 @@ func TestSelectorEnvironment(t *testing.T) {
 // --- Additional: unknown operator -> PolicyError ---
 
 func TestUnknownOperatorPolicyError(t *testing.T) {
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{ToolName: "Bash"})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{ToolName: "Bash"})
 	r := EvaluateExpression(leaf("tool.name", "bogus_op", "x"), env, "")
 	if !r.PolicyError {
 		t.Fatal("expected PolicyError for unknown operator")
@@ -202,7 +202,7 @@ func TestUnknownOperatorPolicyError(t *testing.T) {
 
 func TestEnvVarFloatCoercion(t *testing.T) {
 	t.Setenv("EDICTUM_TEST_FLOAT", "3.14")
-	env := makeEnv(t, envelope.CreateEnvelopeOptions{})
+	env := makeEnv(t, toolcall.CreateToolCallOptions{})
 	r := EvaluateExpression(leaf("env.EDICTUM_TEST_FLOAT", "equals", 3.14), env, "")
 	if !r.Matched {
 		t.Fatal("expected match for env var coerced to float")

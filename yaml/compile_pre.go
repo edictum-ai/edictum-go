@@ -4,40 +4,40 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/edictum-ai/edictum-go/contract"
-	"github.com/edictum-ai/edictum-go/envelope"
+	"github.com/edictum-ai/edictum-go/rule"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func compilePre(
 	raw map[string]any,
 	mode string,
 	cc *compileCtx,
-) (contract.Precondition, error) {
+) (rule.Precondition, error) {
 	cid, _ := raw["id"].(string)
 	tool, _ := raw["tool"].(string)
 	whenExpr, _ := raw["when"].(map[string]any)
 	then, _ := raw["then"].(map[string]any)
 
 	if whenExpr == nil || then == nil {
-		return contract.Precondition{}, fmt.Errorf("contract %q: missing when or then", cid)
+		return rule.Precondition{}, fmt.Errorf("rule %q: missing when or then", cid)
 	}
 
 	compiled := precompileRegexes(whenExpr)
 	msgTemplate, _ := then["message"].(string)
-	effect, _ := then["effect"].(string)
+	effect, _ := then["action"].(string)
 	if effect == "" {
-		effect = "deny"
+		effect = "block"
 	}
 	timeout := intOr(then["timeout"], 300)
-	timeoutEffect, _ := then["timeout_effect"].(string)
+	timeoutEffect, _ := then["timeout_action"].(string)
 	if timeoutEffect == "" {
-		timeoutEffect = "deny"
+		timeoutEffect = "block"
 	}
 
 	isObserve, _ := raw["_observe"].(bool)
 	source := "yaml_precondition"
 
-	pre := contract.Precondition{
+	pre := rule.Precondition{
 		Name:          cid,
 		Tool:          tool,
 		Mode:          mode,
@@ -45,7 +45,7 @@ func compilePre(
 		Effect:        effect,
 		Timeout:       timeout,
 		TimeoutEffect: timeoutEffect,
-		Check: func(_ context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
+		Check: func(_ context.Context, env toolcall.ToolCall) (rule.Decision, error) {
 			result := EvaluateExpression(compiled, env, "",
 				WithCustomOperators(cc.customOperators),
 				WithCustomSelectors(cc.customSelectors),
@@ -53,14 +53,14 @@ func compilePre(
 			)
 			msg := expandMessage(msgTemplate, env, "", cc.customSelectors, false)
 			if result.PolicyError {
-				return contract.Fail(msg, map[string]any{
+				return rule.Fail(msg, map[string]any{
 					"policy_error": true,
 				}), nil
 			}
 			if result.Matched {
-				return contract.Fail(msg), nil
+				return rule.Fail(msg), nil
 			}
-			return contract.Pass(), nil
+			return rule.Pass(), nil
 		},
 	}
 

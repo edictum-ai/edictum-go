@@ -25,7 +25,7 @@ type Request struct {
 	message       string
 	timeout       time.Duration
 	timeoutEffect string
-	principal     any // any: avoids import cycle with envelope.Principal; concrete type varies by integration
+	principal     any // any: avoids import cycle with toolcall.Principal; concrete type varies by integration
 	metadata      map[string]any
 	createdAt     time.Time
 }
@@ -46,7 +46,7 @@ func (r Request) Message() string { return r.message }
 
 // Principal returns the principal associated with the request.
 // Returns any to avoid an import cycle with the envelope package;
-// concrete type is *envelope.Principal when set by the pipeline.
+// concrete type is *toolcall.Principal when set by the pipeline.
 func (r Request) Principal() any { return r.principal }
 
 // Metadata returns a defensive deep copy of the request metadata.
@@ -60,7 +60,7 @@ func (r Request) CreatedAt() time.Time { return r.createdAt }
 // Timeout returns the approval timeout duration.
 func (r Request) Timeout() time.Duration { return r.timeout }
 
-// TimeoutEffect returns the effect when timeout occurs ("deny" or "allow").
+// TimeoutEffect returns the effect when timeout occurs ("block" or "allow").
 func (r Request) TimeoutEffect() string { return r.timeoutEffect }
 
 // Decision represents the outcome of an approval request.
@@ -86,7 +86,7 @@ func WithTimeout(d time.Duration) RequestOption {
 	return func(r *Request) { r.timeout = d }
 }
 
-// WithTimeoutEffect sets the effect when timeout occurs ("deny" or "allow").
+// WithTimeoutEffect sets the effect when timeout occurs ("block" or "allow").
 func WithTimeoutEffect(effect string) RequestOption {
 	return func(r *Request) { r.timeoutEffect = effect }
 }
