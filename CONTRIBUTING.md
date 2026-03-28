@@ -3,8 +3,8 @@
 ## Key design decisions
 
 - **Go 1.25+** -- oldest supported release
-- **Zero runtime deps in core** -- optional: `gopkg.in/yaml.v3` for YAML engine
-- **Struct literals for contracts** -- compile-time validated, explicit
+- **Zero runtime deps in core** -- optional: `gopkg.in/yaml.v3` for YAML support
+- **Struct literals for rules** -- compile-time validated, explicit
 - **`context.Context` everywhere** -- every pipeline, session, and audit method
 - **Unexported fields + getters** -- immutability enforced by API design
 - **`sync.Mutex` for shared state** -- Go is multi-threaded, `go test -race` must pass
@@ -15,15 +15,15 @@
 
 ```
 edictum-go/
-├── pipeline/        # 5-stage governance pipeline
-├── contract/        # Verdict, Precondition, Postcondition, SessionContract
-├── envelope/        # ToolEnvelope, BashClassifier, Principal, ToolRegistry
+├── pipeline/        # 5-stage check pipeline
+├── rule/            # Decision, Check, OutputCheck, SessionRule
+├── toolcall/        # ToolCall, BashClassifier, Principal, ToolRegistry
 ├── guard/           # Top-level API — Run(), Evaluate(), options, callbacks
 ├── session/         # Session counters, MemoryBackend
 ├── audit/           # CollectingSink, CompositeSink, StdoutSink
 ├── redaction/       # RedactionPolicy (word-boundary matching, secret detection)
 ├── sandbox/         # Path/command/domain sandboxing
-├── yaml/            # YAML contract bundle loader, evaluator, compiler
+├── yaml/            # YAML ruleset loader, evaluator, compiler
 ├── server/          # Server SDK — HTTP client, SSE, Ed25519, approval
 ├── approval/        # Approval backend interface
 ├── adapter/         # Framework adapters (5)
@@ -35,6 +35,7 @@ edictum-go/
 ## Running tests
 
 ```bash
+gofmt -l .
 go test ./... -race -count=1
 ```
 

@@ -1,10 +1,10 @@
 # CLAUDE.md — Edictum Go
 
-> Runtime contract enforcement for AI agent tool calls. Go port of the edictum Python library with full feature parity.
+> Runtime rule enforcement for AI agent tool calls. Go port of the edictum Python library with full feature parity.
 
 ## What is Edictum
 
-Runtime contract enforcement for AI agent tool calls. Deterministic pipeline: preconditions, postconditions, session contracts, principal-aware enforcement. Framework adapters (Google ADK Go, LangChainGo, Eino, Anthropic SDK Go, Genkit). Zero runtime deps in core. Full feature parity with the Python library (`edictum` on PyPI, v0.15.0).
+Runtime rule enforcement for AI agent tool calls. Deterministic pipeline: checks, output checks, session rules, principal-aware enforcement. Framework adapters (Google ADK Go, LangChainGo, Eino, Anthropic SDK Go, Genkit). Zero runtime deps in core. Full feature parity with the Python library (`edictum` on PyPI, v0.15.0).
 
 Current version: 0.2.0 (`github.com/edictum-ai/edictum-go`)
 
@@ -12,20 +12,20 @@ Current version: 0.2.0 (`github.com/edictum-ai/edictum-go`)
 
 **Core runs fully standalone. No server dependency. No adapter dependency. No framework dependency.**
 
-Core provides interfaces and implementations. The server package provides HTTP-backed implementations. Adapters are thin translation layers — governance logic stays in the pipeline.
+Core provides interfaces and implementations. The server package provides HTTP-backed implementations. Adapters are thin translation layers — rule enforcement logic stays in the pipeline.
 
 ## Architecture: Single Module, Subpackages
 
 ```
 edictum-go/
-├── pipeline/              # Core 5-stage governance pipeline
-├── envelope/              # ToolEnvelope, BashClassifier, Principal, ToolRegistry
-├── contract/              # Precondition, Postcondition, SessionContract, Verdict
+├── pipeline/              # Core 5-stage check pipeline
+├── toolcall/              # ToolCall, BashClassifier, Principal, ToolRegistry
+├── rule/                  # Check, OutputCheck, SessionRule, Decision
 ├── session/               # Session, StorageBackend, MemoryBackend
 ├── audit/                 # AuditSink, CompositeSink, FileSink, CollectingSink
 ├── redaction/             # RedactionPolicy
 ├── approval/              # ApprovalBackend, LocalApprovalBackend
-├── yaml/                  # YAML contract bundle loader (optional dep)
+├── yaml/                  # YAML ruleset loader (optional dep)
 ├── sandbox/               # Path/command/domain sandbox
 ├── guard/                 # Top-level Edictum guard (constructor, reload, from_yaml)
 ├── adapter/
@@ -57,10 +57,10 @@ edictum-go/
 1. **Full feature parity with Python.** 147 features across 12 categories. Every feature has a parity test ID. If Python passes and Go fails, it's a bug.
 2. **Security is non-negotiable.** This is a security product. No shortcuts, no "good enough", no deferred fixes for vulnerabilities. Fail closed on every error path.
 3. **Zero runtime deps in core.** Optional: `gopkg.in/yaml.v3`, `github.com/santhosh-tekuri/jsonschema`. The `go.opentelemetry.io/otel` API packages (trace, metric) are module-level deps imported by `guard` via `telemetry/` — they are lightweight interfaces with no-op defaults and zero overhead when no SDK is configured. These transitively bring in `go.opentelemetry.io/auto/sdk` as an indirect dep. The full OTel SDK (`go.opentelemetry.io/otel/sdk`) is NOT a dependency.
-4. **Struct literals for contracts.** Interfaces define protocols. Structs define data. Functional options for optional config. No reflection magic.
+4. **Struct literals for rules.** Interfaces define protocols. Structs define data. Functional options for optional config. No reflection magic.
 5. **`context.Context` everywhere.** Every pipeline, session, and audit sink method takes `ctx context.Context` as first parameter.
 6. **Immutability by API design.** Unexported fields + getter methods + value receivers. No `Object.freeze()` in Go — enforce via encapsulation.
-7. **Adapters are thin.** All governance logic lives in GovernancePipeline. Adapters only translate between framework input/output and the pipeline.
+7. **Adapters are thin.** All rule enforcement logic lives in CheckPipeline. Adapters only translate between framework input/output and the pipeline.
 8. **Adversarial tests before ship.** Every security boundary has bypass tests. Positive tests prove it works. Adversarial tests prove it doesn't break.
 9. **`go test -race` must always pass.** Go is multi-threaded — race conditions are real. Every shared state needs mutex protection.
 
@@ -74,11 +74,11 @@ edictum-go/
 - **`context.Context` as first param.** Every method that does I/O or could be cancelled.
 - **Errors, not panics.** Every function that can fail returns `error`. Use `errors.Is()`/`errors.As()` for typed errors.
 - **`sync.Mutex` / `sync.RWMutex`** for shared state. Document what each mutex protects.
-- **Unexported fields + exported getters** for immutable data types (ToolEnvelope, Principal, Verdict).
+- **Unexported fields + exported getters** for immutable data types (`ToolCall`, `Principal`, `Decision`).
 - **Value receivers** for immutable types, pointer receivers for mutable types.
 - **`errors.Join()`** for aggregating multiple errors (replaces AggregateError).
 - **No `init()` functions.** Explicit initialization only.
-- **Generics where natural.** `ToolEnvelope[T any]` for typed args. Don't force generics where `any` suffices.
+- **Generics where natural.** `ToolCall[T any]` for typed args. Don't force generics where `any` suffices.
 
 ### General
 
@@ -87,22 +87,22 @@ edictum-go/
 - **No premature abstraction.** Don't build extension points until there's a second user.
 - **No over-engineering.** Only make changes that are directly requested or clearly necessary.
 
-## Contract API Design
+## Rule API Design
 
-Contracts use **struct literals** with Go interfaces. Idiomatic, explicit, compile-time validated:
+Rules use **struct literals** with Go interfaces. Idiomatic, explicit, compile-time validated:
 
 ```go
-noRm := contract.Precondition{
+noRm := rule.Check{
     Tool: "Bash",
-    Check: func(ctx context.Context, env envelope.ToolEnvelope) (contract.Verdict, error) {
-        if strings.Contains(env.BashCommand(), "rm -rf") {
-            return contract.Fail("Cannot run rm -rf"), nil
+    Check: func(ctx context.Context, call toolcall.ToolCall) (rule.Decision, error) {
+        if strings.Contains(call.BashCommand(), "rm -rf") {
+            return rule.Block("Cannot run rm -rf"), nil
         }
-        return contract.Pass(), nil
+        return rule.Allow(), nil
     },
 }
 
-guard := guard.New(guard.WithContracts(noRm))
+g := guard.New(guard.WithRules(noRm))
 ```
 
 ## Terminology Enforcement
@@ -111,11 +111,11 @@ Inherited from the Python library. ALL code, comments, docstrings, CLI output, a
 
 | Wrong | Correct |
 |-------|---------|
-| rule / rules (in prose) | contract / contracts |
-| blocked | denied |
+| contract / contracts | rule / rules |
+| denied | blocked |
+| finding | violation |
 | engine (for runtime) | pipeline |
 | shadow mode | observe mode |
-| alert | finding |
 
 **No exceptions.**
 
@@ -125,7 +125,7 @@ Before adding any new public API:
 
 - **Every accepted parameter has an observable effect.** If unimplemented, return error — never silently ignore.
 - **Collection parameters have documented merge semantics.** Document whether it EXTENDS or REPLACES defaults.
-- **Deny decisions propagate end-to-end.** Trace deny through every adapter. Never return "allow" after a deny.
+- **Block decisions propagate end-to-end.** Trace block through every adapter. Never return "allow" after a block.
 - **Callbacks fire exactly once.** Assert callback count == 1 in tests.
 - **All adapters handle the new feature.** Run adapter parity tests after any change.
 
@@ -166,7 +166,7 @@ Examples:
 
 147 features across 12 categories must pass in Python, TypeScript, AND Go. See memory file `project_parity_matrix_detail.md` for the full matrix with test IDs.
 
-Cross-language validation: shared YAML contract bundles + JSON input/output fixtures. Same input → same output → parity proven.
+Cross-language validation: shared YAML rulesets + JSON input/output fixtures. Same input → same output → parity proven.
 
 ## Bug & Issue Triage Rule
 
@@ -180,12 +180,13 @@ When working in the project, if a bug, security issue, or problem is detected th
 ## Build & Test
 
 ```bash
+gofmt -l .                            # formatting check (must return empty)
 go build ./...                        # build all packages
 go test ./...                         # test all packages
 go test -race ./...                   # test with race detector
 go test -run "TestSecurity" ./...     # security boundary tests only
 go test ./pipeline/...                # test pipeline only
-go test ./envelope/...                # test envelope only
+go test ./toolcall/...                # test toolcall only
 golangci-lint run ./...               # lint (includes govet, gosec, staticcheck)
 ```
 
@@ -196,6 +197,7 @@ golangci-lint run ./...               # lint (includes govet, gosec, staticcheck
 Every change MUST pass these checks before committing:
 
 ```bash
+gofmt -l .                            # formatting check (must return empty)
 go build ./...                        # all packages build
 go test -race ./...                   # full test suite with race detector
 go test -run "TestSecurity" ./...     # security boundary tests
@@ -206,13 +208,15 @@ go test -run "TestAdapterParity" ./adapter/...
 
 ## YAML Schema
 
-The contract schema lives in the `edictum-schemas` repo — single source of truth. This repo embeds it via `//go:embed`.
+The schema lives in the `edictum-schemas` repo — single source of truth. This repo embeds it via `//go:embed`.
 
-- `apiVersion: edictum/v1`, `kind: ContractBundle`
-- Contract types: `type: pre` (deny/approve), `type: post` (warn/redact/deny), `type: session` (deny only), `type: sandbox` (allowlist-based)
+- `apiVersion: edictum/v1`, `kind: Ruleset`
+- Rule types: `type: check` (block/ask), `type: check_output` (warn/redact/block), `type: session` (block only), `type: sandbox` (allowlist-based)
 - Conditions: `when:` with boolean AST (`all/any/not`) and leaves (`selector: {operator: value}`)
 - 15 operators: exists, equals, not_equals, in, not_in, contains, contains_any, starts_with, ends_with, matches, matches_any, gt, gte, lt, lte
-- Missing fields evaluate to `false`. Type mismatches yield deny/warn + `policyError: true`
+- Missing fields evaluate to `false`. Type mismatches yield block/warn + `policyError: true`
+- Top-level collection uses `rules:`
+- Actions use `action:` instead of `effect:`
 
 ## Ecosystem Context
 
@@ -222,13 +226,13 @@ Edictum is five repos that work together:
 - **edictum-ts** (core TypeScript): `edictum-ai/edictum-ts` — MIT TypeScript library. npm: `@edictum/core`.
 - **edictum-go** (core Go): THIS REPO — MIT Go library. `github.com/edictum-ai/edictum-go`.
 - **edictum-console** (server): `edictum-ai/edictum-console` — Self-hostable FastAPI + React SPA.
-- **edictum-schemas** (shared): `edictum-ai/edictum-schemas` — Shared YAML contract schema.
+- **edictum-schemas** (shared): `edictum-ai/edictum-schemas` — Shared YAML ruleset schema.
 
-All three core libraries (Python, TS, and Go) work standalone. Console is an optional enhancement. Schema repo is the single source of truth for the contract format.
+All three core libraries (Python, TS, and Go) work standalone. Console is an optional enhancement. Schema repo is the single source of truth for the ruleset format.
 
 ## Cross-SDK Conformance Workflow
 
-When a change affects shared semantics, YAML validation, fixture behavior, audit/envelope wire format, or policy evaluation behavior, you MUST follow this workflow before merging:
+When a change affects shared semantics, YAML validation, fixture behavior, audit/toolcall wire format, or rule evaluation behavior, you MUST follow this workflow before merging:
 
 1. **Update shared fixtures** in `edictum-schemas` — add or modify `fixtures/rejection/*.rejection.yaml` files as needed
 2. **Update canonical Python behavior** in `edictum` if the change originates there

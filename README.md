@@ -1,22 +1,22 @@
 # Edictum
 
-Go SDK for runtime contract enforcement on AI agent tool calls.
+Go SDK for runtime rule enforcement on AI agent tool calls.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/edictum-ai/edictum-go.svg)](https://pkg.go.dev/github.com/edictum-ai/edictum-go)
 [![CI](https://github.com/edictum-ai/edictum-go/actions/workflows/ci.yml/badge.svg)](https://github.com/edictum-ai/edictum-go/actions/workflows/ci.yml)
 [![Go 1.25+](https://img.shields.io/badge/go-1.25%2B-blue)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**Prompts are suggestions -- contracts are enforcement.**
-The LLM cannot talk its way past a contract.
+**Prompts are suggestions -- rules are enforcement.**
+The LLM cannot talk its way past a rule.
 
 **Zero runtime deps** | **Fail-closed by default** | **485 tests, -race clean**
 
 ## What it does
 
-- **Deterministic YAML contracts** that execute outside the model -- no prompt-level bypass possible
-- **Immune to prompt injection** -- contracts are not part of the prompt, they run in a separate evaluation pipeline
-- **Fail-closed by default** -- if evaluation errors, the tool call is denied
+- **Deterministic YAML rules** that execute outside the model -- no prompt-level bypass possible
+- **Immune to prompt injection** -- rules are not part of the prompt, they run in a separate pipeline
+- **Fail-closed by default** -- if evaluation errors, the tool call is blocked
 
 ## Install
 
@@ -28,23 +28,23 @@ Requires Go 1.25+.
 
 ## Quick start
 
-Define a contract in YAML:
+Define a ruleset in YAML:
 
 ```yaml
 apiVersion: edictum/v1
-kind: ContractBundle
+kind: Ruleset
 defaults:
   mode: enforce
-contracts:
+rules:
   - id: no-destructive-bash
-    type: pre
+    type: check
     tool: Bash
     when:
       args.command:
         contains_any: ["rm -rf", "DROP TABLE", "FORMAT"]
     then:
-      effect: deny
-      message: "Destructive command denied: {args.command}"
+      action: block
+      message: "Destructive command blocked: {args.command}"
 ```
 
 Load and enforce:
@@ -62,7 +62,7 @@ import (
 )
 
 func main() {
-    g, err := guard.FromYAML("contracts.yaml")
+    g, err := guard.FromYAML("rules.yaml")
     if err != nil {
         panic(err)
     }
@@ -75,9 +75,9 @@ func main() {
     result, err := g.Run(context.Background(), "Bash",
         map[string]any{"command": "rm -rf /"}, myTool)
 
-    var denied *edictum.DeniedError
-    if errors.As(err, &denied) {
-        fmt.Println("Denied:", denied.Reason)
+    var blocked *edictum.BlockedError
+    if errors.As(err, &blocked) {
+        fmt.Println("Blocked:", blocked.Reason)
         return
     }
     fmt.Println("Result:", result)
@@ -115,8 +115,8 @@ Every security boundary has bypass tests. Every error path fails closed. Every s
 
 ## Research
 
-- [arXiv:2503.07918](https://arxiv.org/abs/2503.07918) -- *Runtime Contract Enforcement for AI Agent Tool Calls*
-- [OpenClaw](https://openclaw.org) -- Open dataset of 650+ real-world tool-call failures that motivated Edictum's contract model
+- [arXiv:2503.07918](https://arxiv.org/abs/2503.07918) -- *Runtime Rule Enforcement for AI Agent Tool Calls*
+- [OpenClaw](https://openclaw.org) -- Open dataset of 650+ real-world tool-call failures that motivated Edictum's rule model
 
 ## Ecosystem
 
@@ -126,7 +126,7 @@ Every security boundary has bypass tests. Every error path fails closed. Every s
 | edictum-go | Go SDK | [github.com/edictum-ai/edictum-go](https://github.com/edictum-ai/edictum-go) |
 | edictum-ts | TypeScript SDK | [github.com/edictum-ai/edictum-ts](https://github.com/edictum-ai/edictum-ts) |
 | edictum-console | Ops Console | [github.com/edictum-ai/edictum-console](https://github.com/edictum-ai/edictum-console) |
-| edictum-schemas | Contract schemas | [github.com/edictum-ai/edictum-schemas](https://github.com/edictum-ai/edictum-schemas) |
+| edictum-schemas | Ruleset schemas | [github.com/edictum-ai/edictum-schemas](https://github.com/edictum-ai/edictum-schemas) |
 | edictum-demo | Demos & benchmarks | [github.com/edictum-ai/edictum-demo](https://github.com/edictum-ai/edictum-demo) |
 
 ## Docs
