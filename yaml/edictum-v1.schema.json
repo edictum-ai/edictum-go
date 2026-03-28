@@ -14,7 +14,7 @@
   "additionalProperties": false,
   "properties": {
     "apiVersion": {
-      "const": "edictum/v1"
+      "const": "edictum/v2"
     },
     "kind": {
       "const": "Ruleset"

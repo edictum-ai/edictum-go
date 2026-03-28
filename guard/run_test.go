@@ -133,7 +133,7 @@ func TestRunObserveModeFallthrough(t *testing.T) {
 	events := g.LocalSink().Events()
 	hasWouldDeny := false
 	for _, e := range events {
-		if e.Action == audit.ActionCallWouldDeny {
+		if e.Action == audit.ActionCallWouldBlock {
 			hasWouldDeny = true
 		}
 	}
@@ -359,8 +359,8 @@ func TestRun_DenialAuditIncludesPythonStyleFields(t *testing.T) {
 		t.Fatal("expected audit events")
 	}
 	event := events[0]
-	if event.Action != audit.ActionCallDenied {
-		t.Fatalf("Action = %q, want %q", event.Action, audit.ActionCallDenied)
+	if event.Action != audit.ActionCallBlocked {
+		t.Fatalf("Action = %q, want %q", event.Action, audit.ActionCallBlocked)
 	}
 	if event.Mode != "enforce" {
 		t.Fatalf("Mode = %q, want enforce", event.Mode)

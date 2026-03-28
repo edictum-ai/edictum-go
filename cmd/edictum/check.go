@@ -134,8 +134,8 @@ func printCheckJSON(cmd *cobra.Command, ca checkArgs, r guard.EvaluationResult) 
 		Environment:    ca.environment,
 	}
 
-	if r.Decision == "block" && len(r.DenyReasons) > 0 {
-		out.Reason = r.DenyReasons[0]
+	if r.Decision == "block" && len(r.BlockReasons) > 0 {
+		out.Reason = r.BlockReasons[0]
 	} else if r.Decision == "warn" && len(r.WarnReasons) > 0 {
 		out.Reason = r.WarnReasons[0]
 	}

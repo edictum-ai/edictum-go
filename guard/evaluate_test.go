@@ -28,8 +28,8 @@ func TestEvaluateAllow(t *testing.T) {
 	if result.RulesEvaluated != 1 {
 		t.Errorf("contracts_evaluated: got %d, want 1", result.RulesEvaluated)
 	}
-	if len(result.DenyReasons) != 0 {
-		t.Errorf("deny_reasons: got %v, want empty", result.DenyReasons)
+	if len(result.BlockReasons) != 0 {
+		t.Errorf("block_reasons: got %v, want empty", result.BlockReasons)
 	}
 }
 
@@ -51,8 +51,8 @@ func TestEvaluateDeny(t *testing.T) {
 	if result.Decision != "block" {
 		t.Errorf("decision: got %q, want 'deny'", result.Decision)
 	}
-	if len(result.DenyReasons) != 1 {
-		t.Errorf("deny_reasons: got %d, want 1", len(result.DenyReasons))
+	if len(result.BlockReasons) != 1 {
+		t.Errorf("block_reasons: got %d, want 1", len(result.BlockReasons))
 	}
 }
 
@@ -79,8 +79,8 @@ func TestEvaluateExhaustive(t *testing.T) {
 	if result.RulesEvaluated != 2 {
 		t.Errorf("contracts_evaluated: got %d, want 2", result.RulesEvaluated)
 	}
-	if len(result.DenyReasons) != 2 {
-		t.Errorf("deny_reasons: got %d, want 2", len(result.DenyReasons))
+	if len(result.BlockReasons) != 2 {
+		t.Errorf("block_reasons: got %d, want 2", len(result.BlockReasons))
 	}
 }
 

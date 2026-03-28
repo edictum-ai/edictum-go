@@ -13,30 +13,30 @@ type Action string
 
 // Audit action types. 10 canonical actions matching Python parity.
 const (
-	ActionCallDenied            Action = "call_denied"
-	ActionCallWouldDeny         Action = "call_would_deny"
+	ActionCallBlocked           Action = "call_blocked"
+	ActionCallWouldBlock        Action = "call_would_block"
 	ActionCallAllowed           Action = "call_allowed"
 	ActionCallExecuted          Action = "call_executed"
 	ActionCallFailed            Action = "call_failed"
 	ActionPostconditionWarning  Action = "postcondition_warning"
 	ActionCallApprovalRequested Action = "call_approval_requested"
 	ActionCallApprovalGranted   Action = "call_approval_granted"
-	ActionCallApprovalDenied    Action = "call_approval_denied"
+	ActionCallApprovalBlocked   Action = "call_approval_blocked"
 	ActionCallApprovalTimeout   Action = "call_approval_timeout"
 )
 
 // AllActions returns all 10 canonical audit actions.
 func AllActions() []Action {
 	return []Action{
-		ActionCallDenied,
-		ActionCallWouldDeny,
+		ActionCallBlocked,
+		ActionCallWouldBlock,
 		ActionCallAllowed,
 		ActionCallExecuted,
 		ActionCallFailed,
 		ActionPostconditionWarning,
 		ActionCallApprovalRequested,
 		ActionCallApprovalGranted,
-		ActionCallApprovalDenied,
+		ActionCallApprovalBlocked,
 		ActionCallApprovalTimeout,
 	}
 }
@@ -72,7 +72,7 @@ type Event struct {
 	PolicyError           bool             `json:"policy_error"`
 }
 
-const schemaVersion = "0.3.0"
+const schemaVersion = "0.4.0"
 
 // NewEvent creates a new Event with defaults.
 func NewEvent() Event {
@@ -83,7 +83,7 @@ func NewEvent() Event {
 		HooksEvaluated: []map[string]any{},
 		RulesEvaluated: []map[string]any{},
 		Mode:           "enforce",
-		Action:         ActionCallDenied,
+		Action:         ActionCallBlocked,
 	}
 }
 

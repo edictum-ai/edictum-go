@@ -26,7 +26,7 @@ func TestNewGuardAllParams(t *testing.T) {
 		MaxCallsPerTool: map[string]int{"Bash": 10},
 	}
 
-	denyCalled := false
+	blockCalled := false
 	allowCalled := false
 	postWarnCalled := false
 	var approvalBe approval.Backend
@@ -57,7 +57,7 @@ func TestNewGuardAllParams(t *testing.T) {
 		WithRedaction(pol),
 		WithBackend(backend),
 		WithPolicyVersion("v1.0"),
-		WithOnDeny(func(_ toolcall.ToolCall, _ string, _ string) { denyCalled = true }),
+		WithOnBlock(func(_ toolcall.ToolCall, _ string, _ string) { blockCalled = true }),
 		WithOnAllow(func(_ toolcall.ToolCall) { allowCalled = true }),
 		WithOnPostWarn(func(_ toolcall.ToolCall, _ []string) { postWarnCalled = true }),
 		WithSuccessCheck(func(_ string, _ any) bool { return true }),
@@ -98,7 +98,7 @@ func TestNewGuardAllParams(t *testing.T) {
 	}
 
 	// Verify callbacks are set (not called yet)
-	_ = denyCalled
+	_ = blockCalled
 	_ = allowCalled
 	_ = postWarnCalled
 }
@@ -312,7 +312,7 @@ func TestAuditSinkComposite(t *testing.T) {
 	ctx := context.Background()
 	event := audit.NewEvent()
 	event.ToolName = "test"
-	event.Action = audit.ActionCallDenied
+	event.Action = audit.ActionCallBlocked
 	if err := g.auditSink.Emit(ctx, &event); err != nil {
 		t.Fatal(err)
 	}

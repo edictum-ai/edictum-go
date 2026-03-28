@@ -8,7 +8,7 @@ import (
 // user-authored mode: observe session rule still contributes its limits.
 func TestCompile_ExplicitObserveSessionLimitsMerged(t *testing.T) {
 	bundle := map[string]any{
-		"apiVersion": "edictum/v1",
+		"apiVersion": "edictum/v2",
 		"kind":       "Ruleset",
 		"defaults":   map[string]any{"mode": "enforce"},
 		"rules": []any{
@@ -40,7 +40,7 @@ func TestCompile_ExplicitObserveSessionLimitsMerged(t *testing.T) {
 // an enforce-mode session rule DOES merge its limits.
 func TestCompile_EnforceSessionLimitsMerged(t *testing.T) {
 	bundle := map[string]any{
-		"apiVersion": "edictum/v1",
+		"apiVersion": "edictum/v2",
 		"kind":       "Ruleset",
 		"defaults":   map[string]any{"mode": "enforce"},
 		"rules": []any{
@@ -72,7 +72,7 @@ func TestCompile_EnforceSessionLimitsMerged(t *testing.T) {
 // internal _observe shadow copies skip global limit merging.
 func TestCompile_InternalObserveShadowSessionLimitsNotMerged(t *testing.T) {
 	bundle := map[string]any{
-		"apiVersion": "edictum/v1",
+		"apiVersion": "edictum/v2",
 		"kind":       "Ruleset",
 		"defaults":   map[string]any{"mode": "enforce"},
 		"rules": []any{

@@ -31,7 +31,7 @@ Requires Go 1.25+.
 Define a ruleset in YAML:
 
 ```yaml
-apiVersion: edictum/v1
+apiVersion: edictum/v2
 kind: Ruleset
 defaults:
   mode: enforce

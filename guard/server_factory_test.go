@@ -18,7 +18,7 @@ import (
 	"github.com/edictum-ai/edictum-go/server"
 )
 
-const validBundleYAML = `apiVersion: edictum/v1
+const validBundleYAML = `apiVersion: edictum/v2
 kind: Ruleset
 defaults:
   mode: enforce

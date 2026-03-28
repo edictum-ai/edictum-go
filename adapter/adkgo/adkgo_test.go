@@ -141,7 +141,7 @@ func TestAdapterParity_11_4_ObserveMode(t *testing.T) {
 }
 
 // 11.5: on_deny callback fires exactly once.
-func TestAdapterParity_11_5_OnDenyCallback(t *testing.T) {
+func TestAdapterParity_11_5_OnBlockCallback(t *testing.T) {
 	var denyCount atomic.Int32
 	var capturedReason string
 
@@ -155,7 +155,7 @@ func TestAdapterParity_11_5_OnDenyCallback(t *testing.T) {
 				},
 			},
 		),
-		guard.WithOnDeny(func(_ toolcall.ToolCall, reason string, _ string) {
+		guard.WithOnBlock(func(_ toolcall.ToolCall, reason string, _ string) {
 			denyCount.Add(1)
 			capturedReason = reason
 		}),

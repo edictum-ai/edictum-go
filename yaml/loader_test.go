@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const validBundle = `apiVersion: edictum/v1
+const validBundle = `apiVersion: edictum/v2
 kind: Ruleset
 metadata:
   name: test-bundle
@@ -38,7 +38,7 @@ rules:
 
 // Cat 3.1 — Bundle size limit 1MB
 func TestLoadBundleString_SizeLimit(t *testing.T) {
-	huge := "apiVersion: edictum/v1\n" + strings.Repeat("x", MaxBundleSize+1)
+	huge := "apiVersion: edictum/v2\n" + strings.Repeat("x", MaxBundleSize+1)
 	_, _, err := LoadBundleString(huge)
 	if err == nil {
 		t.Fatal("expected error for oversized bundle")
@@ -77,7 +77,7 @@ func TestLoadBundleString_MissingApiVersion(t *testing.T) {
 
 // Cat 3.2 — Basic schema validation: kind
 func TestLoadBundleString_MissingKind(t *testing.T) {
-	_, _, err := LoadBundleString("apiVersion: edictum/v1\nrules: []\n")
+	_, _, err := LoadBundleString("apiVersion: edictum/v2\nrules: []\n")
 	if err == nil {
 		t.Fatal("expected error for missing kind")
 	}
@@ -99,7 +99,7 @@ func TestLoadBundleString_NonMapping(t *testing.T) {
 
 // Cat 3.2 — defaults.mode validation
 func TestLoadBundleString_InvalidMode(t *testing.T) {
-	y := "apiVersion: edictum/v1\nkind: Ruleset\ndefaults:\n  mode: shadow\nrules: []\n"
+	y := "apiVersion: edictum/v2\nkind: Ruleset\ndefaults:\n  mode: shadow\nrules: []\n"
 	_, _, err := LoadBundleString(y)
 	if err == nil {
 		t.Fatal("expected error for invalid mode")
@@ -111,7 +111,7 @@ func TestLoadBundleString_InvalidMode(t *testing.T) {
 
 // Cat 3.2 — Rule missing id
 func TestLoadBundleString_ContractMissingID(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 metadata:
   name: test-bundle
@@ -138,7 +138,7 @@ rules:
 
 // Cat 3.2 — Rule invalid type
 func TestLoadBundleString_ContractInvalidType(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 metadata:
   name: test-bundle
@@ -160,7 +160,7 @@ rules:
 
 // Cat 3.2 — Rule missing tool for non-session type
 func TestLoadBundleString_ContractMissingTool(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 metadata:
   name: test-bundle
@@ -187,7 +187,7 @@ rules:
 
 // Cat 3.2 — Session rules do not require tool
 func TestLoadBundleString_SessionNoTool(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 metadata:
   name: test-bundle
@@ -206,14 +206,14 @@ rules:
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if data["apiVersion"] != "edictum/v1" {
+	if data["apiVersion"] != "edictum/v2" {
 		t.Fatal("wrong apiVersion")
 	}
 }
 
 // Cat 3.3 — Unique rule ID
 func TestLoadBundleString_DuplicateID(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 metadata:
   name: test-bundle
@@ -250,7 +250,7 @@ rules:
 
 // Cat 3.4 — Regex pre-compilation: invalid regex at load time
 func TestLoadBundleString_InvalidRegex(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: bad-regex
@@ -271,7 +271,7 @@ rules:
 
 // Cat 3.4 — Invalid regex in matches_any
 func TestLoadBundleString_InvalidRegexMatchesAny(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: bad-regex-any
@@ -294,7 +294,7 @@ rules:
 
 // Cat 3.4 — Regex inside boolean combinator
 func TestLoadBundleString_InvalidRegexNested(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: nested-bad
@@ -316,7 +316,7 @@ rules:
 
 // Cat 3.5 — Pre-rule output.text rejection
 func TestLoadBundleString_PreOutputTextRejected(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: pre-output
@@ -337,7 +337,7 @@ rules:
 
 // Cat 3.5 — output.text nested in boolean combinator for pre
 func TestLoadBundleString_PreOutputTextNestedRejected(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: pre-nested
@@ -359,7 +359,7 @@ rules:
 
 // Cat 3.5 — output.text in post rule is allowed
 func TestLoadBundleString_PostOutputTextAllowed(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: post-ok
@@ -377,7 +377,7 @@ rules:
 
 // Cat 3.6 — Sandbox: not_within without within (no primary constraint)
 func TestLoadBundleString_SandboxNotWithinRequiresWithin(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: sb1
@@ -397,7 +397,7 @@ rules:
 
 // Cat 3.6 — Sandbox: not_allows without allows (no primary constraint)
 func TestLoadBundleString_SandboxNotAllowsRequiresAllows(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: sb2
@@ -418,7 +418,7 @@ rules:
 
 // Cat 3.6 — Sandbox: not_allows.domains requires allows.domains
 func TestLoadBundleString_SandboxNotAllowsDomainsRequiresAllowsDomains(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: sb3
@@ -442,7 +442,7 @@ rules:
 
 // Cat 3.6 — Sandbox: not_allows.commands is rejected (only domains valid)
 func TestLoadBundleString_SandboxNotAllowsCommandsRejected(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: sb4
@@ -466,7 +466,7 @@ rules:
 
 // Cat 3.6 — Sandbox: non-string entries in within are rejected
 func TestLoadBundleString_SandboxNonStringWithinRejected(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: bad-within
@@ -486,7 +486,7 @@ rules:
 
 // Cat 3.6 — Sandbox: valid with both within and not_within
 func TestLoadBundleString_SandboxValidWithBothWithin(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: sb-ok
@@ -505,7 +505,7 @@ rules:
 
 // Cat 3.6 — Sandbox: empty sandbox (no constraints) is rejected
 func TestLoadBundleString_SandboxEmptyRejected(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: empty-sb
@@ -523,7 +523,7 @@ rules:
 
 // Cat 3.6 — Sandbox: within: [] (empty list) is rejected
 func TestLoadBundleString_SandboxEmptyWithinRejected(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: empty-within
@@ -542,7 +542,7 @@ rules:
 
 // Cat 3.6 — Sandbox: allows: {} (empty map) is rejected
 func TestLoadBundleString_SandboxEmptyAllowsRejected(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: empty-allows
@@ -581,7 +581,7 @@ func TestLoadBundleString_ValidBundle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if data["apiVersion"] != "edictum/v1" {
+	if data["apiVersion"] != "edictum/v2" {
 		t.Fatal("wrong apiVersion")
 	}
 	if data["kind"] != "Ruleset" {
@@ -607,7 +607,7 @@ func TestLoadBundle_ValidFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if data["apiVersion"] != "edictum/v1" {
+	if data["apiVersion"] != "edictum/v2" {
 		t.Fatal("wrong apiVersion")
 	}
 	if hash.Hex == "" {
@@ -625,7 +625,7 @@ func TestLoadBundle_FileNotFound(t *testing.T) {
 
 // Cat 3.6 — Sandbox: non-string entries in allows.commands are rejected
 func TestLoadBundleString_SandboxNonStringCommandsRejected(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: bad-cmds
@@ -646,7 +646,7 @@ rules:
 
 // Cat 3.6 — Sandbox: non-string entries in allows.domains are rejected
 func TestLoadBundleString_SandboxNonStringDomainsRejected(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: bad-doms
@@ -667,7 +667,7 @@ rules:
 
 // Cat 3.6 — Sandbox: non-string entries in not_allows.domains are rejected
 func TestLoadBundleString_SandboxNonStringNotAllowsDomainsRejected(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: bad-not-allows-doms
@@ -694,7 +694,7 @@ func TestSecurity_ShadowInjection(t *testing.T) {
 	// on a rule. This internal key is reserved for observe_alongside
 	// composition — if accepted, it silently downgrades enforce→observe.
 	bundle := `
-apiVersion: edictum/v1
+apiVersion: edictum/v2
 kind: Ruleset
 defaults:
   mode: enforce

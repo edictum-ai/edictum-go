@@ -10,7 +10,7 @@ import (
 )
 
 // 9.1: on_deny fires exactly once
-func TestOnDenyFiresOnce(t *testing.T) {
+func TestOnBlockFiresOnce(t *testing.T) {
 	denyCount := 0
 	g := New(
 		WithRules(
@@ -19,7 +19,7 @@ func TestOnDenyFiresOnce(t *testing.T) {
 					return rule.Fail("denied"), nil
 				}},
 		),
-		WithOnDeny(func(_ toolcall.ToolCall, reason string, name string) {
+		WithOnBlock(func(_ toolcall.ToolCall, reason string, name string) {
 			denyCount++
 			if reason != "denied" {
 				t.Errorf("deny reason: got %q, want %q", reason, "denied")
@@ -91,7 +91,7 @@ func TestOnPostWarn(t *testing.T) {
 }
 
 // 9.4: on_deny skipped in observe mode
-func TestOnDenySkippedInObserve(t *testing.T) {
+func TestOnBlockSkippedInObserve(t *testing.T) {
 	denyCount := 0
 	g := New(
 		WithMode("observe"),
@@ -101,7 +101,7 @@ func TestOnDenySkippedInObserve(t *testing.T) {
 					return rule.Fail("would deny"), nil
 				}},
 		),
-		WithOnDeny(func(_ toolcall.ToolCall, _ string, _ string) {
+		WithOnBlock(func(_ toolcall.ToolCall, _ string, _ string) {
 			denyCount++
 		}),
 	)
@@ -142,7 +142,7 @@ func TestCallbackDenyPanicDontCrash(t *testing.T) {
 					return rule.Fail("denied"), nil
 				}},
 		),
-		WithOnDeny(func(_ toolcall.ToolCall, _ string, _ string) {
+		WithOnBlock(func(_ toolcall.ToolCall, _ string, _ string) {
 			panic("on_deny panicked")
 		}),
 	)

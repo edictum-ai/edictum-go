@@ -257,7 +257,7 @@ func TestScanSkillStructural(t *testing.T) {
 	t.Run("with_contracts_yaml", func(t *testing.T) {
 		dir := t.TempDir()
 		writeFile(t, filepath.Join(dir, "SKILL.md"), "# Skill\n")
-		writeFile(t, filepath.Join(dir, "rules.yaml"), "apiVersion: edictum/v1\n")
+		writeFile(t, filepath.Join(dir, "rules.yaml"), "apiVersion: edictum/v2\n")
 
 		result, err := ScanSkillStructural(dir)
 		if err != nil {
@@ -271,7 +271,7 @@ func TestScanSkillStructural(t *testing.T) {
 	t.Run("with_contracts_yml", func(t *testing.T) {
 		dir := t.TempDir()
 		writeFile(t, filepath.Join(dir, "SKILL.md"), "# Skill\n")
-		writeFile(t, filepath.Join(dir, "rules.yml"), "apiVersion: edictum/v1\n")
+		writeFile(t, filepath.Join(dir, "rules.yml"), "apiVersion: edictum/v2\n")
 
 		result, err := ScanSkillStructural(dir)
 		if err != nil {

@@ -23,7 +23,7 @@ type EvaluationResult struct {
 	Decision       string // "allow" | "block" | "warn"
 	ToolName       string
 	Rules          []RuleResult
-	DenyReasons    []string
+	BlockReasons   []string
 	WarnReasons    []string
 	RulesEvaluated int
 	PolicyError    bool
@@ -91,7 +91,7 @@ func (g *Guard) Evaluate(
 		return EvaluationResult{
 			Decision: "block",
 			ToolName: toolName,
-			DenyReasons: []string{
+			BlockReasons: []string{
 				fmt.Sprintf("Envelope creation error: %s", err),
 			},
 			RulesEvaluated: 0,
@@ -161,7 +161,7 @@ func (g *Guard) Evaluate(
 		Decision:       decision,
 		ToolName:       toolName,
 		Rules:          rules,
-		DenyReasons:    denyReasons,
+		BlockReasons:   denyReasons,
 		WarnReasons:    warnReasons,
 		RulesEvaluated: len(rules),
 		PolicyError:    policyError,

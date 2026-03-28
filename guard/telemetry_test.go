@@ -37,7 +37,7 @@ func TestWithTracerProvider_DirectOption(t *testing.T) {
 	}
 }
 
-func TestWithTelemetry_SpanErrorOnDeny(t *testing.T) {
+func TestWithTelemetry_SpanErrorOnBlock(t *testing.T) {
 	tp := newTTP()
 	tel := telemetry.New(telemetry.WithTracerProvider(tp))
 	deny := rule.Precondition{

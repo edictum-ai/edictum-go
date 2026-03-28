@@ -116,9 +116,9 @@ func WithPolicyVersion(v string) Option {
 	return func(g *Guard) { g.state.policyVersion = v }
 }
 
-// WithOnDeny sets the callback invoked when a tool call is blocked.
-func WithOnDeny(fn func(toolcall.ToolCall, string, string)) Option {
-	return func(g *Guard) { g.onDeny = fn }
+// WithOnBlock sets the callback invoked when a tool call is blocked.
+func WithOnBlock(fn func(toolcall.ToolCall, string, string)) Option {
+	return func(g *Guard) { g.onBlock = fn }
 }
 
 // WithOnAllow sets the callback invoked when a tool call is allowed.

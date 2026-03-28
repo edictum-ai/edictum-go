@@ -51,8 +51,8 @@ func validateSchema(data map[string]any) error {
 
 	if apiVersion, ok := data["apiVersion"].(string); !ok || apiVersion == "" {
 		return schemaError("apiVersion is required")
-	} else if apiVersion != "edictum/v1" {
-		return schemaError("apiVersion must be %q", "edictum/v1")
+	} else if apiVersion != "edictum/v2" {
+		return schemaError("apiVersion must be %q", "edictum/v2")
 	}
 
 	if kind, ok := data["kind"].(string); !ok || kind == "" {

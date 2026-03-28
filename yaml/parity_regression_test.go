@@ -8,7 +8,7 @@ import (
 )
 
 func TestRegression_SchemaRejectsMalformedPostEffectLikePython(t *testing.T) {
-	y := `apiVersion: edictum/v1
+	y := `apiVersion: edictum/v2
 kind: Ruleset
 metadata:
   name: test-bundle
@@ -36,7 +36,7 @@ rules:
 
 func TestRegression_ExplicitObserveSessionLimitMergesButInternalObserveShadowDoesNot(t *testing.T) {
 	bundle := map[string]any{
-		"apiVersion": "edictum/v1",
+		"apiVersion": "edictum/v2",
 		"kind":       "Ruleset",
 		"metadata":   map[string]any{"name": "test-bundle"},
 		"defaults":   map[string]any{"mode": "observe"},

@@ -94,7 +94,7 @@ func (g *Guard) handleApproval(
 			approved = true
 		}
 	case !decision.Approved:
-		g.emitPreAudit(ctx, env2, sess, audit.ActionCallApprovalDenied, pre, mode, policyVersion)
+		g.emitPreAudit(ctx, env2, sess, audit.ActionCallApprovalBlocked, pre, mode, policyVersion)
 	default:
 		approved = true
 		g.emitPreAudit(ctx, env2, sess, audit.ActionCallApprovalGranted, pre, mode, policyVersion)
@@ -116,7 +116,7 @@ func (g *Guard) handleApproval(
 	if reason == "" {
 		reason = pre.Reason
 	}
-	g.fireOnDeny(env2, reason, pre.DecisionName)
+	g.fireOnBlock(env2, reason, pre.DecisionName)
 	return nil, &edictum.BlockedError{
 		Reason:         reason,
 		DecisionSource: pre.DecisionSource,

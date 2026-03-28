@@ -52,12 +52,12 @@ type replayChange struct {
 }
 
 type replayReport struct {
-	ToolName    string         `json:"tool_name"`
-	ToolArgs    map[string]any `json:"tool_args"`
-	OldAction   string         `json:"old_action"`
-	NewVerdict  string         `json:"new_verdict"`
-	Changed     bool           `json:"changed"`
-	DenyReasons []string       `json:"deny_reasons,omitempty"`
+	ToolName     string         `json:"tool_name"`
+	ToolArgs     map[string]any `json:"tool_args"`
+	OldAction    string         `json:"old_action"`
+	NewVerdict   string         `json:"new_verdict"`
+	Changed      bool           `json:"changed"`
+	BlockReasons []string       `json:"block_reasons,omitempty"`
 }
 
 func runReplay(cmd *cobra.Command, bundlePath, auditLogPath, outputPath string, jsonFlag bool) error {
@@ -112,7 +112,7 @@ func runReplay(cmd *cobra.Command, bundlePath, auditLogPath, outputPath string, 
 				WasVerdict: strings.ToUpper(oldVerdict),
 				NowVerdict: strings.ToUpper(result.Decision),
 			}
-			if result.Decision == "block" && len(result.DenyReasons) > 0 {
+			if result.Decision == "block" && len(result.BlockReasons) > 0 {
 				change.DenyContract = extractRuleID(result)
 			}
 			changes = append(changes, change)
@@ -120,12 +120,12 @@ func runReplay(cmd *cobra.Command, bundlePath, auditLogPath, outputPath string, 
 
 		if outputPath != "" {
 			reports = append(reports, replayReport{
-				ToolName:    event.ToolName,
-				ToolArgs:    event.ToolArgs,
-				OldAction:   event.Action,
-				NewVerdict:  result.Decision,
-				Changed:     changed,
-				DenyReasons: result.DenyReasons,
+				ToolName:     event.ToolName,
+				ToolArgs:     event.ToolArgs,
+				OldAction:    event.Action,
+				NewVerdict:   result.Decision,
+				Changed:      changed,
+				BlockReasons: result.BlockReasons,
 			})
 		}
 	}
@@ -171,7 +171,7 @@ func actionToVerdict(action string) string {
 	switch action {
 	case "call_allowed":
 		return "allow"
-	case "call_denied":
+	case "call_blocked":
 		return "block"
 	default:
 		return action

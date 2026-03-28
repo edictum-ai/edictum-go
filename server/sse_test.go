@@ -47,7 +47,7 @@ func (m *mockReloader) lastCall() string {
 // --- 10.10: SSE hot-reload ---
 
 func TestSSEHotReload(t *testing.T) {
-	bundleYAML := "apiVersion: edictum/v1\nkind: Ruleset"
+	bundleYAML := "apiVersion: edictum/v2\nkind: Ruleset"
 	bundleJSON, _ := json.Marshal(map[string]string{"yaml": bundleYAML})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -176,7 +176,7 @@ func TestEd25519Verification(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	yamlBytes := []byte("apiVersion: edictum/v1\nkind: Ruleset")
+	yamlBytes := []byte("apiVersion: edictum/v2\nkind: Ruleset")
 	sig := ed25519.Sign(priv, yamlBytes)
 	sigB64 := base64.StdEncoding.EncodeToString(sig)
 	pubHex := hex.EncodeToString(pub)
@@ -221,7 +221,7 @@ func TestEd25519Verification(t *testing.T) {
 // --- 10.10b: SSE assignment change ---
 
 func TestSSEAssignmentChange(t *testing.T) {
-	bundleYAML := "apiVersion: edictum/v1\nkind: Ruleset"
+	bundleYAML := "apiVersion: edictum/v2\nkind: Ruleset"
 	yamlB64 := base64.StdEncoding.EncodeToString([]byte(bundleYAML))
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -317,7 +317,7 @@ func TestSSENotKilledByClientTimeout(t *testing.T) {
 		}
 
 		// Send first event immediately.
-		bundleJSON, _ := json.Marshal(map[string]string{"yaml": "apiVersion: edictum/v1\nkind: Ruleset\n# event-1"})
+		bundleJSON, _ := json.Marshal(map[string]string{"yaml": "apiVersion: edictum/v2\nkind: Ruleset\n# event-1"})
 		_, _ = fmt.Fprintf(w, "event: contract_update\ndata: %s\n\n", bundleJSON)
 		flusher.Flush()
 
@@ -325,7 +325,7 @@ func TestSSENotKilledByClientTimeout(t *testing.T) {
 		// Without the fix the connection would be dead by now.
 		time.Sleep(clientTimeout * 3)
 
-		bundleJSON2, _ := json.Marshal(map[string]string{"yaml": "apiVersion: edictum/v1\nkind: Ruleset\n# event-2"})
+		bundleJSON2, _ := json.Marshal(map[string]string{"yaml": "apiVersion: edictum/v2\nkind: Ruleset\n# event-2"})
 		_, _ = fmt.Fprintf(w, "event: contract_update\ndata: %s\n\n", bundleJSON2)
 		flusher.Flush()
 		close(eventsSent)

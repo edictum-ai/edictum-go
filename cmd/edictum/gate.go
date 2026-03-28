@@ -168,8 +168,8 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 
 	ruleID := extractRuleID(result)
 	reason := ""
-	if len(result.DenyReasons) > 0 {
-		reason = result.DenyReasons[0]
+	if len(result.BlockReasons) > 0 {
+		reason = result.BlockReasons[0]
 	}
 
 	// Append audit event with timestamp.

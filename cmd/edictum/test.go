@@ -232,7 +232,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 		Decision       string   `json:"decision"`
 		ToolName       string   `json:"tool_name"`
 		RulesEvaluated int      `json:"rules_evaluated"`
-		DenyReasons    []string `json:"deny_reasons"`
+		BlockReasons   []string `json:"block_reasons"`
 		WarnReasons    []string `json:"warn_reasons"`
 	}
 	var results []callResult
@@ -249,7 +249,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 			Decision:       result.Decision,
 			ToolName:       call.Tool,
 			RulesEvaluated: result.RulesEvaluated,
-			DenyReasons:    nonNilStrings(result.DenyReasons),
+			BlockReasons:   nonNilStrings(result.BlockReasons),
 			WarnReasons:    nonNilStrings(result.WarnReasons),
 		})
 	}
@@ -261,8 +261,8 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 	fmt.Fprintf(w, "%-3s %-12s %-8s %-10s %s\n", "#", "Tool", "Decision", "Contracts", "Details")
 	for i, r := range results {
 		details := ""
-		if len(r.DenyReasons) > 0 {
-			details = strings.Join(r.DenyReasons, "; ")
+		if len(r.BlockReasons) > 0 {
+			details = strings.Join(r.BlockReasons, "; ")
 		}
 		fmt.Fprintf(w, "%-3d %-12s %-8s %-10d %s\n",
 			i+1, r.ToolName, strings.ToUpper(r.Decision), r.RulesEvaluated, details)

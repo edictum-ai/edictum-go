@@ -9,7 +9,7 @@ import (
 )
 
 // Minimal rule bundle for security tests. Denies rm -rf commands.
-const testRuleset = `apiVersion: edictum/v1
+const testRuleset = `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: deny-rm-rf

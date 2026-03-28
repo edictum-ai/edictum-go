@@ -11,7 +11,7 @@ import (
 	edictum "github.com/edictum-ai/edictum-go"
 )
 
-const validBundle = `apiVersion: edictum/v1
+const validBundle = `apiVersion: edictum/v2
 kind: Ruleset
 defaults:
   mode: enforce
@@ -34,7 +34,7 @@ rules:
     then:
       action: redact`
 
-const toolsMergeBundle = `apiVersion: edictum/v1
+const toolsMergeBundle = `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: t1
@@ -105,7 +105,7 @@ func TestFromYAMLString_PolicyVersion(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := "073db7922fe4e4b2f0e4220c47c53b876ed0ee48b60fa38ad596b658b2705c85"
+	want := "f16fafc8c7d2815cd9cc49e6f4156b2dff51f77e03f33fb7a1cf3ee2006fc126"
 	if g.PolicyVersion() != want {
 		t.Errorf("policy_version:\n  got  %q\n  want %q", g.PolicyVersion(), want)
 	}
@@ -160,7 +160,7 @@ func TestFromYAMLString_ToolsMerge(t *testing.T) {
 func TestFromYAML_Directory(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "01-base.yaml"), validBundle)
-	writeFile(t, filepath.Join(dir, "02-extra.yaml"), `apiVersion: edictum/v1
+	writeFile(t, filepath.Join(dir, "02-extra.yaml"), `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: extra-pre
@@ -228,7 +228,7 @@ func TestFromYAMLWithReport_MultiFile(t *testing.T) {
 	dir := t.TempDir()
 
 	// File 1: defines rule "shared-id"
-	writeFile(t, filepath.Join(dir, "01-base.yaml"), `apiVersion: edictum/v1
+	writeFile(t, filepath.Join(dir, "01-base.yaml"), `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: shared-id
@@ -242,7 +242,7 @@ rules:
       message: "base version"`)
 
 	// File 2: overrides "shared-id" with a different message
-	writeFile(t, filepath.Join(dir, "02-override.yaml"), `apiVersion: edictum/v1
+	writeFile(t, filepath.Join(dir, "02-override.yaml"), `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: shared-id
@@ -308,7 +308,7 @@ func TestReloadFromYAML_SwapsContracts(t *testing.T) {
 	oldVersion := g.PolicyVersion()
 
 	// Reload with a different bundle that has 2 preconditions and 0 postconditions.
-	newYAML := `apiVersion: edictum/v1
+	newYAML := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: rule-a
@@ -354,7 +354,7 @@ func TestSecurityResolvePaths_SymlinkEscape(t *testing.T) {
 
 	// Create an escaping symlink to a file outside the directory.
 	externalDir := t.TempDir()
-	writeFile(t, filepath.Join(externalDir, "evil.yaml"), `apiVersion: edictum/v1
+	writeFile(t, filepath.Join(externalDir, "evil.yaml"), `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: injected
@@ -377,7 +377,7 @@ rules:
 
 func TestSecurityResolvePaths_SymlinkToParent(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "secret.yaml"), `apiVersion: edictum/v1
+	writeFile(t, filepath.Join(root, "secret.yaml"), `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: parent-secret
@@ -404,7 +404,7 @@ rules:
 }
 
 func TestReloadFromYAML_ToolRegistryReplaced(t *testing.T) {
-	yamlWithTools := `apiVersion: edictum/v1
+	yamlWithTools := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: t1
@@ -430,7 +430,7 @@ tools:
 	}
 
 	// Reload with bundle that has no tools section — OldTool should be gone.
-	newYAML := `apiVersion: edictum/v1
+	newYAML := `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: t2
@@ -455,7 +455,7 @@ rules:
 // --- YAML sandbox integration tests (issue #35) ---
 
 func sandboxWithinYAML(dir string) string {
-	return fmt.Sprintf(`apiVersion: edictum/v1
+	return fmt.Sprintf(`apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: safe-file-paths
@@ -515,7 +515,7 @@ func TestFromYAMLString_SandboxNotWithinDenies(t *testing.T) {
 	resolvedDir, _ := filepath.EvalSymlinks(dir)
 	resolvedExcluded, _ := filepath.EvalSymlinks(excluded)
 
-	yamlStr := fmt.Sprintf(`apiVersion: edictum/v1
+	yamlStr := fmt.Sprintf(`apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: safe-but-no-secret
@@ -553,7 +553,7 @@ rules:
 	}
 }
 
-const sandboxCommandsBundle = `apiVersion: edictum/v1
+const sandboxCommandsBundle = `apiVersion: edictum/v2
 kind: Ruleset
 rules:
   - id: safe-commands

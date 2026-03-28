@@ -105,7 +105,7 @@ func (g *Guard) emitObservedDenials(
 			event.SideEffect = string(env2.SideEffect())
 			event.Environment = env2.Environment()
 			event.Principal = principalMap(env2.Principal())
-			event.Action = audit.ActionCallWouldDeny
+			event.Action = audit.ActionCallWouldBlock
 			event.DecisionSource = "precondition"
 			if name, ok := cr["name"].(string); ok {
 				event.DecisionName = name
@@ -134,7 +134,7 @@ func (g *Guard) emitObserveResults(
 		passed, _ := sr["passed"].(bool)
 		action := audit.ActionCallAllowed
 		if !passed {
-			action = audit.ActionCallWouldDeny
+			action = audit.ActionCallWouldBlock
 		}
 		event := audit.NewEvent()
 		event.RunID = env2.RunID()
@@ -227,17 +227,17 @@ func deepCopyAny(v any) any {
 	}
 }
 
-// fireOnDeny invokes the on_deny callback, swallowing panics.
-func (g *Guard) fireOnDeny(env2 toolcall.ToolCall, reason, name string) {
-	if g.onDeny == nil {
+// fireOnBlock invokes the on_block callback, swallowing panics.
+func (g *Guard) fireOnBlock(env2 toolcall.ToolCall, reason, name string) {
+	if g.onBlock == nil {
 		return
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("on_deny callback panicked: %v", r)
+			log.Printf("on_block callback panicked: %v", r)
 		}
 	}()
-	g.onDeny(env2, reason, name)
+	g.onBlock(env2, reason, name)
 }
 
 // fireOnAllow invokes the on_allow callback, swallowing panics.

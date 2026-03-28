@@ -151,16 +151,16 @@ func (g *Guard) handlePreDecision(
 	realDeny := pre.Action == "block" && !pre.Observed
 
 	if realDeny {
-		action := audit.ActionCallDenied
+		action := audit.ActionCallBlocked
 		if mode == "observe" {
-			action = audit.ActionCallWouldDeny
+			action = audit.ActionCallWouldBlock
 		}
 		g.emitPreAudit(ctx, env2, sess, action, pre, mode, policyVersion)
 
 		if mode == "enforce" {
 			telemetry.SetSpanError(trace.SpanFromContext(ctx), "rule denied: "+pre.DecisionName)
 			g.telemetry.RecordDenial(ctx, env2.ToolName())
-			g.fireOnDeny(env2, pre.Reason, pre.DecisionName)
+			g.fireOnBlock(env2, pre.Reason, pre.DecisionName)
 			return nil, &edictum.BlockedError{
 				Reason:         pre.Reason,
 				DecisionSource: pre.DecisionSource,
