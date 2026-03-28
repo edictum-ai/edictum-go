@@ -45,10 +45,10 @@ type auditEvent struct {
 }
 
 type replayChange struct {
-	ToolName     string `json:"tool_name"`
-	WasVerdict   string `json:"was_verdict"`
-	NowVerdict   string `json:"now_verdict"`
-	DenyContract string `json:"deny_contract,omitempty"`
+	ToolName      string `json:"tool_name"`
+	WasVerdict    string `json:"was_verdict"`
+	NowVerdict    string `json:"now_verdict"`
+	BlockedByRule string `json:"deny_contract,omitempty"`
 }
 
 type replayReport struct {
@@ -113,7 +113,7 @@ func runReplay(cmd *cobra.Command, bundlePath, auditLogPath, outputPath string, 
 				NowVerdict: strings.ToUpper(result.Decision),
 			}
 			if result.Decision == "block" && len(result.BlockReasons) > 0 {
-				change.DenyContract = extractRuleID(result)
+				change.BlockedByRule = extractRuleID(result)
 			}
 			changes = append(changes, change)
 		}
@@ -196,8 +196,8 @@ func printReplaySummary(w io.Writer, total int, changes []replayChange) {
 	for _, c := range changes {
 		line := fmt.Sprintf("  tool_name: %s → was %s, now %s",
 			c.ToolName, c.WasVerdict, c.NowVerdict)
-		if c.DenyContract != "" {
-			line += " by " + c.DenyContract
+		if c.BlockedByRule != "" {
+			line += " by " + c.BlockedByRule
 		}
 		fmt.Fprintln(w, line)
 	}

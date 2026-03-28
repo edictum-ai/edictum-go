@@ -16,7 +16,7 @@ func (g *Guard) GetLimits() pipeline.OperationLimits {
 	return g.state.limits
 }
 
-// GetHooks returns hooks matching the given phase and tool toolcall.
+// GetHooks returns hooks matching the given phase and ToolCall.
 func (g *Guard) GetHooks(phase string, env toolcall.ToolCall) []pipeline.HookRegistration {
 	g.mu.RLock()
 	defer g.mu.RUnlock()

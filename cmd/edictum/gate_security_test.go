@@ -11,15 +11,20 @@ import (
 // Minimal rule bundle for security tests. Denies rm -rf commands.
 const testRuleset = `apiVersion: edictum/v1
 kind: Ruleset
+metadata:
+  name: test-rules
+defaults:
+  mode: enforce
 rules:
   - id: deny-rm-rf
     type: pre
     tool: Bash
     when:
-      command:
+      bash_command:
         contains: "rm -rf"
-    action: deny
-    message: "rm -rf is not allowed"
+    then:
+      action: block
+      message: "rm -rf is not allowed"
 `
 
 // writeTestBundle writes a minimal rule bundle to a temp directory

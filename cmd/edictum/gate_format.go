@@ -204,7 +204,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 			output = map[string]any{
 				"hookSpecificOutput": map[string]any{
 					"hookEventName":            "PreToolUse",
-					"permissionDecision":       "block",
+					"permissionDecision":       "deny", // Claude Code/Copilot hook protocol value — do not rename,
 					"permissionDecisionReason": buildDenyReason(ruleID, reason),
 				},
 			}
@@ -225,7 +225,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 	case "copilot":
 		if decision == "block" {
 			output = map[string]any{
-				"permissionDecision":       "block",
+				"permissionDecision":       "deny", // Claude Code/Copilot hook protocol value — do not rename,
 				"permissionDecisionReason": buildDenyReason(ruleID, reason),
 			}
 		} else {
@@ -255,7 +255,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 	case "raw":
 		result := map[string]any{"decision": decision}
 		if ruleID != "" {
-			result["contract_id"] = ruleID
+			result["rule_id"] = ruleID
 		}
 		if reason != "" {
 			result["reason"] = reason

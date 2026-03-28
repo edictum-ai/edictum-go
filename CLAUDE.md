@@ -92,13 +92,13 @@ edictum-go/
 Rules use **struct literals** with Go interfaces. Idiomatic, explicit, compile-time validated:
 
 ```go
-noRm := rule.Check{
+noRm := rule.Precondition{
     Tool: "Bash",
     Check: func(ctx context.Context, call toolcall.ToolCall) (rule.Decision, error) {
         if strings.Contains(call.BashCommand(), "rm -rf") {
-            return rule.Block("Cannot run rm -rf"), nil
+            return rule.Fail("Cannot run rm -rf"), nil
         }
-        return rule.Allow(), nil
+        return rule.Pass(), nil
     },
 }
 

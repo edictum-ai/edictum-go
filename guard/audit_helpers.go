@@ -84,7 +84,7 @@ func (g *Guard) emitPostAudit(
 	}
 }
 
-// emitObservedDenials emits CALL_WOULD_DENY for per-rule observed denials.
+// emitObservedDenials emits CALL_WOULD_BLOCK for per-rule observed denials.
 func (g *Guard) emitObservedDenials(
 	ctx context.Context,
 	env2 toolcall.ToolCall,

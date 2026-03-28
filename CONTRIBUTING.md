@@ -16,7 +16,7 @@
 ```
 edictum-go/
 ├── pipeline/        # 5-stage check pipeline
-├── rule/            # Decision, Check, OutputCheck, SessionRule
+├── rule/            # Decision, Precondition, Postcondition, SessionRule
 ├── toolcall/        # ToolCall, BashClassifier, Principal, ToolRegistry
 ├── guard/           # Top-level API — Run(), Evaluate(), options, callbacks
 ├── session/         # Session counters, MemoryBackend
