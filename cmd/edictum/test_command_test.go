@@ -151,7 +151,7 @@ func TestTestCmd_PrincipalWithTicket(t *testing.T) {
 	}
 }
 
-func TestTestCmd_PrincipalWithClaims(t *testing.T) {
+func TestTestCmd_ClaimsFieldIgnored(t *testing.T) {
 	bundle := writeTempFile(t, "rules.yaml", testCommandRulesYAML)
 	cases := writeTempFile(t, "cases.yaml", `cases:
   - id: claims-field-ignored
