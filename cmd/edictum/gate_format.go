@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/guard"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/spf13/cobra"
 )
 

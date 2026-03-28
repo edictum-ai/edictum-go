@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/toolcall"
-	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
 func TestParity_1_22_MessageTruncation500(t *testing.T) {

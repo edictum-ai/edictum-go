@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/toolcall"
-	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
 func makeEnvelopeWithRegistry(t *testing.T, tool string, args map[string]any, se toolcall.SideEffect) toolcall.ToolCall {

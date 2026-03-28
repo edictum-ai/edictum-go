@@ -5,9 +5,9 @@ import (
 	"log"
 
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // emitPreAudit emits a pre-execution audit event.

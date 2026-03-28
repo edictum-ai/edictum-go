@@ -93,7 +93,7 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 			installed = []string{}
 		}
 		out := map[string]any{
-			"rules":      ruleNames,
+			"rules":          ruleNames,
 			"server_url":     cfg.ServerURL,
 			"pending_events": pending,
 			"installed":      installed,
@@ -136,7 +136,7 @@ func newGateAuditCmd() *cobra.Command {
 	var (
 		limit    int
 		tool     string
-		decision  string
+		decision string
 		jsonFlag bool
 	)
 

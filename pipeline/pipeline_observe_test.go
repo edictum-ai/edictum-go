@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/toolcall"
-	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
 func TestPreExecute_ObserveModeContractDoesNotDeny(t *testing.T) {

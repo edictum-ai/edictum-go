@@ -3,8 +3,8 @@ package yaml
 import (
 	"context"
 
-	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/pipeline"
+	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/session"
 )
 

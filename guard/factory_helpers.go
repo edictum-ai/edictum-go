@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	yamlpkg "github.com/edictum-ai/edictum-go/yaml"
 )
 

@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/internal/shlex"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // redirectPrefixRe matches shell redirection operators at the start of a token.

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/guard"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/spf13/cobra"
 )
 
@@ -115,7 +115,7 @@ func buildPrincipal(role, user, ticket string) toolcall.Principal {
 type checkOutput struct {
 	Tool               string         `json:"tool"`
 	Args               map[string]any `json:"args"`
-	Decision            string         `json:"decision"`
+	Decision           string         `json:"decision"`
 	Reason             string         `json:"reason,omitempty"`
 	ContractsEvaluated int            `json:"contracts_evaluated"`
 	Environment        string         `json:"environment"`
@@ -129,7 +129,7 @@ func printCheckJSON(cmd *cobra.Command, ca checkArgs, r guard.EvaluationResult) 
 	out := checkOutput{
 		Tool:               ca.toolName,
 		Args:               args,
-		Decision:            r.Decision,
+		Decision:           r.Decision,
 		ContractsEvaluated: r.ContractsEvaluated,
 		Environment:        ca.environment,
 	}

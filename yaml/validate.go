@@ -8,7 +8,7 @@ import (
 
 var (
 	metadataNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
-	ruleIDRe   = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+	ruleIDRe       = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 )
 
 var (
@@ -17,7 +17,7 @@ var (
 		"kind":              true,
 		"metadata":          true,
 		"defaults":          true,
-		"rules":         true,
+		"rules":             true,
 		"tools":             true,
 		"observability":     true,
 		"observe_alongside": true,

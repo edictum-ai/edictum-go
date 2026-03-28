@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/edictum-ai/edictum-go/rule"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
+	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func TestPreExecute_SessionRuleDeny(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/redaction"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 var (

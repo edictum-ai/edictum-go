@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/edictum-ai/edictum-go/rule"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/sandbox"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // compileSandbox creates a Precondition for sandbox rules with the

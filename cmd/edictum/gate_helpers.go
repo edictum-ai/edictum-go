@@ -137,7 +137,7 @@ func copyFile(src, dst string) error {
 type walEvent struct {
 	Timestamp string `json:"timestamp"`
 	ToolName  string `json:"tool_name"`
-	Decision   string `json:"decision"`
+	Decision  string `json:"decision"`
 	Assistant string `json:"assistant,omitempty"`
 	User      string `json:"user,omitempty"`
 	Reason    string `json:"reason,omitempty"`

@@ -10,9 +10,9 @@ import (
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
+	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/toolcall"
-	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
 func nopCallable(_ map[string]any) (any, error) {

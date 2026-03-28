@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/guard"
+	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -106,10 +106,10 @@ func runTestCases(cmd *cobra.Command, bundlePath, casesPath, env string, jsonOut
 	type caseResult struct {
 		ID       string `json:"id"`
 		Tool     string `json:"tool_name"`
-		Decision  string `json:"decision"`
+		Decision string `json:"decision"`
 		Expected string `json:"expected"`
 		Passed   bool   `json:"passed"`
-		Rule string `json:"rule,omitempty"`
+		Rule     string `json:"rule,omitempty"`
 		Message  string `json:"message,omitempty"`
 	}
 	var results []caseResult
@@ -149,10 +149,10 @@ func runTestCases(cmd *cobra.Command, bundlePath, casesPath, env string, jsonOut
 		cr := caseResult{
 			ID:       tc.ID,
 			Tool:     tc.Tool,
-			Decision:  result.Decision,
+			Decision: result.Decision,
 			Expected: tc.Expect,
 			Passed:   ok,
-			Rule: denyContract,
+			Rule:     denyContract,
 		}
 
 		if !ok {
@@ -229,7 +229,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 	hasDenials := false
 
 	type callResult struct {
-		Decision            string   `json:"decision"`
+		Decision           string   `json:"decision"`
 		ToolName           string   `json:"tool_name"`
 		ContractsEvaluated int      `json:"contracts_evaluated"`
 		DenyReasons        []string `json:"deny_reasons"`
@@ -246,7 +246,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 		}
 
 		results = append(results, callResult{
-			Decision:            result.Decision,
+			Decision:           result.Decision,
 			ToolName:           call.Tool,
 			ContractsEvaluated: result.ContractsEvaluated,
 			DenyReasons:        nonNilStrings(result.DenyReasons),

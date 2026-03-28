@@ -1,16 +1,16 @@
 package yaml
 
 import (
+	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/toolcall"
-	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
 // CompiledRuleset is the result of compiling a YAML rule bundle.
 type CompiledRuleset struct {
 	Preconditions    []rule.Precondition
 	Postconditions   []rule.Postcondition
-	SessionRules []rule.SessionRule
+	SessionRules     []rule.SessionRule
 	SandboxContracts []rule.Precondition
 	Limits           pipeline.OperationLimits
 	DefaultMode      string

@@ -7,8 +7,8 @@ import (
 	"go.opentelemetry.io/otel/codes"
 
 	"github.com/edictum-ai/edictum-go/rule"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/telemetry"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func TestWithTracerProvider_DirectOption(t *testing.T) {

@@ -1,9 +1,9 @@
 package guard
 
 import (
+	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/toolcall"
-	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
 // Compile-time check that Guard implements RuleProvider.

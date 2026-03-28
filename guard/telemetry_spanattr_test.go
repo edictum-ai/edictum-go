@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/edictum-ai/edictum-go/rule"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/telemetry"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // hasSpanAttr reports whether the recorded spans contain the given

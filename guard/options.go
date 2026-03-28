@@ -5,11 +5,11 @@ import (
 
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/rule"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/redaction"
+	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // Option configures a Guard.

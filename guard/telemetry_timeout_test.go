@@ -9,8 +9,8 @@ import (
 
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/rule"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/telemetry"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // TestApprovalTimeout_SetsSpanAttrAndAllowedCounter verifies timeout_action=allow path.

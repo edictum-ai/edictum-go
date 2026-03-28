@@ -148,9 +148,9 @@ func TestPatternMatching(t *testing.T) {
 
 func TestClassifyRisk(t *testing.T) {
 	tests := []struct {
-		name     string
+		name       string
 		violations []Finding
-		want     RiskTier
+		want       RiskTier
 	}{
 		{"no_findings", nil, RiskClean},
 		{"medium_only", []Finding{{Severity: SeverityMedium}}, RiskMedium},

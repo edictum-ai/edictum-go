@@ -3,9 +3,9 @@ package guard
 import (
 	"path"
 
+	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/toolcall"
-	"github.com/edictum-ai/edictum-go/pipeline"
 )
 
 // filterPreconditions returns preconditions matching the tool name.

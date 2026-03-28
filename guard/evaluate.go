@@ -20,7 +20,7 @@ type RuleResult struct {
 
 // EvaluationResult is the result of offline rule evaluation.
 type EvaluationResult struct {
-	Decision            string // "allow" | "block" | "warn"
+	Decision           string // "allow" | "block" | "warn"
 	ToolName           string
 	Contracts          []RuleResult
 	DenyReasons        []string
@@ -89,7 +89,7 @@ func (g *Guard) Evaluate(
 	})
 	if err != nil {
 		return EvaluationResult{
-			Decision:  "block",
+			Decision: "block",
 			ToolName: toolName,
 			DenyReasons: []string{
 				fmt.Sprintf("Envelope creation error: %s", err),
@@ -158,7 +158,7 @@ func (g *Guard) Evaluate(
 	}
 
 	return EvaluationResult{
-		Decision:            decision,
+		Decision:           decision,
 		ToolName:           toolName,
 		Contracts:          rules,
 		DenyReasons:        denyReasons,

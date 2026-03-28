@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/edictum-ai/edictum-go/rule"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/telemetry"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func TestApprovalGranted_RecordsAllowedCounter(t *testing.T) {

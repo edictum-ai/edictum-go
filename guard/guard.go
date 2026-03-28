@@ -9,12 +9,12 @@ import (
 
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/audit"
-	"github.com/edictum-ai/edictum-go/rule"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/redaction"
+	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/telemetry"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // serverClient is satisfied by *server.Client. Defined here to avoid
@@ -39,7 +39,7 @@ type compiledState struct {
 	sandboxContracts        []rule.Precondition
 	observePreconditions    []rule.Precondition
 	observePostconditions   []rule.Postcondition
-	observeSessionRules []rule.SessionRule
+	observeSessionRules     []rule.SessionRule
 	observeSandboxContracts []rule.Precondition
 	limits                  pipeline.OperationLimits
 	policyVersion           string
@@ -59,7 +59,7 @@ type Guard struct {
 	auditSink         audit.Sink
 	localSink         *audit.CollectingSink
 	redactionPolicy   *redaction.Policy
-	onBlock            func(env toolcall.ToolCall, reason string, name string)
+	onBlock           func(env toolcall.ToolCall, reason string, name string)
 	onAllow           func(env toolcall.ToolCall)
 	onPostWarn        func(env toolcall.ToolCall, warnings []string)
 	successCheck      func(toolName string, result any) bool

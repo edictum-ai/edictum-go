@@ -177,7 +177,7 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 		_ = appendWALEvent(cfg.AuditPath, walEvent{
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 			ToolName:  toolName,
-			Decision:   result.Decision,
+			Decision:  result.Decision,
 			User:      currentUser(),
 			Reason:    reason,
 		})

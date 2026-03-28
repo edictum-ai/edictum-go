@@ -6,8 +6,8 @@ import (
 	"log"
 
 	"github.com/edictum-ai/edictum-go/rule"
-	"github.com/edictum-ai/edictum-go/toolcall"
 	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 // CheckPipeline orchestrates all governance checks.
