@@ -26,7 +26,7 @@ func TestEvaluateAllow(t *testing.T) {
 		t.Errorf("decision: got %q, want 'allow'", result.Decision)
 	}
 	if result.RulesEvaluated != 1 {
-		t.Errorf("contracts_evaluated: got %d, want 1", result.RulesEvaluated)
+		t.Errorf("rules_evaluated: got %d, want 1", result.RulesEvaluated)
 	}
 	if len(result.BlockReasons) != 0 {
 		t.Errorf("block_reasons: got %v, want empty", result.BlockReasons)
@@ -77,7 +77,7 @@ func TestEvaluateExhaustive(t *testing.T) {
 		t.Errorf("decision: got %q, want 'deny'", result.Decision)
 	}
 	if result.RulesEvaluated != 2 {
-		t.Errorf("contracts_evaluated: got %d, want 2", result.RulesEvaluated)
+		t.Errorf("rules_evaluated: got %d, want 2", result.RulesEvaluated)
 	}
 	if len(result.BlockReasons) != 2 {
 		t.Errorf("block_reasons: got %d, want 2", len(result.BlockReasons))
@@ -158,7 +158,7 @@ func TestEvaluateObserveContractNotDeny(t *testing.T) {
 		t.Errorf("decision: got %q, want 'allow' (observe rule)", result.Decision)
 	}
 	if result.RulesEvaluated != 1 {
-		t.Errorf("contracts_evaluated: got %d, want 1", result.RulesEvaluated)
+		t.Errorf("rules_evaluated: got %d, want 1", result.RulesEvaluated)
 	}
 	if len(result.Rules) != 1 || !result.Rules[0].Observed {
 		t.Error("rule should be marked as observed")
@@ -300,6 +300,6 @@ func TestEvaluateWithWhenPredicate(t *testing.T) {
 		t.Errorf("decision: got %q, want 'allow' (when=false)", result.Decision)
 	}
 	if result.RulesEvaluated != 0 {
-		t.Errorf("contracts_evaluated: got %d, want 0", result.RulesEvaluated)
+		t.Errorf("rules_evaluated: got %d, want 0", result.RulesEvaluated)
 	}
 }

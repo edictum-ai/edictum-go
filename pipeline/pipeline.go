@@ -68,7 +68,7 @@ func (p *CheckPipeline) PreExecute(
 		decision, hookErr := hook.Before(ctx, env)
 		if hookErr != nil {
 			log.Printf("Hook %s raised: %v", hook.HookName(), hookErr)
-			decision = DenyHook(fmt.Sprintf("Hook error: %s", hookErr))
+			decision = BlockHook(fmt.Sprintf("Hook error: %s", hookErr))
 			hookRaisedException = true
 		}
 		hookRecord := map[string]any{
@@ -77,7 +77,7 @@ func (p *CheckPipeline) PreExecute(
 			"reason": decision.Reason,
 		}
 		hooks = append(hooks, hookRecord)
-		if decision.Result == HookResultDeny {
+		if decision.Result == HookResultBlock {
 			return PreDecision{
 				Action:         "block",
 				Reason:         decision.Reason,

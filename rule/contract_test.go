@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestVerdict(t *testing.T) {
+func TestDecision(t *testing.T) {
 	t.Run("pass", func(t *testing.T) {
 		v := Pass()
 		if !v.Passed() {

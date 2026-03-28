@@ -210,7 +210,7 @@ go test -run "TestAdapterParity" ./adapter/...
 
 The schema lives in the `edictum-schemas` repo — single source of truth. This repo embeds it via `//go:embed`.
 
-- `apiVersion: edictum/v2`, `kind: Ruleset`
+- `apiVersion: edictum/v1`, `kind: Ruleset`
 - Rule types: `type: check` (block/ask), `type: check_output` (warn/redact/block), `type: session` (block only), `type: sandbox` (allowlist-based)
 - Conditions: `when:` with boolean AST (`all/any/not`) and leaves (`selector: {operator: value}`)
 - 15 operators: exists, equals, not_equals, in, not_in, contains, contains_any, starts_with, ends_with, matches, matches_any, gt, gte, lt, lte

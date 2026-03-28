@@ -12,7 +12,7 @@ type HookResult string
 // HookResult values.
 const (
 	HookResultAllow HookResult = "allow"
-	HookResultDeny  HookResult = "block"
+	HookResultBlock HookResult = "block"
 )
 
 // HookDecision is the result of a before/after hook.
@@ -26,13 +26,13 @@ func AllowHook() HookDecision {
 	return HookDecision{Result: HookResultAllow}
 }
 
-// DenyHook creates a deny decision with a reason (truncated to 500 chars).
+// BlockHook creates a block decision with a reason (truncated to 500 chars).
 // Truncation preserves readability: "xxx..." (497 chars + "...").
-func DenyHook(reason string) HookDecision {
+func BlockHook(reason string) HookDecision {
 	if len(reason) > 500 {
 		reason = reason[:497] + "..."
 	}
-	return HookDecision{Result: HookResultDeny, Reason: reason}
+	return HookDecision{Result: HookResultBlock, Reason: reason}
 }
 
 // BeforeHookFunc is the signature for before-execution hooks.

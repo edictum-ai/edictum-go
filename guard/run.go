@@ -158,7 +158,7 @@ func (g *Guard) handlePreDecision(
 		g.emitPreAudit(ctx, env2, sess, action, pre, mode, policyVersion)
 
 		if mode == "enforce" {
-			telemetry.SetSpanError(trace.SpanFromContext(ctx), "rule denied: "+pre.DecisionName)
+			telemetry.SetSpanError(trace.SpanFromContext(ctx), "rule blocked: "+pre.DecisionName)
 			g.telemetry.RecordDenial(ctx, env2.ToolName())
 			g.fireOnBlock(env2, pre.Reason, pre.DecisionName)
 			return nil, &edictum.BlockedError{
@@ -171,7 +171,7 @@ func (g *Guard) handlePreDecision(
 		g.telemetry.RecordDenial(ctx, env2.ToolName())
 		trace.SpanFromContext(ctx).SetAttributes(attribute.Bool("governance.observed_deny", true))
 	} else {
-		// Emit CALL_WOULD_DENY for per-rule observed denials
+		// Emit CALL_WOULD_BLOCK for per-rule observed denials
 		g.emitObservedDenials(ctx, env2, pre, policyVersion)
 		g.emitPreAudit(ctx, env2, sess, audit.ActionCallAllowed, pre, mode, policyVersion)
 		g.telemetry.RecordAllowed(ctx, env2.ToolName())

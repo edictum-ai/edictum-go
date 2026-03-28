@@ -231,7 +231,7 @@
               "minimum": 1,
               "default": 300
             },
-            "timeout_effect": {
+            "timeout_action": {
               "enum": [
                 "block",
                 "allow"
@@ -425,7 +425,7 @@
           "minimum": 1,
           "default": 300
         },
-        "timeout_effect": {
+        "timeout_action": {
           "enum": [
             "block",
             "allow"

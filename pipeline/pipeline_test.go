@@ -169,7 +169,7 @@ func TestPreExecute_HookDeny(t *testing.T) {
 	prov.hooks = []pipeline.HookRegistration{{
 		Phase: "before", Tool: "*", Name: "deny_all",
 		Before: func(_ context.Context, _ toolcall.ToolCall) (pipeline.HookDecision, error) {
-			return pipeline.DenyHook("denied by hook"), nil
+			return pipeline.BlockHook("blocked by hook"), nil
 		},
 	}}
 	p := pipeline.New(prov)
@@ -184,7 +184,7 @@ func TestPreExecute_HookDeny(t *testing.T) {
 	if dec.DecisionSource != "hook" {
 		t.Fatalf("expected hook, got %s", dec.DecisionSource)
 	}
-	if dec.Reason != "denied by hook" {
+	if dec.Reason != "blocked by hook" {
 		t.Fatalf("expected reason, got %q", dec.Reason)
 	}
 	if len(dec.HooksEvaluated) != 1 {

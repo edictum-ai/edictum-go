@@ -129,7 +129,7 @@ func TestRunObserveModeFallthrough(t *testing.T) {
 		t.Errorf("result: got %v, want 'ok'", result)
 	}
 
-	// Should have CALL_WOULD_DENY
+	// Should have CALL_WOULD_BLOCK
 	events := g.LocalSink().Events()
 	hasWouldDeny := false
 	for _, e := range events {
@@ -138,7 +138,7 @@ func TestRunObserveModeFallthrough(t *testing.T) {
 		}
 	}
 	if !hasWouldDeny {
-		t.Error("expected CALL_WOULD_DENY in observe mode")
+		t.Error("expected CALL_WOULD_BLOCK in observe mode")
 	}
 }
 
