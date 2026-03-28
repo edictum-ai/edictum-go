@@ -1,4 +1,4 @@
-// Package envelope defines the ToolCall type and tool classification.
+// Package toolcall defines the ToolCall type and tool classification.
 package toolcall
 
 import (

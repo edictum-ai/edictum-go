@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	edictum "github.com/edictum-ai/edictum-go"
+	"github.com/edictum-ai/edictum-go/guard"
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/toolcall"
-	"github.com/edictum-ai/edictum-go/guard"
 )
 
 func echoTool(_ context.Context, input json.RawMessage) (any, error) {
