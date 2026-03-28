@@ -59,7 +59,7 @@ type Guard struct {
 	auditSink         audit.Sink
 	localSink         *audit.CollectingSink
 	redactionPolicy   *redaction.Policy
-	onBlock           func(env toolcall.ToolCall, reason string, name string)
+	onDeny            func(env toolcall.ToolCall, reason string, name string)
 	onAllow           func(env toolcall.ToolCall)
 	onPostWarn        func(env toolcall.ToolCall, warnings []string)
 	successCheck      func(toolName string, result any) bool

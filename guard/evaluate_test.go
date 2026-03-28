@@ -160,7 +160,7 @@ func TestEvaluateObserveContractNotDeny(t *testing.T) {
 	if result.RulesEvaluated != 1 {
 		t.Errorf("contracts_evaluated: got %d, want 1", result.RulesEvaluated)
 	}
-	if len(result.Contracts) != 1 || !result.Contracts[0].Observed {
+	if len(result.Rules) != 1 || !result.Rules[0].Observed {
 		t.Error("rule should be marked as observed")
 	}
 }
@@ -246,7 +246,7 @@ func TestEvaluateSandboxRules(t *testing.T) {
 	if result.Decision != "block" {
 		t.Errorf("decision: got %q, want 'deny'", result.Decision)
 	}
-	if len(result.Contracts) != 1 || result.Contracts[0].RuleType != "sandbox" {
+	if len(result.Rules) != 1 || result.Rules[0].RuleType != "sandbox" {
 		t.Error("sandbox rule should be evaluated with type 'sandbox'")
 	}
 }

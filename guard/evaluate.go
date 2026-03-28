@@ -22,7 +22,7 @@ type RuleResult struct {
 type EvaluationResult struct {
 	Decision       string // "allow" | "block" | "warn"
 	ToolName       string
-	Contracts      []RuleResult
+	Rules          []RuleResult
 	DenyReasons    []string
 	WarnReasons    []string
 	RulesEvaluated int
@@ -160,7 +160,7 @@ func (g *Guard) Evaluate(
 	return EvaluationResult{
 		Decision:       decision,
 		ToolName:       toolName,
-		Contracts:      rules,
+		Rules:          rules,
 		DenyReasons:    denyReasons,
 		WarnReasons:    warnReasons,
 		RulesEvaluated: len(rules),

@@ -179,7 +179,7 @@ func actionToVerdict(action string) string {
 }
 
 func extractRuleID(result guard.EvaluationResult) string {
-	for _, c := range result.Contracts {
+	for _, c := range result.Rules {
 		if !c.Passed && c.RuleID != "" {
 			return c.RuleID
 		}

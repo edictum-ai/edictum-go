@@ -229,7 +229,7 @@ func deepCopyAny(v any) any {
 
 // fireOnDeny invokes the on_deny callback, swallowing panics.
 func (g *Guard) fireOnDeny(env2 toolcall.ToolCall, reason, name string) {
-	if g.onBlock == nil {
+	if g.onDeny == nil {
 		return
 	}
 	defer func() {
@@ -237,7 +237,7 @@ func (g *Guard) fireOnDeny(env2 toolcall.ToolCall, reason, name string) {
 			log.Printf("on_deny callback panicked: %v", r)
 		}
 	}()
-	g.onBlock(env2, reason, name)
+	g.onDeny(env2, reason, name)
 }
 
 // fireOnAllow invokes the on_allow callback, swallowing panics.

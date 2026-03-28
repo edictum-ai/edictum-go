@@ -744,7 +744,7 @@ func validateSandboxStructural(contractMap map[string]any, index int) error {
 	}
 	if outside, ok := contractMap["outside"].(string); ok {
 		if outside != "block" && outside != "ask" {
-			return schemaError("rules[%d].outside must be one of deny or approve", index)
+			return schemaError("rules[%d].outside must be one of block or ask", index)
 		}
 	} else if _, ok := contractMap["outside"]; ok {
 		return schemaError("rules[%d].outside must be a string", index)

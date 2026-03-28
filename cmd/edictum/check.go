@@ -141,7 +141,7 @@ func printCheckJSON(cmd *cobra.Command, ca checkArgs, r guard.EvaluationResult) 
 	}
 
 	// Find the first failing rule ID.
-	for _, c := range r.Contracts {
+	for _, c := range r.Rules {
 		if !c.Passed {
 			out.RuleID = c.RuleID
 			break
@@ -164,7 +164,7 @@ func printCheckText(cmd *cobra.Command, r guard.EvaluationResult) error { //noli
 	w := cmd.OutOrStdout()
 
 	if r.Decision == "block" {
-		for _, c := range r.Contracts {
+		for _, c := range r.Rules {
 			if !c.Passed {
 				fmt.Fprintf(w, "\u2717 BLOCKED by %s", c.RuleID)
 				if c.Message != "" {

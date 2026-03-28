@@ -275,7 +275,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 }
 
 func matchesDenyContract(result guard.EvaluationResult, ruleID string) bool {
-	for _, c := range result.Contracts {
+	for _, c := range result.Rules {
 		if !c.Passed && c.RuleID == ruleID {
 			return true
 		}
