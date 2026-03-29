@@ -15,7 +15,7 @@ func evalPrecondition(
 	env2 toolcall.ToolCall,
 	ruleType string,
 	rules *[]RuleResult,
-	denyReasons *[]string,
+	blockReasons *[]string,
 ) {
 	name := c.Name
 	if name == "" {
@@ -38,7 +38,7 @@ func evalPrecondition(
 			PolicyError: true,
 		}
 		*rules = append(*rules, cr)
-		*denyReasons = append(*denyReasons, cr.Message)
+		*blockReasons = append(*blockReasons, cr.Message)
 		return
 	}
 
@@ -60,7 +60,7 @@ func evalPrecondition(
 	}
 	*rules = append(*rules, cr)
 	if !decision.Passed() && !isObserved {
-		*denyReasons = append(*denyReasons, decision.Message())
+		*blockReasons = append(*blockReasons, decision.Message())
 	}
 }
 

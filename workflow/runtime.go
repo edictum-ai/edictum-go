@@ -12,6 +12,7 @@ import (
 // Runtime evaluates and persists one workflow definition.
 type Runtime struct {
 	definition Definition
+	// mu serializes all session-backed state reads and writes.
 	mu         sync.Mutex
 	evaluators map[string]FactEvaluator
 }

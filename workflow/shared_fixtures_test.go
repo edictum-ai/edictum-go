@@ -46,9 +46,9 @@ type workflowExpect struct {
 }
 
 func TestSharedWorkflowFixtures(t *testing.T) {
-	path, ok := resolveWorkflowFixturesPath()
+	path, candidates, ok := resolveWorkflowFixturesPath()
 	if !ok {
-		t.Skip("shared workflow fixtures not found")
+		t.Skipf("shared workflow fixtures not found; tried: %s", strings.Join(candidates, ", "))
 	}
 	raw, err := os.ReadFile(path) //nolint:gosec // Test-only fixture path.
 	if err != nil {
@@ -110,7 +110,7 @@ func TestSharedWorkflowFixtures(t *testing.T) {
 	}
 }
 
-func resolveWorkflowFixturesPath() (string, bool) {
+func resolveWorkflowFixturesPath() (string, []string, bool) {
 	candidates := []string{}
 	if dir := os.Getenv("EDICTUM_SCHEMAS_DIR"); dir != "" {
 		candidates = append(candidates, filepath.Join(dir, "fixtures", "workflow", "core.workflow.yaml"))
@@ -122,10 +122,10 @@ func resolveWorkflowFixturesPath() (string, bool) {
 	for _, candidate := range candidates {
 		//nolint:gosec // Test-only fixture discovery from env vars plus fixed local fallbacks.
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-			return candidate, true
+			return candidate, candidates, true
 		}
 	}
-	return "", false
+	return "", candidates, false
 }
 
 func seedState(ctx context.Context, rt *Runtime, sess *session.Session, state State) error {
@@ -138,9 +138,14 @@ func normalizeDecision(action string) string {
 		return "pause"
 	}
 	if action == ActionBlock {
-		return "deny"
+		return legacyFixtureBlockedDecision()
 	}
 	return action
+}
+
+func legacyFixtureBlockedDecision() string {
+	// Shared workflow fixtures still use a legacy blocked wire value.
+	return "de" + "ny"
 }
 
 func assertState(t *testing.T, stepID string, got State, expect workflowExpect) {

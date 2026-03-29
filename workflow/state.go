@@ -61,6 +61,7 @@ func recordApproval(state *State, stageID string) {
 
 func recordResult(state *State, stageID string, env toolcall.ToolCall) {
 	state.ensureMaps()
+	// M1 only records file paths from Read and executed commands from Bash.
 	switch env.ToolName() {
 	case "Read":
 		if path := env.FilePath(); path != "" {
