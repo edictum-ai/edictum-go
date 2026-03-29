@@ -5,10 +5,7 @@ import "context"
 type commandEvaluator struct{}
 
 func (commandEvaluator) Evaluate(_ context.Context, req EvaluateRequest) (FactResult, error) {
-	parsed, err := parseCondition(req.Gate.Condition)
-	if err != nil {
-		return FactResult{}, err
-	}
+	parsed := req.Parsed
 	commands := req.State.Evidence.StageCalls[req.Stage.ID]
 	passed := parsed.kind == "command_not_matches"
 	for _, command := range commands {

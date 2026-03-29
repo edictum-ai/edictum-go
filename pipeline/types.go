@@ -17,6 +17,7 @@ type PreDecision struct {
 	Workflow           map[string]any
 	WorkflowStageID    string
 	WorkflowInvolved   bool
+	WorkflowEvents     []map[string]any
 	WorkflowSkipped    bool
 	WorkflowSkipReason string
 }

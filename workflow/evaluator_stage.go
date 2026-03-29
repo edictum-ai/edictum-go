@@ -5,10 +5,7 @@ import "context"
 type stageCompleteEvaluator struct{}
 
 func (stageCompleteEvaluator) Evaluate(_ context.Context, req EvaluateRequest) (FactResult, error) {
-	parsed, err := parseCondition(req.Gate.Condition)
-	if err != nil {
-		return FactResult{}, err
-	}
+	parsed := req.Parsed
 	passed := req.State.completed(parsed.arg)
 	return FactResult{
 		Passed:    passed,

@@ -44,7 +44,7 @@ stages:
 	if decision.Action != ActionAllow || decision.StageID != "read-context" {
 		t.Fatalf("unexpected read decision: %+v", decision)
 	}
-	if err := rt.RecordResult(ctx, sess, decision.StageID, read); err != nil {
+	if _, err := rt.RecordResult(ctx, sess, decision.StageID, read); err != nil {
 		t.Fatalf("RecordResult(read): %v", err)
 	}
 
@@ -123,63 +123,18 @@ stages:
 	}
 }
 
-func TestRuntime_ExecAndCommandEvaluators(t *testing.T) {
-	rt := mustRuntime(t, `apiVersion: edictum/v1
-kind: Workflow
-metadata:
-  name: verify-process
-stages:
-  - id: local-verify
-    tools: [Bash]
-    checks:
-      - command_matches: "^go version$"
-        message: Only go version is allowed
-    exit:
-      - condition: exec("go version", exit_code=0)
-        message: Go must be installed
-  - id: commit-push
-    entry:
-      - condition: stage_complete("local-verify")
-    tools: [Bash]
-    checks:
-      - command_not_matches: "^git push origin main$"
-        message: Push to a branch, not main
-    exit:
-      - condition: command_not_matches("^git push origin main$")
-        message: Push to a branch, not main
-`)
-	sess := newWorkflowSession(t, "wf-evaluators")
-	ctx := context.Background()
-
-	verify := makeCall(t, "Bash", map[string]any{"command": "go version"})
-	decision, err := rt.Evaluate(ctx, sess, verify)
-	if err != nil {
-		t.Fatalf("Evaluate(verify): %v", err)
-	}
-	if decision.Action != ActionAllow {
-		t.Fatalf("unexpected verify decision: %+v", decision)
-	}
-	if err := rt.RecordResult(ctx, sess, decision.StageID, verify); err != nil {
-		t.Fatalf("RecordResult(verify): %v", err)
-	}
-
-	mainPush := makeCall(t, "Bash", map[string]any{"command": "git push origin main"})
-	decision, err = rt.Evaluate(ctx, sess, mainPush)
-	if err != nil {
-		t.Fatalf("Evaluate(main push): %v", err)
-	}
-	if decision.Action != ActionBlock || decision.Reason != "Push to a branch, not main" {
-		t.Fatalf("unexpected main push decision: %+v", decision)
-	}
+func mustRuntime(t *testing.T, content string) *Runtime {
+	t.Helper()
+	return mustRuntimeWithOpts(t, content)
 }
 
-func mustRuntime(t *testing.T, content string) *Runtime {
+func mustRuntimeWithOpts(t *testing.T, content string, opts ...RuntimeOption) *Runtime {
 	t.Helper()
 	def, err := LoadString(content)
 	if err != nil {
 		t.Fatalf("LoadString: %v", err)
 	}
-	rt, err := NewRuntime(def)
+	rt, err := NewRuntime(def, opts...)
 	if err != nil {
 		t.Fatalf("NewRuntime: %v", err)
 	}

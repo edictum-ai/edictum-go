@@ -3,7 +3,7 @@ package workflow
 const (
 	// ActionAllow means the tool call may execute.
 	ActionAllow = "allow"
-	// ActionBlock means the tool call is denied by the workflow layer.
+	// ActionBlock means the tool call is blocked by the workflow layer.
 	ActionBlock = "block"
 	// ActionPendingApproval means the call pauses at a stage boundary.
 	ActionPendingApproval = "pending_approval"
@@ -16,6 +16,7 @@ type Evaluation struct {
 	StageID string
 	Records []map[string]any
 	Audit   map[string]any
+	Events  []map[string]any
 }
 
 // State is the persisted workflow instance state.

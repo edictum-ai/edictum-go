@@ -10,6 +10,7 @@ import (
 )
 
 const approvedStatus = "approved"
+const maxWorkflowEvidenceItems = 1000
 
 func stateKey(name string) string {
 	return "workflow:" + name + ":state"
@@ -63,11 +64,27 @@ func recordResult(state *State, stageID string, env toolcall.ToolCall) {
 	switch env.ToolName() {
 	case "Read":
 		if path := env.FilePath(); path != "" {
-			state.Evidence.Reads = append(state.Evidence.Reads, path)
+			state.Evidence.Reads = appendUniqueCapped(state.Evidence.Reads, path, maxWorkflowEvidenceItems)
 		}
 	case "Bash":
 		if cmd := env.BashCommand(); cmd != "" {
-			state.Evidence.StageCalls[stageID] = append(state.Evidence.StageCalls[stageID], cmd)
+			state.Evidence.StageCalls[stageID] = appendCapped(state.Evidence.StageCalls[stageID], cmd, maxWorkflowEvidenceItems)
 		}
 	}
+}
+
+func appendUniqueCapped(items []string, item string, limit int) []string {
+	for _, existing := range items {
+		if existing == item {
+			return items
+		}
+	}
+	return appendCapped(items, item, limit)
+}
+
+func appendCapped(items []string, item string, limit int) []string {
+	if len(items) >= limit {
+		return items
+	}
+	return append(items, item)
 }

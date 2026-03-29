@@ -51,15 +51,18 @@ func (g *Guard) executeAndPost(
 	post.Workflow = pre.Workflow
 	post.WorkflowStageID = pre.WorkflowStageID
 	post.WorkflowInvolved = pre.WorkflowInvolved
+	var workflowEvents []map[string]any
 
 	if toolSuccess && pre.WorkflowInvolved && pre.WorkflowStageID != "" {
 		g.mu.RLock()
 		rt := g.workflowRuntime
 		g.mu.RUnlock()
 		if rt != nil {
-			if err := rt.RecordResult(ctx, sess, pre.WorkflowStageID, env2); err != nil {
+			events, err := rt.RecordResult(ctx, sess, pre.WorkflowStageID, env2)
+			if err != nil {
 				return nil, fmt.Errorf("record workflow evidence: %w", err)
 			}
+			workflowEvents = append(workflowEvents, events...)
 		}
 	}
 	if err := sess.RecordExecution(ctx, env2.ToolName(), toolSuccess); err != nil {
@@ -77,6 +80,7 @@ func (g *Guard) executeAndPost(
 		postAction = audit.ActionCallFailed
 	}
 	g.emitPostAudit(ctx, env2, sess, postAction, post, mode, policyVersion)
+	g.emitWorkflowEvents(ctx, env2, workflowEvents, mode, policyVersion)
 
 	if !toolSuccess {
 		// Tool execution failed — Error status reflects the tool outcome.

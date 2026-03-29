@@ -114,7 +114,7 @@ func (g *Guard) Run(
 	// increment_attempts() is called before pre_execute(). With
 	// max_attempts=1, the first call sees attempt_count=1 which equals
 	// the limit, so it is allowed; the second call sees attempt_count=2
-	// which exceeds the limit, so it is denied.
+	// which exceeds the limit, so it is blocked.
 	if _, err := sess.IncrementAttempts(ctx); err != nil {
 		telemetry.SetSpanError(span, fmt.Sprintf("increment attempts: %v", err))
 		return nil, fmt.Errorf("increment attempts: %w", err)
@@ -174,6 +174,7 @@ func (g *Guard) handlePreDecision(
 		// Emit CALL_WOULD_BLOCK for per-rule observed denials
 		g.emitObservedDenials(ctx, env2, pre, policyVersion)
 		g.emitPreAudit(ctx, env2, sess, audit.ActionCallAllowed, pre, mode, policyVersion)
+		g.emitWorkflowEvents(ctx, env2, pre.WorkflowEvents, mode, policyVersion)
 		g.telemetry.RecordAllowed(ctx, env2.ToolName())
 		g.fireOnAllow(env2)
 	}

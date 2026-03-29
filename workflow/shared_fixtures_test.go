@@ -96,7 +96,7 @@ func TestSharedWorkflowFixtures(t *testing.T) {
 					}
 				}
 				if decision.Action == ActionAllow && step.Execution == "success" {
-					if err := rt.RecordResult(context.Background(), sess, decision.StageID, call); err != nil {
+					if _, err := rt.RecordResult(context.Background(), sess, decision.StageID, call); err != nil {
 						t.Fatalf("RecordResult(%s): %v", step.ID, err)
 					}
 				}

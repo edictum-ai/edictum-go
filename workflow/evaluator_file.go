@@ -5,10 +5,7 @@ import "context"
 type fileReadEvaluator struct{}
 
 func (fileReadEvaluator) Evaluate(_ context.Context, req EvaluateRequest) (FactResult, error) {
-	parsed, err := parseCondition(req.Gate.Condition)
-	if err != nil {
-		return FactResult{}, err
-	}
+	parsed := req.Parsed
 	passed := false
 	for _, path := range req.State.Evidence.Reads {
 		if path == parsed.arg {

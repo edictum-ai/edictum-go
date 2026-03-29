@@ -49,9 +49,11 @@ type Approval struct {
 
 // Check constrains a call while a stage is active.
 type Check struct {
-	CommandMatches    string `yaml:"command_matches,omitempty"`
-	CommandNotMatches string `yaml:"command_not_matches,omitempty"`
-	Message           string `yaml:"message,omitempty"`
+	CommandMatches    string         `yaml:"command_matches,omitempty"`
+	CommandNotMatches string         `yaml:"command_not_matches,omitempty"`
+	Message           string         `yaml:"message,omitempty"`
+	commandMatchesRE  *regexp.Regexp `yaml:"-"`
+	commandNotRE      *regexp.Regexp `yaml:"-"`
 }
 
 func (d *Definition) validate() error {
@@ -71,7 +73,7 @@ func (d *Definition) validate() error {
 	d.index = make(map[string]int, len(d.Stages))
 	for i := range d.Stages {
 		stage := &d.Stages[i]
-		if err := validateStage(*stage); err != nil {
+		if err := validateStage(stage); err != nil {
 			return err
 		}
 		if _, exists := d.index[stage.ID]; exists {
@@ -82,7 +84,7 @@ func (d *Definition) validate() error {
 	return nil
 }
 
-func validateStage(stage Stage) error {
+func validateStage(stage *Stage) error {
 	if !workflowNameRe.MatchString(stage.ID) {
 		return fmt.Errorf("workflow: stage.id %q must match %q", stage.ID, workflowNameRe.String())
 	}
@@ -95,13 +97,31 @@ func validateStage(stage Stage) error {
 		if gate.Condition == "" {
 			return fmt.Errorf("workflow: stage %q gate condition must not be empty", stage.ID)
 		}
+		if _, err := parseCondition(gate.Condition); err != nil {
+			return fmt.Errorf("workflow: stage %q invalid gate condition %q: %w", stage.ID, gate.Condition, err)
+		}
 	}
-	for _, check := range stage.Checks {
+	for i := range stage.Checks {
+		check := &stage.Checks[i]
 		if (check.CommandMatches == "") == (check.CommandNotMatches == "") {
 			return fmt.Errorf("workflow: stage %q checks must set exactly one of command_matches or command_not_matches", stage.ID)
 		}
 		if check.Message == "" {
 			return fmt.Errorf("workflow: stage %q checks require message", stage.ID)
+		}
+		if check.CommandMatches != "" {
+			re, err := compileWorkflowRegex(check.CommandMatches, check.CommandMatches)
+			if err != nil {
+				return fmt.Errorf("workflow: stage %q invalid command_matches regex %q: %w", stage.ID, check.CommandMatches, err)
+			}
+			check.commandMatchesRE = re
+		}
+		if check.CommandNotMatches != "" {
+			re, err := compileWorkflowRegex(check.CommandNotMatches, check.CommandNotMatches)
+			if err != nil {
+				return fmt.Errorf("workflow: stage %q invalid command_not_matches regex %q: %w", stage.ID, check.CommandNotMatches, err)
+			}
+			check.commandNotRE = re
 		}
 	}
 	if stage.Approval != nil && stage.Approval.Message == "" {

@@ -37,3 +37,23 @@ stages:
 		t.Fatal("expected kind validation error")
 	}
 }
+
+func TestLoadString_RejectsInvalidRegexes(t *testing.T) {
+	_, err := LoadString(`apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: invalid-regex
+stages:
+  - id: verify
+    tools: [Bash]
+    checks:
+      - command_matches: "("
+        message: broken
+    exit:
+      - condition: command_matches("(")
+        message: broken gate
+`)
+	if err == nil {
+		t.Fatal("expected regex validation error")
+	}
+}

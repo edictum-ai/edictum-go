@@ -10,6 +10,8 @@ import (
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
+const maxWorkflowRegexLength = 10000
+
 // FactEvaluator evaluates one workflow gate condition.
 type FactEvaluator interface {
 	Evaluate(ctx context.Context, req EvaluateRequest) (FactResult, error)
@@ -20,6 +22,7 @@ type EvaluateRequest struct {
 	Definition Definition
 	Stage      Stage
 	Gate       Gate
+	Parsed     parsedCondition
 	State      State
 	Call       toolcall.ToolCall
 }
@@ -34,6 +37,21 @@ type FactResult struct {
 	StageID    string
 	Workflow   string
 	ExtraAudit map[string]any
+}
+
+func usesExecCondition(def Definition) (bool, error) {
+	for _, stage := range def.Stages {
+		for _, gate := range append(append([]Gate{}, stage.Entry...), stage.Exit...) {
+			parsed, err := parseCondition(gate.Condition)
+			if err != nil {
+				return false, err
+			}
+			if parsed.kind == "exec" {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 type parsedCondition struct {
@@ -69,9 +87,9 @@ func parseCondition(raw string) (parsedCondition, error) {
 		if err != nil {
 			return parsedCondition{}, err
 		}
-		re, err := regexp.Compile(arg)
+		re, err := compileWorkflowRegex(arg, raw)
 		if err != nil {
-			return parsedCondition{}, fmt.Errorf("workflow: invalid regex in %q: %w", raw, err)
+			return parsedCondition{}, err
 		}
 		return parsedCondition{kind: "command_matches", arg: arg, regex: re, condition: raw}, nil
 	case strings.HasPrefix(raw, `command_not_matches(`):
@@ -79,9 +97,9 @@ func parseCondition(raw string) (parsedCondition, error) {
 		if err != nil {
 			return parsedCondition{}, err
 		}
-		re, err := regexp.Compile(arg)
+		re, err := compileWorkflowRegex(arg, raw)
 		if err != nil {
-			return parsedCondition{}, fmt.Errorf("workflow: invalid regex in %q: %w", raw, err)
+			return parsedCondition{}, err
 		}
 		return parsedCondition{kind: "command_not_matches", arg: arg, regex: re, condition: raw}, nil
 	case strings.HasPrefix(raw, `exec(`):
@@ -104,6 +122,17 @@ func parseCondition(raw string) (parsedCondition, error) {
 	default:
 		return parsedCondition{}, fmt.Errorf("workflow: unsupported condition %q", raw)
 	}
+}
+
+func compileWorkflowRegex(pattern, context string) (*regexp.Regexp, error) {
+	if len(pattern) > maxWorkflowRegexLength {
+		return nil, fmt.Errorf("workflow: regex in %q exceeds %d characters", context, maxWorkflowRegexLength)
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("workflow: invalid regex in %q: %w", context, err)
+	}
+	return re, nil
 }
 
 var (

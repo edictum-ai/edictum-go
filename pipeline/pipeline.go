@@ -36,6 +36,7 @@ func (p *CheckPipeline) PreExecute(
 	var workflowMeta map[string]any
 	var workflowStageID string
 	workflowInvolved := false
+	var workflowEvents []map[string]any
 
 	// Pre-fetch session counters in a single batch.
 	var includeTool string
@@ -62,6 +63,7 @@ func (p *CheckPipeline) PreExecute(
 			Workflow:         workflowMeta,
 			WorkflowStageID:  workflowStageID,
 			WorkflowInvolved: workflowInvolved,
+			WorkflowEvents:   workflowEvents,
 		}, nil
 	}
 
@@ -95,6 +97,7 @@ func (p *CheckPipeline) PreExecute(
 				Workflow:         workflowMeta,
 				WorkflowStageID:  workflowStageID,
 				WorkflowInvolved: workflowInvolved,
+				WorkflowEvents:   workflowEvents,
 			}, nil
 		}
 	}
@@ -149,6 +152,7 @@ func (p *CheckPipeline) PreExecute(
 				Workflow:         workflowMeta,
 				WorkflowStageID:  workflowStageID,
 				WorkflowInvolved: workflowInvolved,
+				WorkflowEvents:   workflowEvents,
 			}, nil
 		}
 	}
@@ -167,9 +171,10 @@ func (p *CheckPipeline) PreExecute(
 				},
 			}
 			rules = append(rules, record)
+			reason := fmt.Sprintf("Workflow evaluation error: %s", wfErr)
 			return PreDecision{
 				Action:           "block",
-				Reason:           record["message"].(string),
+				Reason:           reason,
 				DecisionSource:   "workflow",
 				DecisionName:     "workflow_error",
 				HooksEvaluated:   hooks,
@@ -178,14 +183,18 @@ func (p *CheckPipeline) PreExecute(
 				Workflow:         workflowMeta,
 				WorkflowStageID:  workflowStageID,
 				WorkflowInvolved: true,
+				WorkflowEvents:   workflowEvents,
 			}, nil
 		}
 		if len(wf.Records) > 0 {
 			rules = append(rules, wf.Records...)
-			workflowInvolved = true
 			workflowMeta = wf.Audit
 			workflowStageID = wf.StageID
 		}
+		if len(wf.Records) > 0 || len(wf.Events) > 0 || wf.StageID != "" {
+			workflowInvolved = true
+		}
+		workflowEvents = append(workflowEvents, wf.Events...)
 		switch wf.Action {
 		case "block":
 			return PreDecision{
@@ -199,6 +208,7 @@ func (p *CheckPipeline) PreExecute(
 				Workflow:         workflowMeta,
 				WorkflowStageID:  workflowStageID,
 				WorkflowInvolved: workflowInvolved,
+				WorkflowEvents:   workflowEvents,
 			}, nil
 		case "pending_approval":
 			return PreDecision{
@@ -213,6 +223,7 @@ func (p *CheckPipeline) PreExecute(
 				Workflow:         workflowMeta,
 				WorkflowStageID:  workflowStageID,
 				WorkflowInvolved: workflowInvolved,
+				WorkflowEvents:   workflowEvents,
 			}, nil
 		}
 	}
@@ -229,6 +240,7 @@ func (p *CheckPipeline) PreExecute(
 			Workflow:         workflowMeta,
 			WorkflowStageID:  workflowStageID,
 			WorkflowInvolved: workflowInvolved,
+			WorkflowEvents:   workflowEvents,
 		}, nil
 	}
 
@@ -247,6 +259,7 @@ func (p *CheckPipeline) PreExecute(
 				Workflow:         workflowMeta,
 				WorkflowStageID:  workflowStageID,
 				WorkflowInvolved: workflowInvolved,
+				WorkflowEvents:   workflowEvents,
 			}, nil
 		}
 	}
@@ -265,5 +278,6 @@ func (p *CheckPipeline) PreExecute(
 		Workflow:         workflowMeta,
 		WorkflowStageID:  workflowStageID,
 		WorkflowInvolved: workflowInvolved,
+		WorkflowEvents:   workflowEvents,
 	}, nil
 }

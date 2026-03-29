@@ -18,6 +18,8 @@ import (
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
+const maxWorkflowApprovalRounds = 32
+
 // handleApproval handles the pending_approval flow.
 func (g *Guard) handleApproval(
 	ctx context.Context,
@@ -29,10 +31,50 @@ func (g *Guard) handleApproval(
 	toolCallable func(map[string]any) (any, error),
 	args map[string]any,
 ) (any, error) {
+	approved, decision, nextCtx, err := g.resolveApproval(ctx, env2, sess, pre, mode, policyVersion)
+	if err != nil {
+		return nil, err
+	}
+	ctx = nextCtx
+
+	if approved {
+		if pre.DecisionSource == "workflow" && pre.WorkflowStageID != "" {
+			return g.handleWorkflowApproval(ctx, env2, sess, pipe, pre, mode, policyVersion, toolCallable, args)
+		}
+		g.telemetry.RecordAllowed(ctx, env2.ToolName())
+		g.fireOnAllow(env2)
+		return g.executeAndPost(ctx, env2, sess, pipe, pre, mode, policyVersion, toolCallable, args)
+	}
+
+	// For timeout: span error was already set before ctx was replaced
+	// (line 69). This call is a no-op on the timeout path (ctx is
+	// Background(), SpanFromContext returns no-op) but correctly marks
+	// the span on the human-block path where ctx still carries it.
+	telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval blocked")
+	g.telemetry.RecordDenial(ctx, env2.ToolName())
+	reason := decision.Reason
+	if reason == "" {
+		reason = pre.Reason
+	}
+	g.fireOnBlock(env2, reason, pre.DecisionName)
+	return nil, &edictum.BlockedError{
+		Reason:         reason,
+		DecisionSource: pre.DecisionSource,
+		DecisionName:   pre.DecisionName,
+	}
+}
+
+func (g *Guard) resolveApproval(
+	ctx context.Context,
+	env2 toolcall.ToolCall,
+	sess *session.Session,
+	pre pipeline.PreDecision,
+	mode, policyVersion string,
+) (bool, approval.Decision, context.Context, error) {
 	if g.approvalBackend == nil {
 		telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval backend not configured")
 		g.telemetry.RecordDenial(ctx, env2.ToolName())
-		return nil, &edictum.BlockedError{
+		return false, approval.Decision{}, ctx, &edictum.BlockedError{
 			Reason:         fmt.Sprintf("Approval required but no approval backend configured: %s", pre.Reason),
 			DecisionSource: pre.DecisionSource,
 			DecisionName:   pre.DecisionName,
@@ -44,7 +86,6 @@ func (g *Guard) handleApproval(
 		msg = pre.Reason
 	}
 
-	// Propagate per-rule timeout settings to the approval backend.
 	var reqOpts []approval.RequestOption
 	if pre.ApprovalTimeout > 0 {
 		reqOpts = append(reqOpts, approval.WithTimeout(time.Duration(pre.ApprovalTimeout)*time.Second))
@@ -54,22 +95,14 @@ func (g *Guard) handleApproval(
 	}
 	req, err := g.approvalBackend.RequestApproval(ctx, env2.ToolName(), env2.Args(), msg, reqOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("request approval: %w", err)
+		return false, approval.Decision{}, ctx, fmt.Errorf("request approval: %w", err)
 	}
 
 	g.emitPreAudit(ctx, env2, sess, audit.ActionCallApprovalRequested, pre, mode, policyVersion)
 
 	decision, err := g.approvalBackend.PollApprovalStatus(ctx, req.ApprovalID())
 	if err != nil {
-		// Context cancellation/deadline → treat as approval timeout.
-		// Apply timeout_action rather than propagating the raw error.
-		// Use a fresh context for post-timeout operations (audit, execution)
-		// since the original context is expired.
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-			// Mark the span BEFORE dropping the context that carries it.
-			// Set ERROR only when timeout results in deny (default).
-			// For timeout_action=allow, the span status should match
-			// the governance outcome (allowed), so use an attribute.
 			if pre.ApprovalTimeoutEff != "allow" {
 				telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval timeout")
 			} else {
@@ -82,7 +115,7 @@ func (g *Guard) handleApproval(
 			}
 			ctx = context.Background()
 		} else {
-			return nil, fmt.Errorf("poll approval: %w", err)
+			return false, approval.Decision{}, ctx, fmt.Errorf("poll approval: %w", err)
 		}
 	}
 
@@ -100,45 +133,62 @@ func (g *Guard) handleApproval(
 		g.emitPreAudit(ctx, env2, sess, audit.ActionCallApprovalGranted, pre, mode, policyVersion)
 	}
 
-	if approved {
-		if pre.DecisionSource == "workflow" && pre.WorkflowStageID != "" {
-			g.mu.RLock()
-			rt := g.workflowRuntime
-			g.mu.RUnlock()
-			if rt == nil {
-				return nil, fmt.Errorf("workflow approval requested for %q but no workflow runtime configured", pre.WorkflowStageID)
-			}
-			if err := rt.RecordApproval(ctx, sess, pre.WorkflowStageID); err != nil {
-				return nil, fmt.Errorf("record workflow approval: %w", err)
-			}
-			pre2, err := pipe.PreExecute(ctx, env2, sess)
-			if err != nil {
-				return nil, fmt.Errorf("pre-execute after workflow approval: %w", err)
-			}
-			if pre2.Action == "pending_approval" {
-				return g.handleApproval(ctx, env2, sess, pipe, pre2, mode, policyVersion, toolCallable, args)
-			}
-			return g.handlePreDecision(ctx, env2, sess, pipe, pre2, mode, policyVersion, toolCallable, args)
-		}
-		g.telemetry.RecordAllowed(ctx, env2.ToolName())
-		g.fireOnAllow(env2)
-		return g.executeAndPost(ctx, env2, sess, pipe, pre, mode, policyVersion, toolCallable, args)
+	return approved, decision, ctx, nil
+}
+
+func (g *Guard) handleWorkflowApproval(
+	ctx context.Context,
+	env2 toolcall.ToolCall,
+	sess *session.Session,
+	pipe *pipeline.CheckPipeline,
+	pre pipeline.PreDecision,
+	mode, policyVersion string,
+	toolCallable func(map[string]any) (any, error),
+	args map[string]any,
+) (any, error) {
+	g.mu.RLock()
+	rt := g.workflowRuntime
+	g.mu.RUnlock()
+	if rt == nil {
+		return nil, fmt.Errorf("workflow approval requested for %q but no workflow runtime configured", pre.WorkflowStageID)
 	}
 
-	// For timeout: span error was already set before ctx was replaced
-	// (line 69). This call is a no-op on the timeout path (ctx is
-	// Background(), SpanFromContext returns no-op) but correctly marks
-	// the span on the human-denial path where ctx still carries it.
-	telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval denied")
-	g.telemetry.RecordDenial(ctx, env2.ToolName())
-	reason := decision.Reason
-	if reason == "" {
-		reason = pre.Reason
+	current := pre
+	for round := 0; round < maxWorkflowApprovalRounds; round++ {
+		if err := rt.RecordApproval(ctx, sess, current.WorkflowStageID); err != nil {
+			return nil, fmt.Errorf("record workflow approval: %w", err)
+		}
+		nextPre, err := pipe.PreExecute(ctx, env2, sess)
+		if err != nil {
+			return nil, fmt.Errorf("pre-execute after workflow approval: %w", err)
+		}
+		if nextPre.Action != "pending_approval" {
+			return g.handlePreDecision(ctx, env2, sess, pipe, nextPre, mode, policyVersion, toolCallable, args)
+		}
+		if nextPre.DecisionSource != "workflow" || nextPre.WorkflowStageID == "" {
+			return g.handleApproval(ctx, env2, sess, pipe, nextPre, mode, policyVersion, toolCallable, args)
+		}
+		current = nextPre
+		approved, decision, nextCtx, err := g.resolveApproval(ctx, env2, sess, current, mode, policyVersion)
+		if err != nil {
+			return nil, err
+		}
+		ctx = nextCtx
+		if !approved {
+			telemetry.SetSpanError(trace.SpanFromContext(ctx), "approval blocked")
+			g.telemetry.RecordDenial(ctx, env2.ToolName())
+			reason := decision.Reason
+			if reason == "" {
+				reason = current.Reason
+			}
+			g.fireOnBlock(env2, reason, current.DecisionName)
+			return nil, &edictum.BlockedError{
+				Reason:         reason,
+				DecisionSource: current.DecisionSource,
+				DecisionName:   current.DecisionName,
+			}
+		}
 	}
-	g.fireOnBlock(env2, reason, pre.DecisionName)
-	return nil, &edictum.BlockedError{
-		Reason:         reason,
-		DecisionSource: pre.DecisionSource,
-		DecisionName:   pre.DecisionName,
-	}
+
+	return nil, fmt.Errorf("workflow: exceeded maximum approval rounds (%d)", maxWorkflowApprovalRounds)
 }

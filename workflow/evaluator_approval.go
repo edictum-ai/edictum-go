@@ -5,10 +5,7 @@ import "context"
 type approvalEvaluator struct{}
 
 func (approvalEvaluator) Evaluate(_ context.Context, req EvaluateRequest) (FactResult, error) {
-	parsed, err := parseCondition(req.Gate.Condition)
-	if err != nil {
-		return FactResult{}, err
-	}
+	parsed := req.Parsed
 	stageID := parsed.arg
 	if stageID == "" {
 		stageID = req.Stage.ID

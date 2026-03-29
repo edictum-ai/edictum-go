@@ -118,6 +118,7 @@ stages:
 	events := g.LocalSink().Events()
 	sawApprovalRequested := false
 	sawAllowedWithWorkflow := false
+	sawStageAdvanced := false
 	for _, event := range events {
 		if event.Action == audit.ActionCallApprovalRequested && event.Workflow != nil {
 			sawApprovalRequested = true
@@ -127,6 +128,9 @@ stages:
 				sawAllowedWithWorkflow = true
 			}
 		}
+		if event.Action == audit.ActionWorkflowStageAdvanced && event.Workflow != nil {
+			sawStageAdvanced = true
+		}
 	}
 	if !sawApprovalRequested {
 		t.Fatal("expected workflow approval request audit event")
@@ -134,6 +138,38 @@ stages:
 	if !sawAllowedWithWorkflow {
 		t.Fatal("expected allowed audit event with workflow stage metadata")
 	}
+	if !sawStageAdvanced {
+		t.Fatal("expected workflow stage advanced audit event")
+	}
+}
+
+func TestRun_WorkflowCompletionEmitsAuditEvent(t *testing.T) {
+	rt := mustWorkflowRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: completion-process
+stages:
+  - id: verify
+    tools: [Bash]
+    exit:
+      - condition: command_matches("^npm test$")
+        message: Run npm test
+`)
+	g := New(WithWorkflowRuntime(rt))
+
+	if _, err := g.Run(context.Background(), "Bash", map[string]any{"command": "npm test"}, nopCallable); err != nil {
+		t.Fatalf("Run(Bash): %v", err)
+	}
+
+	events := g.LocalSink().Events()
+	for _, event := range events {
+		if event.Action == audit.ActionWorkflowCompleted && event.Workflow != nil {
+			if event.Workflow["workflow_name"] == "completion-process" {
+				return
+			}
+		}
+	}
+	t.Fatal("expected workflow completed audit event")
 }
 
 func mustWorkflowRuntime(t *testing.T, content string) *workflow.Runtime {

@@ -23,6 +23,11 @@ const (
 	ActionCallApprovalGranted   Action = "call_approval_granted"
 	ActionCallApprovalBlocked   Action = "call_approval_blocked"
 	ActionCallApprovalTimeout   Action = "call_approval_timeout"
+
+	// Additional workflow progress events for M1. These are intentionally
+	// excluded from AllActions(), which preserves the canonical parity set.
+	ActionWorkflowStageAdvanced Action = "workflow_stage_advanced"
+	ActionWorkflowCompleted     Action = "workflow_completed"
 )
 
 // AllActions returns all 10 canonical audit actions.

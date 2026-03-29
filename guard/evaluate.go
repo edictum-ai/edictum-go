@@ -160,6 +160,7 @@ func (g *Guard) Evaluate(
 		}
 	}
 
+	rt := g.GetWorkflowRuntime()
 	return EvaluationResult{
 		Decision:        decision,
 		ToolName:        toolName,
@@ -168,8 +169,8 @@ func (g *Guard) Evaluate(
 		WarnReasons:     warnReasons,
 		RulesEvaluated:  len(rules),
 		PolicyError:     policyError,
-		WorkflowSkipped: g.GetWorkflowRuntime() != nil,
-		WorkflowReason:  workflowSkipReason(g.GetWorkflowRuntime() != nil),
+		WorkflowSkipped: rt != nil,
+		WorkflowReason:  workflowSkipReason(rt != nil),
 	}
 }
 
