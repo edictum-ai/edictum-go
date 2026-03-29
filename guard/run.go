@@ -131,6 +131,7 @@ func (g *Guard) Run(
 	// ordinary denies fall through in observe mode; pending_approval still
 	// goes through the approval backend.
 	if pre.Action == "pending_approval" {
+		g.emitWorkflowEvents(ctx, env2, pre.WorkflowEvents, mode, policyVersion)
 		return g.handleApproval(ctx, env2, sess, pipe, pre, mode, policyVersion, toolCallable, args)
 	}
 
@@ -156,6 +157,7 @@ func (g *Guard) handlePreDecision(
 			action = audit.ActionCallWouldBlock
 		}
 		g.emitPreAudit(ctx, env2, sess, action, pre, mode, policyVersion)
+		g.emitWorkflowEvents(ctx, env2, pre.WorkflowEvents, mode, policyVersion)
 
 		if mode == "enforce" {
 			telemetry.SetSpanError(trace.SpanFromContext(ctx), "rule blocked: "+pre.DecisionName)

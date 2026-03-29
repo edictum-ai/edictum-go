@@ -7,6 +7,7 @@ import (
 
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/audit"
+	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/workflow"
 )
@@ -140,6 +141,119 @@ stages:
 	}
 	if !sawStageAdvanced {
 		t.Fatal("expected workflow stage advanced audit event")
+	}
+}
+
+func TestRun_WorkflowStageAdvanceEmittedWhenApprovalPauses(t *testing.T) {
+	rt := mustWorkflowRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: approval-pause-process
+stages:
+  - id: implement
+    tools: [Edit]
+  - id: review
+    entry:
+      - condition: stage_complete("implement")
+    approval:
+      message: Approval required before push
+  - id: push
+    entry:
+      - condition: stage_complete("review")
+    tools: [Bash]
+`)
+	g := New(
+		WithWorkflowRuntime(rt),
+		WithApprovalBackend(&autoDenyBackend{}),
+	)
+
+	if _, err := g.Run(context.Background(), "Edit", map[string]any{"path": "src/app.ts"}, nopCallable); err != nil {
+		t.Fatalf("Run(Edit): %v", err)
+	}
+	_, err := g.Run(context.Background(), "Bash", map[string]any{"command": "git push origin feature-branch"}, nopCallable)
+	if err == nil {
+		t.Fatal("expected approval block")
+	}
+
+	events := g.LocalSink().Events()
+	sawStageAdvanced := false
+	sawApprovalRequested := false
+	for _, event := range events {
+		if event.Action == audit.ActionWorkflowStageAdvanced && event.Workflow != nil {
+			if event.Workflow["workflow_name"] == "approval-pause-process" && event.Workflow["stage_id"] == "implement" && event.Workflow["to_stage_id"] == "review" {
+				sawStageAdvanced = true
+			}
+		}
+		if event.Action == audit.ActionCallApprovalRequested && event.Workflow != nil {
+			if event.Workflow["workflow_name"] == "approval-pause-process" {
+				sawApprovalRequested = true
+			}
+		}
+	}
+	if !sawStageAdvanced {
+		t.Fatal("expected workflow stage advanced event before approval resolution")
+	}
+	if !sawApprovalRequested {
+		t.Fatal("expected approval requested audit event")
+	}
+}
+
+func TestRun_WorkflowStageAdvanceEmittedWhenLaterLimitBlocks(t *testing.T) {
+	rt := mustWorkflowRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: limit-block-process
+stages:
+  - id: read-context
+    tools: [Read]
+    exit:
+      - condition: file_read("specs/008.md")
+        message: Read the workflow spec first
+  - id: implement
+    entry:
+      - condition: stage_complete("read-context")
+    tools: [Edit]
+`)
+	limits := pipeline.DefaultLimits()
+	limits.MaxToolCalls = 1
+	g := New(
+		WithWorkflowRuntime(rt),
+		WithLimits(limits),
+	)
+
+	if _, err := g.Run(context.Background(), "Read", map[string]any{"path": "specs/008.md"}, nopCallable); err != nil {
+		t.Fatalf("Run(Read): %v", err)
+	}
+	_, err := g.Run(context.Background(), "Edit", map[string]any{"path": "src/app.ts"}, nopCallable)
+	if err == nil {
+		t.Fatal("expected execution limit block")
+	}
+	var blocked *edictum.BlockedError
+	if !errors.As(err, &blocked) {
+		t.Fatalf("expected BlockedError, got %T", err)
+	}
+	if blocked.DecisionSource != "operation_limit" {
+		t.Fatalf("DecisionSource = %q, want operation_limit", blocked.DecisionSource)
+	}
+
+	events := g.LocalSink().Events()
+	sawStageAdvanced := false
+	sawLimitBlock := false
+	for _, event := range events {
+		if event.Action == audit.ActionWorkflowStageAdvanced && event.Workflow != nil {
+			if event.Workflow["workflow_name"] == "limit-block-process" && event.Workflow["stage_id"] == "read-context" && event.Workflow["to_stage_id"] == "implement" {
+				sawStageAdvanced = true
+			}
+		}
+		if event.Action == audit.ActionCallBlocked && event.DecisionSource == "operation_limit" {
+			sawLimitBlock = true
+		}
+	}
+	if !sawStageAdvanced {
+		t.Fatal("expected workflow stage advanced event before later pre-execute block")
+	}
+	if !sawLimitBlock {
+		t.Fatal("expected later operation limit block audit event")
 	}
 }
 
