@@ -20,13 +20,15 @@ type RuleResult struct {
 
 // EvaluationResult is the result of offline rule evaluation.
 type EvaluationResult struct {
-	Decision       string // "allow" | "block" | "warn"
-	ToolName       string
-	Rules          []RuleResult
-	BlockReasons   []string
-	WarnReasons    []string
-	RulesEvaluated int
-	PolicyError    bool
+	Decision        string // "allow" | "block" | "warn"
+	ToolName        string
+	Rules           []RuleResult
+	BlockReasons    []string
+	WarnReasons     []string
+	RulesEvaluated  int
+	PolicyError     bool
+	WorkflowSkipped bool
+	WorkflowReason  string
 }
 
 // EvalOption configures a single Evaluate() call.
@@ -56,7 +58,8 @@ func WithEvalEnvironment(env string) EvalOption {
 // Evaluate performs an offline evaluation of a tool call against all
 // matching rules. Unlike Run(), this never executes the tool and
 // evaluates all matching rules exhaustively (no short-circuit on
-// first deny). Session rules are skipped (no session state).
+// first deny). Session rules and workflow gates are skipped because
+// they depend on runtime session state and persisted evidence.
 func (g *Guard) Evaluate(
 	ctx context.Context,
 	toolName string,
@@ -158,12 +161,21 @@ func (g *Guard) Evaluate(
 	}
 
 	return EvaluationResult{
-		Decision:       decision,
-		ToolName:       toolName,
-		Rules:          rules,
-		BlockReasons:   denyReasons,
-		WarnReasons:    warnReasons,
-		RulesEvaluated: len(rules),
-		PolicyError:    policyError,
+		Decision:        decision,
+		ToolName:        toolName,
+		Rules:           rules,
+		BlockReasons:    denyReasons,
+		WarnReasons:     warnReasons,
+		RulesEvaluated:  len(rules),
+		PolicyError:     policyError,
+		WorkflowSkipped: g.GetWorkflowRuntime() != nil,
+		WorkflowReason:  workflowSkipReason(g.GetWorkflowRuntime() != nil),
 	}
+}
+
+func workflowSkipReason(skipped bool) string {
+	if !skipped {
+		return ""
+	}
+	return "workflow evaluation requires runtime session state and is enforced only by Run() in M1"
 }

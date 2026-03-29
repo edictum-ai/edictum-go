@@ -101,9 +101,28 @@ func (g *Guard) handleApproval(
 	}
 
 	if approved {
+		if pre.DecisionSource == "workflow" && pre.WorkflowStageID != "" {
+			g.mu.RLock()
+			rt := g.workflowRuntime
+			g.mu.RUnlock()
+			if rt == nil {
+				return nil, fmt.Errorf("workflow approval requested for %q but no workflow runtime configured", pre.WorkflowStageID)
+			}
+			if err := rt.RecordApproval(ctx, sess, pre.WorkflowStageID); err != nil {
+				return nil, fmt.Errorf("record workflow approval: %w", err)
+			}
+			pre2, err := pipe.PreExecute(ctx, env2, sess)
+			if err != nil {
+				return nil, fmt.Errorf("pre-execute after workflow approval: %w", err)
+			}
+			if pre2.Action == "pending_approval" {
+				return g.handleApproval(ctx, env2, sess, pipe, pre2, mode, policyVersion, toolCallable, args)
+			}
+			return g.handlePreDecision(ctx, env2, sess, pipe, pre2, mode, policyVersion, toolCallable, args)
+		}
 		g.telemetry.RecordAllowed(ctx, env2.ToolName())
 		g.fireOnAllow(env2)
-		return g.executeAndPost(ctx, env2, sess, pipe, mode, policyVersion, toolCallable, args)
+		return g.executeAndPost(ctx, env2, sess, pipe, pre, mode, policyVersion, toolCallable, args)
 	}
 
 	// For timeout: span error was already set before ctx was replaced

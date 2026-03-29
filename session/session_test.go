@@ -423,6 +423,40 @@ func TestSession_IDValidation(t *testing.T) {
 	}
 }
 
+func TestSession_ValueRoundTrip(t *testing.T) {
+	s := newTestSession(t)
+	ctx := context.Background()
+
+	if err := s.SetValue(ctx, "workflow:test:state", `{"active_stage":"read-context"}`); err != nil {
+		t.Fatalf("SetValue: %v", err)
+	}
+	got, err := s.GetValue(ctx, "workflow:test:state")
+	if err != nil {
+		t.Fatalf("GetValue: %v", err)
+	}
+	if got != `{"active_stage":"read-context"}` {
+		t.Fatalf("GetValue = %q", got)
+	}
+	if err := s.DeleteValue(ctx, "workflow:test:state"); err != nil {
+		t.Fatalf("DeleteValue: %v", err)
+	}
+	got, err = s.GetValue(ctx, "workflow:test:state")
+	if err != nil {
+		t.Fatalf("GetValue after delete: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("GetValue after delete = %q, want empty", got)
+	}
+}
+
+func TestSession_ValueNameValidation(t *testing.T) {
+	s := newTestSession(t)
+	err := s.SetValue(context.Background(), "workflow/test", "x")
+	if err == nil {
+		t.Fatal("expected invalid session value name error")
+	}
+}
+
 // --- Key scheme verification ---
 
 func TestParity_KeyScheme(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/toolcall"
+	"github.com/edictum-ai/edictum-go/workflow"
 )
 
 // 7.12: Evaluate() dry-run
@@ -301,5 +302,32 @@ func TestEvaluateWithWhenPredicate(t *testing.T) {
 	}
 	if result.RulesEvaluated != 0 {
 		t.Errorf("rules_evaluated: got %d, want 0", result.RulesEvaluated)
+	}
+}
+
+func TestEvaluateWorkflowSkippedMetadata(t *testing.T) {
+	def, err := workflow.LoadString(`apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: core-dev-process
+stages:
+  - id: read-context
+    tools: [Read]
+`)
+	if err != nil {
+		t.Fatalf("workflow.LoadString: %v", err)
+	}
+	rt, err := workflow.NewRuntime(def)
+	if err != nil {
+		t.Fatalf("workflow.NewRuntime: %v", err)
+	}
+	g := New(WithWorkflowRuntime(rt))
+
+	result := g.Evaluate(context.Background(), "Read", map[string]any{"path": "specs/008.md"})
+	if !result.WorkflowSkipped {
+		t.Fatal("expected WorkflowSkipped=true")
+	}
+	if result.WorkflowReason == "" {
+		t.Fatal("expected WorkflowReason to be populated")
 	}
 }

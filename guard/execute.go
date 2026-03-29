@@ -21,6 +21,7 @@ func (g *Guard) executeAndPost(
 	env2 toolcall.ToolCall,
 	sess *session.Session,
 	pipe *pipeline.CheckPipeline,
+	pre pipeline.PreDecision,
 	mode, policyVersion string,
 	toolCallable func(map[string]any) (any, error),
 	args map[string]any,
@@ -46,6 +47,20 @@ func (g *Guard) executeAndPost(
 	post, postErr := pipe.PostExecute(ctx, env2, result, toolSuccess)
 	if postErr != nil {
 		return nil, fmt.Errorf("post-execute: %w", postErr)
+	}
+	post.Workflow = pre.Workflow
+	post.WorkflowStageID = pre.WorkflowStageID
+	post.WorkflowInvolved = pre.WorkflowInvolved
+
+	if toolSuccess && pre.WorkflowInvolved && pre.WorkflowStageID != "" {
+		g.mu.RLock()
+		rt := g.workflowRuntime
+		g.mu.RUnlock()
+		if rt != nil {
+			if err := rt.RecordResult(ctx, sess, pre.WorkflowStageID, env2); err != nil {
+				return nil, fmt.Errorf("record workflow evidence: %w", err)
+			}
+		}
 	}
 	if err := sess.RecordExecution(ctx, env2.ToolName(), toolSuccess); err != nil {
 		return nil, fmt.Errorf("record execution: %w", err)

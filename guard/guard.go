@@ -15,6 +15,7 @@ import (
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/telemetry"
 	"github.com/edictum-ai/edictum-go/toolcall"
+	"github.com/edictum-ai/edictum-go/workflow"
 )
 
 // serverClient is satisfied by *server.Client. Defined here to avoid
@@ -67,6 +68,7 @@ type Guard struct {
 	principalResolver func(toolName string, args map[string]any) *toolcall.Principal
 	approvalBackend   approval.Backend
 	sessionID         string
+	workflowRuntime   *workflow.Runtime
 
 	telemetry *telemetry.GovernanceTelemetry
 	telOpts   []telemetry.Option // accumulated before New() builds telemetry

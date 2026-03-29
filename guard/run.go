@@ -181,5 +181,5 @@ func (g *Guard) handlePreDecision(
 	// Emit observe-mode audit events
 	g.emitObserveResults(ctx, env2, pre, policyVersion)
 
-	return g.executeAndPost(ctx, env2, sess, pipe, mode, policyVersion, toolCallable, args)
+	return g.executeAndPost(ctx, env2, sess, pipe, pre, mode, policyVersion, toolCallable, args)
 }

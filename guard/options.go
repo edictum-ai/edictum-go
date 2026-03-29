@@ -10,6 +10,7 @@ import (
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/toolcall"
+	"github.com/edictum-ai/edictum-go/workflow"
 )
 
 // Option configures a Guard.
@@ -150,6 +151,11 @@ func WithPrincipalResolver(fn func(string, map[string]any) *toolcall.Principal) 
 // WithApprovalBackend sets the human-in-the-loop approval backend.
 func WithApprovalBackend(b approval.Backend) Option {
 	return func(g *Guard) { g.approvalBackend = b }
+}
+
+// WithWorkflowRuntime sets the workflow runtime used by Run().
+func WithWorkflowRuntime(rt *workflow.Runtime) Option {
+	return func(g *Guard) { g.workflowRuntime = rt }
 }
 
 // WithTools registers tools from a map of name to config.

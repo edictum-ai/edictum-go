@@ -35,6 +35,7 @@ func (g *Guard) emitPreAudit(
 	event.DecisionSource = pre.DecisionSource
 	event.DecisionName = pre.DecisionName
 	event.Reason = pre.Reason
+	event.Workflow = deepCopyRecord(pre.Workflow)
 	event.HooksEvaluated = deepCopyRecords(pre.HooksEvaluated)
 	event.RulesEvaluated = deepCopyRecords(pre.RulesEvaluated)
 	event.SessionAttemptCount = &attempts
@@ -72,6 +73,7 @@ func (g *Guard) emitPostAudit(
 	event.Action = action
 	event.ToolSuccess = &post.ToolSuccess
 	event.PostconditionsPassed = &post.PostconditionsPassed
+	event.Workflow = deepCopyRecord(post.Workflow)
 	event.RulesEvaluated = deepCopyRecords(post.RulesEvaluated)
 	event.SessionAttemptCount = &attempts
 	event.SessionExecutionCount = &execs

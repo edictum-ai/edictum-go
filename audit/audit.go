@@ -58,6 +58,7 @@ type Event struct {
 	DecisionSource        string           `json:"decision_source,omitempty"`
 	DecisionName          string           `json:"decision_name,omitempty"`
 	Reason                string           `json:"reason,omitempty"`
+	Workflow              map[string]any   `json:"workflow,omitempty"`
 	HooksEvaluated        []map[string]any `json:"hooks_evaluated"`
 	RulesEvaluated        []map[string]any `json:"rules_evaluated"`
 	ToolSuccess           *bool            `json:"tool_success,omitempty"`
@@ -129,6 +130,9 @@ func (c *CompositeSink) Emit(ctx context.Context, event *Event) error {
 		}
 		if pm, ok := event.Principal.(map[string]any); ok {
 			cp.Principal = deepCopyMap(pm)
+		}
+		if event.Workflow != nil {
+			cp.Workflow = deepCopyMap(event.Workflow)
 		}
 		if event.HooksEvaluated != nil {
 			cp.HooksEvaluated = deepCopyRecordSlice(event.HooksEvaluated)
