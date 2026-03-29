@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -211,6 +212,213 @@ func TestGateRunWorkflowApprovalFlow(t *testing.T) {
 	}
 	if stdout != "runner ok" {
 		t.Fatalf("stdout = %q, want %q", stdout, "runner ok")
+	}
+}
+
+func TestGateInitRulesDirectorySucceeds(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(rulesDir, "base.yaml"), []byte(validBundleYAML), 0o600); err != nil {
+		t.Fatalf("write rules dir file: %v", err)
+	}
+
+	cmd := newGateInitCmd()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"--rules", rulesDir})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+
+	cfg, err := loadGateConfigDefault()
+	if err != nil {
+		t.Fatalf("loadGateConfigDefault: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(cfg.ContractsPath, "base.yaml")); err != nil {
+		t.Fatalf("copied rules file missing: %v", err)
+	}
+}
+
+func TestGateInitRulesFileStillWorks(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+
+	cmd := newGateInitCmd()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"--rules", rulesPath})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+
+	cfg, err := loadGateConfigDefault()
+	if err != nil {
+		t.Fatalf("loadGateConfigDefault: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(cfg.ContractsPath, filepath.Base(rulesPath))); err != nil {
+		t.Fatalf("copied rules file missing: %v", err)
+	}
+}
+
+func TestGateRunAppendsWALEventOnAllow(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	input := `{"tool_name":"Read","tool_input":{"path":"README.md"}}`
+	stdout, stderr, err := runGateCommand(t, newGateRunCmd(), input, []string{
+		"--format", "raw",
+		"--session-id", "gate-run-audit",
+		runner,
+	})
+	if err != nil {
+		t.Fatalf("gate run error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout, stderr)
+	}
+
+	cfg, err := loadGateConfigDefault()
+	if err != nil {
+		t.Fatalf("loadGateConfigDefault: %v", err)
+	}
+	events, err := readWALEvents(cfg.AuditPath, 10, "Read", "allow")
+	if err != nil {
+		t.Fatalf("readWALEvents: %v", err)
+	}
+	if len(events) == 0 {
+		t.Fatal("expected gate run to append a WAL audit event")
+	}
+}
+
+func TestGateRunAppendsWALEventOnBlock(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	workflowPath := writeTempFile(t, "workflow.yaml", gateReadThenEditWorkflow)
+	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath, "--workflow", workflowPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	input := `{"tool_name":"Edit","tool_input":{"path":"src/app.go"}}`
+	_, _, err := runGateCommand(t, newGateRunCmd(), input, []string{
+		"--format", "raw",
+		"--session-id", "gate-run-audit-block",
+		runner,
+	})
+	if err == nil || err.Error() != "exit 1" {
+		t.Fatalf("err = %v, want exit 1", err)
+	}
+
+	cfg, err := loadGateConfigDefault()
+	if err != nil {
+		t.Fatalf("loadGateConfigDefault: %v", err)
+	}
+	events, err := readWALEvents(cfg.AuditPath, 10, "Edit", "block")
+	if err != nil {
+		t.Fatalf("readWALEvents: %v", err)
+	}
+	if len(events) == 0 {
+		t.Fatal("expected blocked gate run to append a WAL audit event")
+	}
+}
+
+func TestGateAuditShowsGateRunActivity(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	input := `{"tool_name":"Read","tool_input":{"path":"README.md"}}`
+	if _, _, err := runGateCommand(t, newGateRunCmd(), input, []string{
+		"--format", "raw",
+		"--session-id", "gate-run-audit-visible",
+		runner,
+	}); err != nil {
+		t.Fatalf("gate run error: %v", err)
+	}
+
+	auditCmd := newGateAuditCmd()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	auditCmd.SetOut(&stdout)
+	auditCmd.SetErr(&stderr)
+	auditCmd.SetArgs([]string{"--json", "--limit", "10"})
+	if err := auditCmd.Execute(); err != nil {
+		t.Fatalf("gate audit error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+
+	parsed := mustJSONMap(t, &stdout)
+	events := mustSlice(t, parsed["events"], "events")
+	if len(events) == 0 {
+		t.Fatal("expected gate audit output to include gate run activity")
+	}
+}
+
+func TestGateStatusPendingCountReflectsGateRun(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	input := `{"tool_name":"Read","tool_input":{"path":"README.md"}}`
+	if _, _, err := runGateCommand(t, newGateRunCmd(), input, []string{
+		"--format", "raw",
+		"--session-id", "gate-run-status",
+		runner,
+	}); err != nil {
+		t.Fatalf("gate run error: %v", err)
+	}
+
+	statusCmd := newGateStatusCmd()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	statusCmd.SetOut(&stdout)
+	statusCmd.SetErr(&stderr)
+	statusCmd.SetArgs([]string{"--json"})
+	if err := statusCmd.Execute(); err != nil {
+		t.Fatalf("gate status error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+
+	parsed := mustJSONMap(t, &stdout)
+	if parsed["pending_events"] != float64(1) {
+		t.Fatalf("pending_events = %#v, want 1", parsed["pending_events"])
 	}
 }
 

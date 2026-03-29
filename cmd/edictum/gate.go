@@ -90,12 +90,14 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath, workflowP
 	}
 
 	if contractsPath != "" {
-		dst := filepath.Join(gateDir, "rules", filepath.Base(contractsPath))
-		if cpErr := copyFile(contractsPath, dst); cpErr != nil {
+		copiedRules, cpErr := syncYAMLInput(contractsPath, cfg.ContractsPath)
+		if cpErr != nil {
 			return fmt.Errorf("copying rules: %w", cpErr)
 		}
-		if _, buildErr := guard.FromYAML(dst); buildErr != nil {
-			_ = os.Remove(dst)
+		if _, buildErr := guard.FromYAML(cfg.ContractsPath); buildErr != nil {
+			for _, path := range copiedRules {
+				_ = os.Remove(path)
+			}
 			return fmt.Errorf("rule validation failed: %w", buildErr)
 		}
 	}

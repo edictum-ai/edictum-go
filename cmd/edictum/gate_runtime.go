@@ -1,46 +1,23 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
 	edictum "github.com/edictum-ai/edictum-go"
-	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/guard"
-	"github.com/edictum-ai/edictum-go/server"
-	"github.com/edictum-ai/edictum-go/session"
-	"github.com/edictum-ai/edictum-go/workflow"
 	"github.com/spf13/cobra"
 )
-
-const gateApprovalPollInterval = 100 * time.Millisecond
-
-type gateGuardConfig struct {
-	RulesPath           string
-	WorkflowPath        string
-	WorkflowExecEnabled bool
-	ServerURL           string
-	APIKey              string
-}
-
-type gateSubprocessCapture struct {
-	stderr string
-}
 
 func newGateRunCmd() *cobra.Command {
 	var (
 		format       string
-		contracts    string
+		rulesPath    string
 		workflowPath string
 		sessionID    string
 		workflowExec bool
@@ -55,12 +32,12 @@ func newGateRunCmd() *cobra.Command {
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			workflowExecSet := cmd.Flags().Lookup("workflow-exec").Changed
-			return runGateRun(cmd, format, contracts, workflowPath, sessionID, workflowExec, workflowExecSet, args)
+			return runGateRun(cmd, format, rulesPath, workflowPath, sessionID, workflowExec, workflowExecSet, args)
 		},
 	}
 
 	cmd.Flags().StringVar(&format, "format", "raw", "input format (claude-code, cursor, copilot, gemini, opencode, raw)")
-	cmd.Flags().StringVar(&contracts, "rules", "", "override rule path")
+	cmd.Flags().StringVar(&rulesPath, "rules", "", "override rule path")
 	cmd.Flags().StringVar(&workflowPath, "workflow", "", "override workflow path")
 	cmd.Flags().StringVar(&sessionID, "session-id", "", "stable session ID for persisted runtime state")
 	cmd.Flags().BoolVar(&workflowExec, "workflow-exec", false, "enable trusted exec(...) workflow conditions")
@@ -140,6 +117,7 @@ func runGateRun(
 	if err != nil {
 		var blocked *edictum.BlockedError
 		if errors.As(err, &blocked) {
+			appendGateAuditEvent(cfg, toolName, "block", blocked.Reason)
 			return gateRunExit(cmd, blocked.Reason, 1)
 		}
 		var toolErr *edictum.ToolError
@@ -148,10 +126,12 @@ func runGateRun(
 			if msg == "" {
 				msg = "tool execution failed"
 			}
+			appendGateAuditEvent(cfg, toolName, "allow", msg)
 			return gateRunExit(cmd, msg, 1)
 		}
 		return err
 	}
+	appendGateAuditEvent(cfg, toolName, "allow", "")
 
 	if capture.stderr != "" {
 		if _, err := io.WriteString(cmd.ErrOrStderr(), capture.stderr); err != nil {
@@ -183,236 +163,15 @@ func writeGateRunResult(w io.Writer, result any) error {
 	}
 }
 
-func buildGateGuard(cfg gateGuardConfig) (*guard.Guard, error) {
-	statePath, err := gateSessionStorePath()
-	if err != nil {
-		return nil, err
+func appendGateAuditEvent(cfg *gateConfig, toolName, decision, reason string) {
+	if cfg == nil || cfg.AuditPath == "" {
+		return
 	}
-	backend := newGateFileBackend(statePath)
-
-	approvalBackend, err := newGateApprovalBackend(cfg.ServerURL, cfg.APIKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return buildGateGuardWithDeps(cfg, backend, approvalBackend)
-}
-
-func buildGateGuardWithDeps(cfg gateGuardConfig, backend session.StorageBackend, approvalBackend approval.Backend) (*guard.Guard, error) {
-	if cfg.RulesPath == "" {
-		return nil, fmt.Errorf("no rules configured")
-	}
-
-	opts := []guard.Option{guard.WithBackend(backend)}
-	if approvalBackend != nil {
-		opts = append(opts, guard.WithApprovalBackend(approvalBackend))
-	}
-	if cfg.WorkflowPath != "" {
-		rt, err := loadGateWorkflowRuntime(cfg.WorkflowPath, cfg.WorkflowExecEnabled)
-		if err != nil {
-			return nil, err
-		}
-		opts = append(opts, guard.WithWorkflowRuntime(rt))
-	}
-
-	g, err := guard.FromYAML(cfg.RulesPath, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("loading rules: %w", err)
-	}
-	return g, nil
-}
-
-func loadGateWorkflowRuntime(path string, execEnabled bool) (*workflow.Runtime, error) {
-	def, err := workflow.Load(path)
-	if err != nil {
-		return nil, fmt.Errorf("loading workflow: %w", err)
-	}
-	var opts []workflow.RuntimeOption
-	if execEnabled {
-		opts = append(opts, workflow.WithExecEvaluatorEnabled())
-	}
-	rt, err := workflow.NewRuntime(def, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("loading workflow: %w", err)
-	}
-	return rt, nil
-}
-
-func newGateApprovalBackend(serverURL, apiKey string) (approval.Backend, error) {
-	if serverURL == "" {
-		return nil, nil
-	}
-
-	client, err := server.NewClient(server.ClientConfig{
-		BaseURL: serverURL,
-		APIKey:  apiKey,
-		AgentID: "gate-cli",
-		Env:     "production",
+	_ = appendWALEvent(cfg.AuditPath, walEvent{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		ToolName:  toolName,
+		Decision:  decision,
+		User:      currentUser(),
+		Reason:    reason,
 	})
-	if err != nil {
-		return nil, fmt.Errorf("configuring approval backend: %w", err)
-	}
-	return server.NewApprovalBackend(client, server.WithPollInterval(gateApprovalPollInterval)), nil
-}
-
-func gateSessionStorePath() (string, error) {
-	gateDir, err := gateDirectory()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(gateDir, "state", "sessions.json"), nil
-}
-
-func gateSubprocessCallable(runnerArgs []string, raw []byte) (func(map[string]any) (any, error), *gateSubprocessCapture) {
-	capture := &gateSubprocessCapture{}
-	return func(_ map[string]any) (any, error) {
-		proc := exec.Command(runnerArgs[0], runnerArgs[1:]...) //nolint:gosec // Child command is the explicit CLI API.
-		proc.Stdin = bytes.NewReader(raw)
-
-		var stdout bytes.Buffer
-		var stderr bytes.Buffer
-		proc.Stdout = &stdout
-		proc.Stderr = &stderr
-
-		err := proc.Run()
-		capture.stderr = stderr.String()
-		if err != nil {
-			msg := strings.TrimSpace(stderr.String())
-			if msg == "" {
-				msg = strings.TrimSpace(stdout.String())
-			}
-			if msg == "" {
-				msg = err.Error()
-			}
-			return nil, fmt.Errorf("%s", msg)
-		}
-
-		return stdout.String(), nil
-	}, capture
-}
-
-type gateFileBackend struct {
-	path string
-}
-
-func newGateFileBackend(path string) *gateFileBackend {
-	return &gateFileBackend{path: path}
-}
-
-func (b *gateFileBackend) Get(_ context.Context, key string) (string, error) {
-	state, unlock, err := b.lockedState()
-	if err != nil {
-		return "", err
-	}
-	defer unlock()
-	return state[key], nil
-}
-
-func (b *gateFileBackend) Set(_ context.Context, key, value string) error {
-	state, unlock, err := b.lockedState()
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	state[key] = value
-	return b.writeLocked(state)
-}
-
-func (b *gateFileBackend) Delete(_ context.Context, key string) error {
-	state, unlock, err := b.lockedState()
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	delete(state, key)
-	return b.writeLocked(state)
-}
-
-func (b *gateFileBackend) Increment(_ context.Context, key string, amount int) (int, error) {
-	state, unlock, err := b.lockedState()
-	if err != nil {
-		return 0, err
-	}
-	defer unlock()
-
-	current := 0
-	if raw, ok := state[key]; ok && raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil {
-			return 0, fmt.Errorf("decode counter %q: %w", key, err)
-		}
-		current = parsed
-	}
-	current += amount
-	state[key] = strconv.Itoa(current)
-	if err := b.writeLocked(state); err != nil {
-		return 0, err
-	}
-	return current, nil
-}
-
-func (b *gateFileBackend) BatchGet(_ context.Context, keys []string) (map[string]string, error) {
-	state, unlock, err := b.lockedState()
-	if err != nil {
-		return nil, err
-	}
-	defer unlock()
-
-	result := make(map[string]string, len(keys))
-	for _, key := range keys {
-		if value, ok := state[key]; ok {
-			result[key] = value
-		}
-	}
-	return result, nil
-}
-
-func (b *gateFileBackend) lockedState() (map[string]string, func(), error) {
-	lockPath := b.path + ".lock"
-	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
-		return nil, nil, err
-	}
-
-	lockHandle, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := lockFile(lockHandle); err != nil {
-		lockHandle.Close()
-		return nil, nil, err
-	}
-
-	unlock := func() {
-		_ = lockHandle.Close()
-	}
-
-	raw, err := os.ReadFile(b.path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return map[string]string{}, unlock, nil
-		}
-		unlock()
-		return nil, nil, err
-	}
-	if len(raw) == 0 {
-		return map[string]string{}, unlock, nil
-	}
-
-	var state map[string]string
-	if err := json.Unmarshal(raw, &state); err != nil {
-		unlock()
-		return nil, nil, fmt.Errorf("decode session store: %w", err)
-	}
-	if state == nil {
-		state = map[string]string{}
-	}
-	return state, unlock, nil
-}
-
-func (b *gateFileBackend) writeLocked(state map[string]string) error {
-	data, err := json.Marshal(state)
-	if err != nil {
-		return err
-	}
-	return atomicWrite(b.path, data)
 }

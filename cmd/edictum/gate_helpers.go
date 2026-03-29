@@ -132,6 +132,60 @@ func copyFile(src, dst string) error {
 	return atomicWrite(dst, data)
 }
 
+func syncYAMLInput(src, dstDir string) ([]string, error) {
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		return nil, err
+	}
+
+	existing, err := filepath.Glob(filepath.Join(dstDir, "*.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	existingYML, err := filepath.Glob(filepath.Join(dstDir, "*.yml"))
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range append(existing, existingYML...) {
+		if rmErr := os.Remove(path); rmErr != nil && !os.IsNotExist(rmErr) {
+			return nil, rmErr
+		}
+	}
+
+	info, err := os.Stat(src)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		dst := filepath.Join(dstDir, filepath.Base(src))
+		if err := copyFile(src, dst); err != nil {
+			return nil, err
+		}
+		return []string{dst}, nil
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return nil, err
+	}
+	var copied []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if filepath.Ext(name) != ".yaml" && filepath.Ext(name) != ".yml" {
+			continue
+		}
+		srcPath := filepath.Join(src, name)
+		dstPath := filepath.Join(dstDir, name)
+		if err := copyFile(srcPath, dstPath); err != nil {
+			return nil, err
+		}
+		copied = append(copied, dstPath)
+	}
+	return copied, nil
+}
+
 // ---------------------------------------------------------------------------
 // WAL (write-ahead log) operations
 // ---------------------------------------------------------------------------
