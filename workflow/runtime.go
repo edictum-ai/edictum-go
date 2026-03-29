@@ -125,55 +125,58 @@ func (r *Runtime) Evaluate(ctx context.Context, sess *session.Session, env toolc
 			return Evaluation{}, fmt.Errorf("workflow: active stage %q not found", state.ActiveStage)
 		}
 
-		if allowed, eval, invalid, err := r.evaluateCurrentStage(stage, state, env); err != nil {
+		allowed, eval, invalid, err := r.evaluateCurrentStage(stage, env)
+		if err != nil {
 			return Evaluation{}, err
-		} else if allowed {
+		}
+		if allowed {
 			if changed {
 				if err := saveState(ctx, sess, r.definition, state); err != nil {
 					return Evaluation{}, err
 				}
 			}
 			return eval, nil
-		} else {
-			nextIndex, hasNext := r.nextIndex(stage.ID)
-			if invalid != nil && !hasNext {
-				return *invalid, nil
-			}
-			if completion, ok, err := r.evaluateCompletion(ctx, stage, state, env, hasNext); err != nil {
-				return Evaluation{}, err
-			} else if !ok {
-				if completion.Action != "" {
-					if changed && completion.Action == ActionPendingApproval {
-						if err := saveState(ctx, sess, r.definition, state); err != nil {
-							return Evaluation{}, err
-						}
+		}
+
+		nextIndex, hasNext := r.nextIndex(stage.ID)
+		if invalid != nil && !hasNext {
+			return *invalid, nil
+		}
+		completion, ok, err := r.evaluateCompletion(ctx, stage, state, env, hasNext)
+		if err != nil {
+			return Evaluation{}, err
+		}
+		if !ok {
+			if completion.Action != "" {
+				if changed && completion.Action == ActionPendingApproval {
+					if err := saveState(ctx, sess, r.definition, state); err != nil {
+						return Evaluation{}, err
 					}
-					return completion, nil
-				}
-				if invalid != nil {
-					return *invalid, nil
 				}
 				return completion, nil
 			}
-
-			if !state.completed(stage.ID) {
-				state.CompletedStages = append(state.CompletedStages, stage.ID)
+			if invalid != nil {
+				return *invalid, nil
 			}
-			if !hasNext {
-				state.ActiveStage = ""
-				changed = true
-				if err := saveState(ctx, sess, r.definition, state); err != nil {
-					return Evaluation{}, err
-				}
-				return Evaluation{Action: ActionAllow}, nil
-			}
-			state.ActiveStage = r.definition.Stages[nextIndex].ID
-			changed = true
+			return completion, nil
 		}
+
+		if !state.completed(stage.ID) {
+			state.CompletedStages = append(state.CompletedStages, stage.ID)
+		}
+		if !hasNext {
+			state.ActiveStage = ""
+			if err := saveState(ctx, sess, r.definition, state); err != nil {
+				return Evaluation{}, err
+			}
+			return Evaluation{Action: ActionAllow}, nil
+		}
+		state.ActiveStage = r.definition.Stages[nextIndex].ID
+		changed = true
 	}
 }
 
-func (r *Runtime) evaluateCurrentStage(stage Stage, state State, env toolcall.ToolCall) (bool, Evaluation, *Evaluation, error) {
+func (r *Runtime) evaluateCurrentStage(stage Stage, env toolcall.ToolCall) (bool, Evaluation, *Evaluation, error) {
 	if !toolAllowed(stage, env) {
 		block := evaluationFromRecord(ActionBlock, stage.ID, "Tool is not allowed in this workflow stage", workflowMetadata(r.definition.Metadata.Name, stage.ID, "tools", strings.Join(stage.Tools, ","), false, env.ToolName(), nil), gateRecord(FactResult{
 			Kind:      "tools",

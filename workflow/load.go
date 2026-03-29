@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -39,10 +40,11 @@ func parse(raw []byte) (Definition, error) {
 		return Definition{}, fmt.Errorf("workflow: parse error: %w", err)
 	}
 	var extra any
-	if err := dec.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return Definition{}, fmt.Errorf("workflow: multiple YAML documents are not supported")
-		}
+	err := dec.Decode(&extra)
+	if err == nil {
+		return Definition{}, fmt.Errorf("workflow: multiple YAML documents are not supported")
+	}
+	if !errors.Is(err, io.EOF) {
 		return Definition{}, fmt.Errorf("workflow: parse error: %w", err)
 	}
 

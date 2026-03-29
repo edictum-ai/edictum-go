@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"runtime"
@@ -18,11 +19,13 @@ func (execEvaluator) Evaluate(ctx context.Context, req EvaluateRequest) (FactRes
 	if runtime.GOOS == "windows" {
 		shell, flag = "cmd", "/C"
 	}
+	//nolint:gosec // Workflow exec(...) is an intentional self-authored local evaluator in M1.
 	cmd := exec.CommandContext(ctx, shell, flag, parsed.arg)
 	out, err := cmd.CombinedOutput()
 	exitCode := 0
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			exitCode = exitErr.ExitCode()
 		} else {
 			return FactResult{}, fmt.Errorf("workflow: exec evaluator %q failed: %w", parsed.arg, err)

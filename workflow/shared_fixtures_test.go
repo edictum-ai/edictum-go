@@ -120,6 +120,7 @@ func resolveWorkflowFixturesPath() (string, bool) {
 		"../../edictum-schemas/fixtures/workflow/core.workflow.yaml",
 	)
 	for _, candidate := range candidates {
+		//nolint:gosec // Test-only fixture discovery from env vars plus fixed local fallbacks.
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
 			return candidate, true
 		}
