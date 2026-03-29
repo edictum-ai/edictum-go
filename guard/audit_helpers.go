@@ -35,6 +35,7 @@ func (g *Guard) emitPreAudit(
 	event.DecisionSource = pre.DecisionSource
 	event.DecisionName = pre.DecisionName
 	event.Reason = pre.Reason
+	event.Workflow = deepCopyRecord(pre.Workflow)
 	event.HooksEvaluated = deepCopyRecords(pre.HooksEvaluated)
 	event.RulesEvaluated = deepCopyRecords(pre.RulesEvaluated)
 	event.SessionAttemptCount = &attempts
@@ -72,6 +73,7 @@ func (g *Guard) emitPostAudit(
 	event.Action = action
 	event.ToolSuccess = &post.ToolSuccess
 	event.PostconditionsPassed = &post.PostconditionsPassed
+	event.Workflow = deepCopyRecord(post.Workflow)
 	event.RulesEvaluated = deepCopyRecords(post.RulesEvaluated)
 	event.SessionAttemptCount = &attempts
 	event.SessionExecutionCount = &execs
@@ -162,106 +164,4 @@ func (g *Guard) emitObserveResults(
 			log.Printf("audit emit error: %v", err)
 		}
 	}
-}
-
-func principalMap(p *toolcall.Principal) map[string]any {
-	if p == nil {
-		return nil
-	}
-	result := map[string]any{}
-	if v := p.UserID(); v != "" {
-		result["user_id"] = v
-	}
-	if v := p.ServiceID(); v != "" {
-		result["service_id"] = v
-	}
-	if v := p.OrgID(); v != "" {
-		result["org_id"] = v
-	}
-	if v := p.Role(); v != "" {
-		result["role"] = v
-	}
-	if v := p.TicketRef(); v != "" {
-		result["ticket_ref"] = v
-	}
-	if claims := p.Claims(); claims != nil {
-		result["claims"] = claims
-	}
-	if len(result) == 0 {
-		return nil
-	}
-	return result
-}
-
-func deepCopyRecords(records []map[string]any) []map[string]any {
-	if records == nil {
-		return nil
-	}
-	out := make([]map[string]any, len(records))
-	for i, record := range records {
-		out[i] = deepCopyRecord(record)
-	}
-	return out
-}
-
-func deepCopyRecord(record map[string]any) map[string]any {
-	cp := make(map[string]any, len(record))
-	for k, v := range record {
-		cp[k] = deepCopyAny(v)
-	}
-	return cp
-}
-
-func deepCopyAny(v any) any {
-	switch val := v.(type) {
-	case map[string]any:
-		return deepCopyRecord(val)
-	case []any:
-		cp := make([]any, len(val))
-		for i, item := range val {
-			cp[i] = deepCopyAny(item)
-		}
-		return cp
-	default:
-		return v
-	}
-}
-
-// fireOnBlock invokes the on_block callback, swallowing panics.
-func (g *Guard) fireOnBlock(env2 toolcall.ToolCall, reason, name string) {
-	if g.onBlock == nil {
-		return
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("on_block callback panicked: %v", r)
-		}
-	}()
-	g.onBlock(env2, reason, name)
-}
-
-// fireOnAllow invokes the on_allow callback, swallowing panics.
-func (g *Guard) fireOnAllow(env2 toolcall.ToolCall) {
-	if g.onAllow == nil {
-		return
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("on_allow callback panicked: %v", r)
-		}
-	}()
-	g.onAllow(env2)
-}
-
-// fireOnPostWarn invokes the on_post_warn callback, swallowing panics.
-func (g *Guard) fireOnPostWarn(env2 toolcall.ToolCall, warnings []string) {
-	if g.onPostWarn == nil {
-		return
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("on_post_warn callback panicked: %v", r)
-		}
-	}()
-	g.onPostWarn(env2, warnings)
 }

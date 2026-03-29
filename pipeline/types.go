@@ -14,6 +14,12 @@ type PreDecision struct {
 	ApprovalTimeout    int
 	ApprovalTimeoutEff string
 	ApprovalMessage    string
+	Workflow           map[string]any
+	WorkflowStageID    string
+	WorkflowInvolved   bool
+	WorkflowEvents     []map[string]any
+	WorkflowSkipped    bool
+	WorkflowSkipReason string
 }
 
 // PostDecision is the result of post-execution governance checks.
@@ -25,4 +31,7 @@ type PostDecision struct {
 	PolicyError          bool
 	RedactedResponse     any
 	OutputSuppressed     bool
+	Workflow             map[string]any
+	WorkflowStageID      string
+	WorkflowInvolved     bool
 }

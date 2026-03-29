@@ -145,6 +145,30 @@ func (s *Session) BatchGetCounters(ctx context.Context, includeTool string) (map
 	return result, nil
 }
 
+// GetValue returns a namespaced session-scoped value.
+func (s *Session) GetValue(ctx context.Context, name string) (string, error) {
+	if err := validateKeyComponent(name); err != nil {
+		return "", fmt.Errorf("invalid session value name: %w", err)
+	}
+	return s.backend.Get(ctx, s.key(name))
+}
+
+// SetValue stores a namespaced session-scoped value.
+func (s *Session) SetValue(ctx context.Context, name, value string) error {
+	if err := validateKeyComponent(name); err != nil {
+		return fmt.Errorf("invalid session value name: %w", err)
+	}
+	return s.backend.Set(ctx, s.key(name), value)
+}
+
+// DeleteValue removes a namespaced session-scoped value.
+func (s *Session) DeleteValue(ctx context.Context, name string) error {
+	if err := validateKeyComponent(name); err != nil {
+		return fmt.Errorf("invalid session value name: %w", err)
+	}
+	return s.backend.Delete(ctx, s.key(name))
+}
+
 func (s *Session) getCounter(ctx context.Context, key string) (int, error) {
 	val, err := s.backend.Get(ctx, key)
 	if err != nil {

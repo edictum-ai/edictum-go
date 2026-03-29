@@ -33,6 +33,10 @@ func (p *CheckPipeline) PreExecute(
 	rules := make([]map[string]any, 0)
 	hasObservedDeny := false
 	limits := p.provider.GetLimits()
+	var workflowMeta map[string]any
+	var workflowStageID string
+	workflowInvolved := false
+	var workflowEvents []map[string]any
 
 	// Pre-fetch session counters in a single batch.
 	var includeTool string
@@ -50,12 +54,16 @@ func (p *CheckPipeline) PreExecute(
 	// This matches Python parity: increment_attempts() before pre_execute().
 	if counters["attempts"] >= limits.MaxAttempts {
 		return PreDecision{
-			Action:         "block",
-			Reason:         fmt.Sprintf("Attempt limit reached (%d). Agent may be stuck in a retry loop. Stop and reassess.", limits.MaxAttempts),
-			DecisionSource: "attempt_limit",
-			DecisionName:   "max_attempts",
-			HooksEvaluated: hooks,
-			RulesEvaluated: rules,
+			Action:           "block",
+			Reason:           fmt.Sprintf("Attempt limit reached (%d). Agent may be stuck in a retry loop. Stop and reassess.", limits.MaxAttempts),
+			DecisionSource:   "attempt_limit",
+			DecisionName:     "max_attempts",
+			HooksEvaluated:   hooks,
+			RulesEvaluated:   rules,
+			Workflow:         workflowMeta,
+			WorkflowStageID:  workflowStageID,
+			WorkflowInvolved: workflowInvolved,
+			WorkflowEvents:   workflowEvents,
 		}, nil
 	}
 
@@ -79,13 +87,17 @@ func (p *CheckPipeline) PreExecute(
 		hooks = append(hooks, hookRecord)
 		if decision.Result == HookResultBlock {
 			return PreDecision{
-				Action:         "block",
-				Reason:         decision.Reason,
-				DecisionSource: "hook",
-				DecisionName:   hook.HookName(),
-				HooksEvaluated: hooks,
-				RulesEvaluated: rules,
-				PolicyError:    hookRaisedException,
+				Action:           "block",
+				Reason:           decision.Reason,
+				DecisionSource:   "hook",
+				DecisionName:     hook.HookName(),
+				HooksEvaluated:   hooks,
+				RulesEvaluated:   rules,
+				PolicyError:      hookRaisedException,
+				Workflow:         workflowMeta,
+				WorkflowStageID:  workflowStageID,
+				WorkflowInvolved: workflowInvolved,
+				WorkflowEvents:   workflowEvents,
 			}, nil
 		}
 	}
@@ -130,26 +142,105 @@ func (p *CheckPipeline) PreExecute(
 				source = "session_rule"
 			}
 			return PreDecision{
-				Action:         "block",
-				Reason:         decision.Message(),
-				DecisionSource: source,
-				DecisionName:   ruleName(sc.Name),
-				HooksEvaluated: hooks,
-				RulesEvaluated: rules,
-				PolicyError:    hasPolicyError(rules),
+				Action:           "block",
+				Reason:           decision.Message(),
+				DecisionSource:   source,
+				DecisionName:     ruleName(sc.Name),
+				HooksEvaluated:   hooks,
+				RulesEvaluated:   rules,
+				PolicyError:      hasPolicyError(rules),
+				Workflow:         workflowMeta,
+				WorkflowStageID:  workflowStageID,
+				WorkflowInvolved: workflowInvolved,
+				WorkflowEvents:   workflowEvents,
 			}, nil
 		}
 	}
 
-	// 5. Execution limits
+	// 5. Workflow gates
+	if rt := p.provider.GetWorkflowRuntime(); rt != nil {
+		wf, wfErr := rt.Evaluate(ctx, sess, env)
+		if wfErr != nil {
+			record := map[string]any{
+				"name":    "workflow:error",
+				"type":    "workflow_gate",
+				"passed":  false,
+				"message": fmt.Sprintf("Workflow evaluation error: %s", wfErr),
+				"metadata": map[string]any{
+					"policy_error": true,
+				},
+			}
+			rules = append(rules, record)
+			reason := fmt.Sprintf("Workflow evaluation error: %s", wfErr)
+			return PreDecision{
+				Action:           "block",
+				Reason:           reason,
+				DecisionSource:   "workflow",
+				DecisionName:     "workflow_error",
+				HooksEvaluated:   hooks,
+				RulesEvaluated:   rules,
+				PolicyError:      true,
+				Workflow:         workflowMeta,
+				WorkflowStageID:  workflowStageID,
+				WorkflowInvolved: true,
+				WorkflowEvents:   workflowEvents,
+			}, nil
+		}
+		if len(wf.Records) > 0 {
+			rules = append(rules, wf.Records...)
+			workflowMeta = wf.Audit
+			workflowStageID = wf.StageID
+		}
+		if len(wf.Records) > 0 || len(wf.Events) > 0 || wf.StageID != "" {
+			workflowInvolved = true
+		}
+		workflowEvents = append(workflowEvents, wf.Events...)
+		switch wf.Action {
+		case "block":
+			return PreDecision{
+				Action:           "block",
+				Reason:           wf.Reason,
+				DecisionSource:   "workflow",
+				DecisionName:     wf.StageID,
+				HooksEvaluated:   hooks,
+				RulesEvaluated:   rules,
+				PolicyError:      hasPolicyError(rules),
+				Workflow:         workflowMeta,
+				WorkflowStageID:  workflowStageID,
+				WorkflowInvolved: workflowInvolved,
+				WorkflowEvents:   workflowEvents,
+			}, nil
+		case "pending_approval":
+			return PreDecision{
+				Action:           "pending_approval",
+				Reason:           wf.Reason,
+				DecisionSource:   "workflow",
+				DecisionName:     wf.StageID,
+				HooksEvaluated:   hooks,
+				RulesEvaluated:   rules,
+				PolicyError:      hasPolicyError(rules),
+				ApprovalMessage:  wf.Reason,
+				Workflow:         workflowMeta,
+				WorkflowStageID:  workflowStageID,
+				WorkflowInvolved: workflowInvolved,
+				WorkflowEvents:   workflowEvents,
+			}, nil
+		}
+	}
+
+	// 6. Execution limits
 	if counters["execs"] >= limits.MaxToolCalls {
 		return PreDecision{
-			Action:         "block",
-			Reason:         fmt.Sprintf("Execution limit reached (%d calls). Summarize progress and stop.", limits.MaxToolCalls),
-			DecisionSource: "operation_limit",
-			DecisionName:   "max_tool_calls",
-			HooksEvaluated: hooks,
-			RulesEvaluated: rules,
+			Action:           "block",
+			Reason:           fmt.Sprintf("Execution limit reached (%d calls). Summarize progress and stop.", limits.MaxToolCalls),
+			DecisionSource:   "operation_limit",
+			DecisionName:     "max_tool_calls",
+			HooksEvaluated:   hooks,
+			RulesEvaluated:   rules,
+			Workflow:         workflowMeta,
+			WorkflowStageID:  workflowStageID,
+			WorkflowInvolved: workflowInvolved,
+			WorkflowEvents:   workflowEvents,
 		}, nil
 	}
 
@@ -159,26 +250,34 @@ func (p *CheckPipeline) PreExecute(
 		toolCount := counters[toolKey]
 		if toolCount >= toolLimit {
 			return PreDecision{
-				Action:         "block",
-				Reason:         fmt.Sprintf("Per-tool limit: %s called %d times (limit: %d).", env.ToolName(), toolCount, toolLimit),
-				DecisionSource: "operation_limit",
-				DecisionName:   "max_calls_per_tool:" + env.ToolName(),
-				HooksEvaluated: hooks,
-				RulesEvaluated: rules,
+				Action:           "block",
+				Reason:           fmt.Sprintf("Per-tool limit: %s called %d times (limit: %d).", env.ToolName(), toolCount, toolLimit),
+				DecisionSource:   "operation_limit",
+				DecisionName:     "max_calls_per_tool:" + env.ToolName(),
+				HooksEvaluated:   hooks,
+				RulesEvaluated:   rules,
+				Workflow:         workflowMeta,
+				WorkflowStageID:  workflowStageID,
+				WorkflowInvolved: workflowInvolved,
+				WorkflowEvents:   workflowEvents,
 			}, nil
 		}
 	}
 
-	// 6. All checks passed
-	// 7. Evaluate observe-mode rules
+	// 7. All checks passed
+	// 8. Evaluate observe-mode rules
 	observeResults := p.evaluateObserveContracts(ctx, env, sess)
 
 	return PreDecision{
-		Action:         "allow",
-		HooksEvaluated: hooks,
-		RulesEvaluated: rules,
-		Observed:       hasObservedDeny,
-		PolicyError:    hasPolicyError(rules),
-		ObserveResults: observeResults,
+		Action:           "allow",
+		HooksEvaluated:   hooks,
+		RulesEvaluated:   rules,
+		Observed:         hasObservedDeny,
+		PolicyError:      hasPolicyError(rules),
+		ObserveResults:   observeResults,
+		Workflow:         workflowMeta,
+		WorkflowStageID:  workflowStageID,
+		WorkflowInvolved: workflowInvolved,
+		WorkflowEvents:   workflowEvents,
 	}, nil
 }

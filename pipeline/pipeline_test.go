@@ -9,6 +9,7 @@ import (
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/toolcall"
+	"github.com/edictum-ai/edictum-go/workflow"
 )
 
 // mockProvider implements pipeline.RuleProvider for testing.
@@ -23,6 +24,7 @@ type mockProvider struct {
 	observePreconditions  []rule.Precondition
 	observeSandbox        []rule.Precondition
 	observeSession        []rule.SessionRule
+	workflowRuntime       *workflow.Runtime
 }
 
 func (m *mockProvider) GetLimits() pipeline.OperationLimits { return m.limits }
@@ -70,6 +72,9 @@ func (m *mockProvider) GetObserveSandboxRules(env toolcall.ToolCall) []rule.Prec
 }
 func (m *mockProvider) GetObserveSessionRules() []rule.SessionRule {
 	return m.observeSession
+}
+func (m *mockProvider) GetWorkflowRuntime() *workflow.Runtime {
+	return m.workflowRuntime
 }
 
 func filterPreconditions(pres []rule.Precondition, env toolcall.ToolCall) []rule.Precondition {

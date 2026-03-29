@@ -20,13 +20,15 @@ type RuleResult struct {
 
 // EvaluationResult is the result of offline rule evaluation.
 type EvaluationResult struct {
-	Decision       string // "allow" | "block" | "warn"
-	ToolName       string
-	Rules          []RuleResult
-	BlockReasons   []string
-	WarnReasons    []string
-	RulesEvaluated int
-	PolicyError    bool
+	Decision        string // "allow" | "block" | "warn"
+	ToolName        string
+	Rules           []RuleResult
+	BlockReasons    []string
+	WarnReasons     []string
+	RulesEvaluated  int
+	PolicyError     bool
+	WorkflowSkipped bool
+	WorkflowReason  string
 }
 
 // EvalOption configures a single Evaluate() call.
@@ -56,7 +58,8 @@ func WithEvalEnvironment(env string) EvalOption {
 // Evaluate performs an offline evaluation of a tool call against all
 // matching rules. Unlike Run(), this never executes the tool and
 // evaluates all matching rules exhaustively (no short-circuit on
-// first deny). Session rules are skipped (no session state).
+// first block). Session rules and workflow gates are skipped because
+// they depend on runtime session state and persisted evidence.
 func (g *Guard) Evaluate(
 	ctx context.Context,
 	toolName string,
@@ -100,7 +103,7 @@ func (g *Guard) Evaluate(
 	}
 
 	var rules []RuleResult
-	var denyReasons []string
+	var blockReasons []string
 	var warnReasons []string
 
 	// Evaluate preconditions (exhaustive, no short-circuit)
@@ -109,10 +112,10 @@ func (g *Guard) Evaluate(
 	obsPres := filterPreconditions(g.state.observePreconditions, env2)
 	g.mu.RUnlock()
 	for _, c := range pres {
-		evalPrecondition(ctx, c, env2, "precondition", &rules, &denyReasons)
+		evalPrecondition(ctx, c, env2, "precondition", &rules, &blockReasons)
 	}
 	for _, c := range obsPres {
-		evalPrecondition(ctx, c, env2, "precondition", &rules, &denyReasons)
+		evalPrecondition(ctx, c, env2, "precondition", &rules, &blockReasons)
 	}
 
 	// Evaluate sandbox rules (exhaustive, no short-circuit)
@@ -121,10 +124,10 @@ func (g *Guard) Evaluate(
 	obsSandboxes := filterSandbox(g.state.observeSandboxRules, env2)
 	g.mu.RUnlock()
 	for _, c := range sandboxes {
-		evalPrecondition(ctx, c, env2, "sandbox", &rules, &denyReasons)
+		evalPrecondition(ctx, c, env2, "sandbox", &rules, &blockReasons)
 	}
 	for _, c := range obsSandboxes {
-		evalPrecondition(ctx, c, env2, "sandbox", &rules, &denyReasons)
+		evalPrecondition(ctx, c, env2, "sandbox", &rules, &blockReasons)
 	}
 
 	// Evaluate postconditions only when output is provided
@@ -143,7 +146,7 @@ func (g *Guard) Evaluate(
 
 	// Compute decision
 	decision := "allow"
-	if len(denyReasons) > 0 {
+	if len(blockReasons) > 0 {
 		decision = "block"
 	} else if len(warnReasons) > 0 {
 		decision = "warn"
@@ -157,13 +160,23 @@ func (g *Guard) Evaluate(
 		}
 	}
 
+	rt := g.GetWorkflowRuntime()
 	return EvaluationResult{
-		Decision:       decision,
-		ToolName:       toolName,
-		Rules:          rules,
-		BlockReasons:   denyReasons,
-		WarnReasons:    warnReasons,
-		RulesEvaluated: len(rules),
-		PolicyError:    policyError,
+		Decision:        decision,
+		ToolName:        toolName,
+		Rules:           rules,
+		BlockReasons:    blockReasons,
+		WarnReasons:     warnReasons,
+		RulesEvaluated:  len(rules),
+		PolicyError:     policyError,
+		WorkflowSkipped: rt != nil,
+		WorkflowReason:  workflowSkipReason(rt != nil),
 	}
+}
+
+func workflowSkipReason(skipped bool) string {
+	if !skipped {
+		return ""
+	}
+	return "workflow evaluation requires runtime session state and is enforced only by Run() in M1"
 }

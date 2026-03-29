@@ -4,6 +4,7 @@ import (
 	"github.com/edictum-ai/edictum-go/pipeline"
 	"github.com/edictum-ai/edictum-go/rule"
 	"github.com/edictum-ai/edictum-go/toolcall"
+	"github.com/edictum-ai/edictum-go/workflow"
 )
 
 // Compile-time check that Guard implements RuleProvider.
@@ -84,4 +85,11 @@ func (g *Guard) GetObserveSessionRules() []rule.SessionRule {
 	result := make([]rule.SessionRule, len(g.state.observeSessionRules))
 	copy(result, g.state.observeSessionRules)
 	return result
+}
+
+// GetWorkflowRuntime returns the configured workflow runtime, if any.
+func (g *Guard) GetWorkflowRuntime() *workflow.Runtime {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.workflowRuntime
 }
