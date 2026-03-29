@@ -16,6 +16,7 @@ const gateApprovalPollInterval = 100 * time.Millisecond
 
 type gateGuardConfig struct {
 	RulesPath           string
+	Environment         string
 	WorkflowPath        string
 	WorkflowExecEnabled bool
 	ServerURL           string
@@ -29,7 +30,7 @@ func buildGateGuard(cfg gateGuardConfig) (*guard.Guard, error) {
 	}
 	backend := newGateFileBackend(statePath)
 
-	approvalBackend, err := newGateApprovalBackend(cfg.ServerURL, cfg.APIKey)
+	approvalBackend, err := newGateApprovalBackend(cfg.ServerURL, cfg.APIKey, cfg.Environment)
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +44,9 @@ func buildGateGuardWithDeps(cfg gateGuardConfig, backend session.StorageBackend,
 	}
 
 	opts := []guard.Option{guard.WithBackend(backend)}
+	if cfg.Environment != "" {
+		opts = append(opts, guard.WithEnvironment(cfg.Environment))
+	}
 	if approvalBackend != nil {
 		opts = append(opts, guard.WithApprovalBackend(approvalBackend))
 	}
@@ -77,16 +81,19 @@ func loadGateWorkflowRuntime(path string, execEnabled bool) (*workflow.Runtime, 
 	return rt, nil
 }
 
-func newGateApprovalBackend(serverURL, apiKey string) (approval.Backend, error) {
+func newGateApprovalBackend(serverURL, apiKey, environment string) (approval.Backend, error) {
 	if serverURL == "" {
 		return nil, nil
+	}
+	if environment == "" {
+		environment = "production"
 	}
 
 	client, err := server.NewClient(server.ClientConfig{
 		BaseURL: serverURL,
 		APIKey:  apiKey,
 		AgentID: "gate-cli",
-		Env:     "production",
+		Env:     environment,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("configuring approval backend: %w", err)

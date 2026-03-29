@@ -98,6 +98,7 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 		}
 		out := map[string]any{
 			"rules":                 ruleNames,
+			"environment":           cfg.Environment,
 			"workflow":              workflowName,
 			"workflow_exec_enabled": cfg.WorkflowExecEnabled,
 			"server_url":            cfg.ServerURL,
@@ -135,6 +136,7 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 	} else {
 		fmt.Fprintln(w, "  Server:    not configured")
 	}
+	fmt.Fprintf(w, "  Env:       %s\n", cfg.Environment)
 
 	fmt.Fprintf(w, "  Audit:     %d events pending\n", pending)
 
@@ -165,7 +167,7 @@ func newGateAuditCmd() *cobra.Command {
 
 	cmd.Flags().IntVar(&limit, "limit", 20, "number of recent events")
 	cmd.Flags().StringVar(&tool, "tool", "", "filter by tool name")
-	cmd.Flags().StringVar(&decision, "decision", "", "filter by decision (allow, deny)")
+	cmd.Flags().StringVar(&decision, "decision", "", "filter by decision (allow, block)")
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "output as JSON")
 	return cmd
 }

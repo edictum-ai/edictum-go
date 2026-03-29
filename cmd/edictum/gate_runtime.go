@@ -26,7 +26,7 @@ func newGateRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "run [flags] -- <command> [args...]",
 		Short:         "Execute a tool call through the full Gate runtime",
-		Long:          "Run a real tool invocation through Guard.Run(), including session state, workflow gates, and approval handling.",
+		Long:          "Run a real tool call through Guard.Run(), including session state, workflow gates, and approval handling.",
 		Args:          cobra.ArbitraryArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -103,6 +103,7 @@ func runGateRun(
 		WorkflowExecEnabled: workflowExecEnabled,
 	}
 	if cfg != nil {
+		guardCfg.Environment = cfg.Environment
 		guardCfg.ServerURL = cfg.ServerURL
 		guardCfg.APIKey = cfg.APIKey
 	}
@@ -129,6 +130,7 @@ func runGateRun(
 			appendGateAuditEvent(cfg, toolName, "allow", msg)
 			return gateRunExit(cmd, msg, 1)
 		}
+		appendGateAuditEvent(cfg, toolName, "block", "gate run internal error: "+err.Error())
 		return err
 	}
 	appendGateAuditEvent(cfg, toolName, "allow", "")

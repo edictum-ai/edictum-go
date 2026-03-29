@@ -37,6 +37,7 @@ func newGateInitCmd() *cobra.Command {
 		serverURL      string
 		apiKey         string
 		rulesPath      string
+		environment    string
 		workflowPath   string
 		workflowExec   bool
 		nonInteractive bool
@@ -46,20 +47,21 @@ func newGateInitCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Set up Edictum Gate governance",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runGateInit(cmd, serverURL, apiKey, rulesPath, workflowPath, workflowExec, nonInteractive)
+			return runGateInit(cmd, serverURL, apiKey, rulesPath, environment, workflowPath, workflowExec, nonInteractive)
 		},
 	}
 
 	cmd.Flags().StringVar(&serverURL, "server", "", "Console server URL")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "Console API key")
 	cmd.Flags().StringVar(&rulesPath, "rules", "", "custom Ruleset YAML")
+	cmd.Flags().StringVar(&environment, "environment", "production", "environment name")
 	cmd.Flags().StringVar(&workflowPath, "workflow", "", "custom Workflow YAML")
 	cmd.Flags().BoolVar(&workflowExec, "workflow-exec", false, "enable trusted exec(...) workflow conditions")
 	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "skip prompts, use defaults")
 	return cmd
 }
 
-func runGateInit(cmd *cobra.Command, serverURL, apiKey, rulesPath, workflowPath string, workflowExec bool, _ bool) error {
+func runGateInit(cmd *cobra.Command, serverURL, apiKey, rulesPath, environment, workflowPath string, workflowExec bool, _ bool) error {
 	if workflowExec && workflowPath == "" {
 		return fmt.Errorf("--workflow-exec requires --workflow")
 	}
@@ -83,10 +85,11 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, rulesPath, workflowPath 
 	}
 
 	cfg := &gateConfig{
-		ServerURL: serverURL,
-		APIKey:    apiKey,
-		RulesPath: filepath.Join(gateDir, "rules"),
-		AuditPath: filepath.Join(gateDir, "audit"),
+		ServerURL:   serverURL,
+		APIKey:      apiKey,
+		RulesPath:   filepath.Join(gateDir, "rules"),
+		Environment: environment,
+		AuditPath:   filepath.Join(gateDir, "audit"),
 	}
 
 	if rulesPath != "" {
@@ -123,6 +126,7 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, rulesPath, workflowPath 
 	fmt.Fprintln(w, "Edictum Gate initialized.")
 	fmt.Fprintf(w, "  Config:    %s\n", configPath)
 	fmt.Fprintf(w, "  Rules:     %s\n", cfg.RulesPath)
+	fmt.Fprintf(w, "  Env:       %s\n", cfg.Environment)
 	if cfg.WorkflowPath != "" {
 		fmt.Fprintf(w, "  Workflow:  %s\n", cfg.WorkflowPath)
 		if cfg.WorkflowExecEnabled {
