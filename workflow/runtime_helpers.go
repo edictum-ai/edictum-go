@@ -7,6 +7,8 @@ import (
 )
 
 func toolAllowed(stage Stage, env toolcall.ToolCall) bool {
+	// M1 keeps tools semantics explicit: omitting tools means the stage is
+	// unrestricted, and providing tools makes that list authoritative.
 	if len(stage.Tools) == 0 {
 		return true
 	}

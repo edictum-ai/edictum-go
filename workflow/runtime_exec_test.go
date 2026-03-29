@@ -96,6 +96,34 @@ stages:
 	}
 }
 
+func TestSecurityRuntime_ToolsAllowlistIsAuthoritativeWhenPresent(t *testing.T) {
+	rt := mustRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: listed-tools-only
+stages:
+  - id: inspect
+    tools: [Read]
+`)
+	sess := newWorkflowSession(t, "wf-listed-tools-only")
+
+	readDecision, err := rt.Evaluate(context.Background(), sess, makeCall(t, "Read", map[string]any{"path": "specs/008.md"}))
+	if err != nil {
+		t.Fatalf("Evaluate(Read): %v", err)
+	}
+	if readDecision.Action != ActionAllow {
+		t.Fatalf("Read decision = %+v, want allow", readDecision)
+	}
+
+	editDecision, err := rt.Evaluate(context.Background(), sess, makeCall(t, "Edit", map[string]any{"path": "src/app.ts"}))
+	if err != nil {
+		t.Fatalf("Evaluate(Edit): %v", err)
+	}
+	if editDecision.Action != ActionBlock {
+		t.Fatalf("Edit decision = %+v, want block", editDecision)
+	}
+}
+
 func TestSecurityRuntime_StageToolsAllowlistBlocksReadAndGrep(t *testing.T) {
 	rt := mustRuntime(t, `apiVersion: edictum/v1
 kind: Workflow
