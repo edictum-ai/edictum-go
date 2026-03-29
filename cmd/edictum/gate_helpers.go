@@ -15,11 +15,14 @@ import (
 // ---------------------------------------------------------------------------
 
 type gateConfig struct {
-	ServerURL     string   `json:"server_url"`
-	APIKey        string   `json:"api_key"`
-	ContractsPath string   `json:"contracts_path"`
-	AuditPath     string   `json:"audit_path"`
-	Installed     []string `json:"installed_assistants"`
+	ServerURL           string   `json:"server_url"`
+	APIKey              string   `json:"api_key"`
+	RulesPath           string   `json:"rules_path"`
+	Environment         string   `json:"environment,omitempty"`
+	WorkflowPath        string   `json:"workflow_path,omitempty"`
+	WorkflowExecEnabled bool     `json:"workflow_exec_enabled,omitempty"`
+	AuditPath           string   `json:"audit_path"`
+	Installed           []string `json:"installed_assistants"`
 }
 
 // ---------------------------------------------------------------------------
@@ -50,6 +53,9 @@ func loadGateConfig(path string) (*gateConfig, error) {
 	var cfg gateConfig
 	if jErr := json.Unmarshal(data, &cfg); jErr != nil {
 		return nil, fmt.Errorf("parse config: %w", jErr)
+	}
+	if cfg.Environment == "" {
+		cfg.Environment = "production"
 	}
 	return &cfg, nil
 }
@@ -128,6 +134,60 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return atomicWrite(dst, data)
+}
+
+func syncYAMLInput(src, dstDir string) ([]string, error) {
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		return nil, err
+	}
+
+	existing, err := filepath.Glob(filepath.Join(dstDir, "*.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	existingYML, err := filepath.Glob(filepath.Join(dstDir, "*.yml"))
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range append(existing, existingYML...) {
+		if rmErr := os.Remove(path); rmErr != nil && !os.IsNotExist(rmErr) {
+			return nil, rmErr
+		}
+	}
+
+	info, err := os.Stat(src)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		dst := filepath.Join(dstDir, filepath.Base(src))
+		if err := copyFile(src, dst); err != nil {
+			return nil, err
+		}
+		return []string{dst}, nil
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return nil, err
+	}
+	var copied []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if filepath.Ext(name) != ".yaml" && filepath.Ext(name) != ".yml" {
+			continue
+		}
+		srcPath := filepath.Join(src, name)
+		dstPath := filepath.Join(dstDir, name)
+		if err := copyFile(srcPath, dstPath); err != nil {
+			return nil, err
+		}
+		copied = append(copied, dstPath)
+	}
+	return copied, nil
 }
 
 // ---------------------------------------------------------------------------

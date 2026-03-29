@@ -22,6 +22,7 @@ func newGateCmd() *cobra.Command {
 	cmd.AddCommand(
 		newGateInitCmd(),
 		newGateCheckCmd(),
+		newGateRunCmd(),
 		newGateInstallCmd(),
 		newGateUninstallCmd(),
 		newGateStatusCmd(),
@@ -35,7 +36,10 @@ func newGateInitCmd() *cobra.Command {
 	var (
 		serverURL      string
 		apiKey         string
-		contractsPath  string
+		rulesPath      string
+		environment    string
+		workflowPath   string
+		workflowExec   bool
 		nonInteractive bool
 	)
 
@@ -43,18 +47,25 @@ func newGateInitCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Set up Edictum Gate governance",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runGateInit(cmd, serverURL, apiKey, contractsPath, nonInteractive)
+			return runGateInit(cmd, serverURL, apiKey, rulesPath, environment, workflowPath, workflowExec, nonInteractive)
 		},
 	}
 
 	cmd.Flags().StringVar(&serverURL, "server", "", "Console server URL")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "Console API key")
-	cmd.Flags().StringVar(&contractsPath, "rules", "", "custom Ruleset YAML")
+	cmd.Flags().StringVar(&rulesPath, "rules", "", "custom Ruleset YAML")
+	cmd.Flags().StringVar(&environment, "environment", "production", "environment name")
+	cmd.Flags().StringVar(&workflowPath, "workflow", "", "custom Workflow YAML")
+	cmd.Flags().BoolVar(&workflowExec, "workflow-exec", false, "enable trusted exec(...) workflow conditions")
 	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "skip prompts, use defaults")
 	return cmd
 }
 
-func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ bool) error {
+func runGateInit(cmd *cobra.Command, serverURL, apiKey, rulesPath, environment, workflowPath string, workflowExec bool, _ bool) error {
+	if workflowExec && workflowPath == "" {
+		return fmt.Errorf("--workflow-exec requires --workflow")
+	}
+
 	gateDir, err := gateDirectory()
 	if err != nil {
 		return err
@@ -63,6 +74,8 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ 
 	dirs := []string{
 		gateDir,
 		filepath.Join(gateDir, "rules"),
+		filepath.Join(gateDir, "workflows"),
+		filepath.Join(gateDir, "state"),
 		filepath.Join(gateDir, "audit"),
 	}
 	for _, d := range dirs {
@@ -72,21 +85,36 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ 
 	}
 
 	cfg := &gateConfig{
-		ServerURL:     serverURL,
-		APIKey:        apiKey,
-		ContractsPath: filepath.Join(gateDir, "rules"),
-		AuditPath:     filepath.Join(gateDir, "audit"),
+		ServerURL:   serverURL,
+		APIKey:      apiKey,
+		RulesPath:   filepath.Join(gateDir, "rules"),
+		Environment: environment,
+		AuditPath:   filepath.Join(gateDir, "audit"),
 	}
 
-	if contractsPath != "" {
-		dst := filepath.Join(gateDir, "rules", filepath.Base(contractsPath))
-		if cpErr := copyFile(contractsPath, dst); cpErr != nil {
+	if rulesPath != "" {
+		copiedRules, cpErr := syncYAMLInput(rulesPath, cfg.RulesPath)
+		if cpErr != nil {
 			return fmt.Errorf("copying rules: %w", cpErr)
 		}
-		if _, buildErr := guard.FromYAML(dst); buildErr != nil {
-			_ = os.Remove(dst)
+		if _, buildErr := guard.FromYAML(cfg.RulesPath); buildErr != nil {
+			for _, path := range copiedRules {
+				_ = os.Remove(path)
+			}
 			return fmt.Errorf("rule validation failed: %w", buildErr)
 		}
+	}
+	if workflowPath != "" {
+		dst := filepath.Join(gateDir, "workflows", filepath.Base(workflowPath))
+		if cpErr := copyFile(workflowPath, dst); cpErr != nil {
+			return fmt.Errorf("copying workflow: %w", cpErr)
+		}
+		if _, loadErr := loadGateWorkflowRuntime(dst, workflowExec); loadErr != nil {
+			_ = os.Remove(dst)
+			return fmt.Errorf("workflow validation failed: %w", loadErr)
+		}
+		cfg.WorkflowPath = dst
+		cfg.WorkflowExecEnabled = workflowExec
 	}
 
 	configPath := filepath.Join(gateDir, "config.json")
@@ -97,7 +125,14 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ 
 	w := cmd.OutOrStdout()
 	fmt.Fprintln(w, "Edictum Gate initialized.")
 	fmt.Fprintf(w, "  Config:    %s\n", configPath)
-	fmt.Fprintf(w, "  Contracts: %s\n", cfg.ContractsPath)
+	fmt.Fprintf(w, "  Rules:     %s\n", cfg.RulesPath)
+	fmt.Fprintf(w, "  Env:       %s\n", cfg.Environment)
+	if cfg.WorkflowPath != "" {
+		fmt.Fprintf(w, "  Workflow:  %s\n", cfg.WorkflowPath)
+		if cfg.WorkflowExecEnabled {
+			fmt.Fprintln(w, "  Workflow exec(...): enabled")
+		}
+	}
 	fmt.Fprintf(w, "  Audit:     %s\n", cfg.AuditPath)
 	if serverURL != "" {
 		fmt.Fprintf(w, "  Server:    %s\n", serverURL)
@@ -107,21 +142,21 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ 
 
 func newGateCheckCmd() *cobra.Command {
 	var (
-		format        string
-		contractsPath string
-		jsonFlag      bool
+		format    string
+		rulesPath string
+		jsonFlag  bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "check",
 		Short: "Evaluate a tool call from stdin against rules",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runGateCheck(cmd, format, contractsPath, jsonFlag)
+			return runGateCheck(cmd, format, rulesPath, jsonFlag)
 		},
 	}
 
 	cmd.Flags().StringVar(&format, "format", "claude-code", "output format (claude-code, cursor, copilot, gemini, opencode, raw)")
-	cmd.Flags().StringVar(&contractsPath, "rules", "", "override rule path")
+	cmd.Flags().StringVar(&rulesPath, "rules", "", "override rule path")
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "force JSON output")
 	return cmd
 }
@@ -130,7 +165,7 @@ func newGateCheckCmd() *cobra.Command {
 // Prevents OOM on large tool_input payloads (e.g., Write with multi-MB files).
 const maxStdinBytes = 10 * 1024 * 1024
 
-func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag bool) error {
+func runGateCheck(cmd *cobra.Command, format, rulesOverride string, jsonFlag bool) error {
 	if jsonFlag {
 		format = "raw"
 	}
@@ -150,12 +185,12 @@ func runGateCheck(cmd *cobra.Command, format, contractsOverride string, jsonFlag
 
 	// Load config once for both rules path and audit path.
 	cfg, _ := loadGateConfigDefault() // nil if no config exists — audit is optional
-	cPath := contractsOverride
+	cPath := rulesOverride
 	if cPath == "" {
 		if cfg == nil {
 			return gateCheckError(cmd, format, "no gate config found — run 'edictum gate init'")
 		}
-		cPath = cfg.ContractsPath
+		cPath = cfg.RulesPath
 	}
 
 	g, gErr := buildGuardFromPath(cPath)

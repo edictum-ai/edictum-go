@@ -224,7 +224,7 @@ func printSingleResult(w io.Writer, r *skill.ScanResult) {
 			fmt.Fprintf(w, "  [%s] %s\n", f.Severity, f.Message)
 		}
 	}
-	if !r.HasContracts {
+	if !r.HasRules {
 		fmt.Fprintln(w, "  [INFO] no rules.yaml found")
 	}
 

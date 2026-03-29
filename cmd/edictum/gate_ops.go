@@ -73,8 +73,8 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 		return fmt.Errorf("no gate config found — run 'edictum gate init' first: %w", err)
 	}
 
-	files, _ := filepath.Glob(filepath.Join(cfg.ContractsPath, "*.yaml"))
-	ymlFiles, _ := filepath.Glob(filepath.Join(cfg.ContractsPath, "*.yml"))
+	files, _ := filepath.Glob(filepath.Join(cfg.RulesPath, "*.yaml"))
+	ymlFiles, _ := filepath.Glob(filepath.Join(cfg.RulesPath, "*.yml"))
 	files = append(files, ymlFiles...)
 
 	pending := countWALEvents(cfg.AuditPath)
@@ -92,11 +92,18 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 		if installed == nil {
 			installed = []string{}
 		}
+		workflowName := ""
+		if cfg.WorkflowPath != "" {
+			workflowName = filepath.Base(cfg.WorkflowPath)
+		}
 		out := map[string]any{
-			"rules":          ruleNames,
-			"server_url":     cfg.ServerURL,
-			"pending_events": pending,
-			"installed":      installed,
+			"rules":                 ruleNames,
+			"environment":           cfg.Environment,
+			"workflow":              workflowName,
+			"workflow_exec_enabled": cfg.WorkflowExecEnabled,
+			"server_url":            cfg.ServerURL,
+			"pending_events":        pending,
+			"installed":             installed,
 		}
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		return enc.Encode(out)
@@ -109,10 +116,19 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 	if len(files) > 0 {
 		for _, f := range files {
 			hash := fileHash(f)
-			fmt.Fprintf(w, "  Contracts: %s (sha256: %s)\n", filepath.Base(f), hash)
+			fmt.Fprintf(w, "  Rules:     %s (sha256: %s)\n", filepath.Base(f), hash)
 		}
 	} else {
-		fmt.Fprintln(w, "  Contracts: none")
+		fmt.Fprintln(w, "  Rules:     none")
+	}
+	if cfg.WorkflowPath != "" {
+		hash := fileHash(cfg.WorkflowPath)
+		fmt.Fprintf(w, "  Workflow:  %s (sha256: %s)\n", filepath.Base(cfg.WorkflowPath), hash)
+		if cfg.WorkflowExecEnabled {
+			fmt.Fprintln(w, "  Workflow exec(...): enabled")
+		}
+	} else {
+		fmt.Fprintln(w, "  Workflow:  none")
 	}
 
 	if cfg.ServerURL != "" {
@@ -120,6 +136,7 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 	} else {
 		fmt.Fprintln(w, "  Server:    not configured")
 	}
+	fmt.Fprintf(w, "  Env:       %s\n", cfg.Environment)
 
 	fmt.Fprintf(w, "  Audit:     %d events pending\n", pending)
 
@@ -150,7 +167,7 @@ func newGateAuditCmd() *cobra.Command {
 
 	cmd.Flags().IntVar(&limit, "limit", 20, "number of recent events")
 	cmd.Flags().StringVar(&tool, "tool", "", "filter by tool name")
-	cmd.Flags().StringVar(&decision, "decision", "", "filter by decision (allow, deny)")
+	cmd.Flags().StringVar(&decision, "decision", "", "filter by decision (allow, block)")
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "output as JSON")
 	return cmd
 }

@@ -39,14 +39,14 @@ func ScanSkill(path string) (*ScanResult, error) {
 	violations = append(violations, blockFindings...)
 	violations = append(violations, blobFindings...)
 
-	hasContracts := checkContracts(dirPath)
+	hasRules := checkRules(dirPath)
 
 	return &ScanResult{
-		SkillName:    filepath.Base(dirPath),
-		SkillPath:    filePath,
-		RiskTier:     ClassifyRisk(violations),
-		Findings:     violations,
-		HasContracts: hasContracts,
+		SkillName: filepath.Base(dirPath),
+		SkillPath: filePath,
+		RiskTier:  ClassifyRisk(violations),
+		Findings:  violations,
+		HasRules:  hasRules,
 	}, nil
 }
 
@@ -59,14 +59,14 @@ func ScanSkillStructural(path string) (*ScanResult, error) {
 		return nil, err
 	}
 
-	hasContracts := checkContracts(dirPath)
+	hasRules := checkRules(dirPath)
 
 	return &ScanResult{
-		SkillName:    filepath.Base(dirPath),
-		SkillPath:    path,
-		RiskTier:     RiskClean,
-		Findings:     nil,
-		HasContracts: hasContracts,
+		SkillName: filepath.Base(dirPath),
+		SkillPath: path,
+		RiskTier:  RiskClean,
+		Findings:  nil,
+		HasRules:  hasRules,
 	}, nil
 }
 
@@ -194,9 +194,9 @@ func scanBase64Blobs(blocks []codeBlock) []Finding {
 	return violations
 }
 
-// checkContracts returns true if rules.yaml or rules.yml exists
+// checkRules returns true if rules.yaml or rules.yml exists
 // in the given directory.
-func checkContracts(dir string) bool {
+func checkRules(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, "rules.yaml")); err == nil {
 		return true
 	}

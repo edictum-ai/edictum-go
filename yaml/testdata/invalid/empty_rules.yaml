@@ -1,7 +1,7 @@
 apiVersion: edictum/v1
 kind: Ruleset
 metadata:
-  name: empty-contracts
+  name: empty-rules
 defaults:
   mode: enforce
 rules: []

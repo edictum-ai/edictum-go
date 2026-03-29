@@ -302,7 +302,7 @@ func TestPostExecute_ObservePostconditionsEvaluated(t *testing.T) {
 		t.Fatalf("expected [observe] in warning, got %q", dec.Warnings[0])
 	}
 
-	// PostconditionsPassed reflects the observe result in contracts_evaluated
+	// PostconditionsPassed reflects the observe result in rules_evaluated
 	if dec.PostconditionsPassed {
 		t.Fatal("expected PostconditionsPassed=false (observe rule failed)")
 	}
