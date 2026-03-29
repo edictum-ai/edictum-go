@@ -254,7 +254,7 @@ func TestScanSkillDirectFile(t *testing.T) {
 // --- Structural scan ---
 
 func TestScanSkillStructural(t *testing.T) {
-	t.Run("with_contracts_yaml", func(t *testing.T) {
+	t.Run("with_rules_yaml", func(t *testing.T) {
 		dir := t.TempDir()
 		writeFile(t, filepath.Join(dir, "SKILL.md"), "# Skill\n")
 		writeFile(t, filepath.Join(dir, "rules.yaml"), "apiVersion: edictum/v1\n")
@@ -263,12 +263,12 @@ func TestScanSkillStructural(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !result.HasContracts {
-			t.Error("expected HasContracts=true")
+		if !result.HasRules {
+			t.Error("expected HasRules=true")
 		}
 	})
 
-	t.Run("with_contracts_yml", func(t *testing.T) {
+	t.Run("with_rules_yml", func(t *testing.T) {
 		dir := t.TempDir()
 		writeFile(t, filepath.Join(dir, "SKILL.md"), "# Skill\n")
 		writeFile(t, filepath.Join(dir, "rules.yml"), "apiVersion: edictum/v1\n")
@@ -277,12 +277,12 @@ func TestScanSkillStructural(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !result.HasContracts {
-			t.Error("expected HasContracts=true")
+		if !result.HasRules {
+			t.Error("expected HasRules=true")
 		}
 	})
 
-	t.Run("without_contracts", func(t *testing.T) {
+	t.Run("without_rules", func(t *testing.T) {
 		dir := t.TempDir()
 		writeFile(t, filepath.Join(dir, "SKILL.md"), "# Skill\n")
 
@@ -290,8 +290,8 @@ func TestScanSkillStructural(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if result.HasContracts {
-			t.Error("expected HasContracts=false")
+		if result.HasRules {
+			t.Error("expected HasRules=false")
 		}
 	})
 }

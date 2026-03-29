@@ -25,11 +25,11 @@ type Finding struct {
 
 // ScanResult holds the complete results of scanning a skill.
 type ScanResult struct {
-	SkillName    string
-	SkillPath    string
-	RiskTier     RiskTier
-	Findings     []Finding
-	HasContracts bool // Whether rules.yaml exists in the skill dir
+	SkillName string
+	SkillPath string
+	RiskTier  RiskTier
+	Findings  []Finding
+	HasRules  bool // Whether rules.yaml exists in the skill dir
 }
 
 // ClassifyRisk returns the highest severity tier from the given violations.

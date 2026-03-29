@@ -17,7 +17,7 @@ import (
 type gateConfig struct {
 	ServerURL           string   `json:"server_url"`
 	APIKey              string   `json:"api_key"`
-	ContractsPath       string   `json:"contracts_path"`
+	RulesPath           string   `json:"rules_path"`
 	WorkflowPath        string   `json:"workflow_path,omitempty"`
 	WorkflowExecEnabled bool     `json:"workflow_exec_enabled,omitempty"`
 	AuditPath           string   `json:"audit_path"`
@@ -49,9 +49,26 @@ func loadGateConfig(path string) (*gateConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	var cfg gateConfig
-	if jErr := json.Unmarshal(data, &cfg); jErr != nil {
+	var raw struct {
+		ServerURL           string   `json:"server_url"`
+		APIKey              string   `json:"api_key"`
+		RulesPath           string   `json:"rules_path"`
+		WorkflowPath        string   `json:"workflow_path,omitempty"`
+		WorkflowExecEnabled bool     `json:"workflow_exec_enabled,omitempty"`
+		AuditPath           string   `json:"audit_path"`
+		Installed           []string `json:"installed_assistants"`
+	}
+	if jErr := json.Unmarshal(data, &raw); jErr != nil {
 		return nil, fmt.Errorf("parse config: %w", jErr)
+	}
+	cfg := gateConfig{
+		ServerURL:           raw.ServerURL,
+		APIKey:              raw.APIKey,
+		RulesPath:           raw.RulesPath,
+		WorkflowPath:        raw.WorkflowPath,
+		WorkflowExecEnabled: raw.WorkflowExecEnabled,
+		AuditPath:           raw.AuditPath,
+		Installed:           raw.Installed,
 	}
 	return &cfg, nil
 }

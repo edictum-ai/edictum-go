@@ -73,8 +73,8 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 		return fmt.Errorf("no gate config found — run 'edictum gate init' first: %w", err)
 	}
 
-	files, _ := filepath.Glob(filepath.Join(cfg.ContractsPath, "*.yaml"))
-	ymlFiles, _ := filepath.Glob(filepath.Join(cfg.ContractsPath, "*.yml"))
+	files, _ := filepath.Glob(filepath.Join(cfg.RulesPath, "*.yaml"))
+	ymlFiles, _ := filepath.Glob(filepath.Join(cfg.RulesPath, "*.yml"))
 	files = append(files, ymlFiles...)
 
 	pending := countWALEvents(cfg.AuditPath)
@@ -115,10 +115,10 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 	if len(files) > 0 {
 		for _, f := range files {
 			hash := fileHash(f)
-			fmt.Fprintf(w, "  Contracts: %s (sha256: %s)\n", filepath.Base(f), hash)
+			fmt.Fprintf(w, "  Rules:     %s (sha256: %s)\n", filepath.Base(f), hash)
 		}
 	} else {
-		fmt.Fprintln(w, "  Contracts: none")
+		fmt.Fprintln(w, "  Rules:     none")
 	}
 	if cfg.WorkflowPath != "" {
 		hash := fileHash(cfg.WorkflowPath)

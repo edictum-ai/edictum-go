@@ -46,7 +46,7 @@ func newGateRunCmd() *cobra.Command {
 
 func runGateRun(
 	cmd *cobra.Command,
-	format, contractsOverride, workflowOverride, sessionID string,
+	format, rulesOverride, workflowOverride, sessionID string,
 	workflowExecEnabled, workflowExecSet bool,
 	runnerArgs []string,
 ) error {
@@ -71,16 +71,16 @@ func runGateRun(
 	}
 
 	cfg, cfgErr := loadGateConfigDefault()
-	if cfgErr != nil && contractsOverride == "" {
+	if cfgErr != nil && rulesOverride == "" {
 		return fmt.Errorf("no gate config found — run 'edictum gate init'")
 	}
 	if cfgErr != nil {
 		cfg = nil
 	}
 
-	rulesPath := contractsOverride
+	rulesPath := rulesOverride
 	if rulesPath == "" && cfg != nil {
-		rulesPath = cfg.ContractsPath
+		rulesPath = cfg.RulesPath
 	}
 	if rulesPath == "" {
 		return fmt.Errorf("no rules configured — pass --rules or run 'edictum gate init'")

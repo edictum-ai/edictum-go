@@ -111,7 +111,7 @@ Inherited from the Python library. ALL code, comments, docstrings, CLI output, a
 
 | Wrong | Correct |
 |-------|---------|
-| contract / contracts | rule / rules |
+| contract | rule / rules |
 | denied | blocked |
 | finding | violation |
 | engine (for runtime) | pipeline |

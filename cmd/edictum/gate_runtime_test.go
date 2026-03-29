@@ -180,7 +180,7 @@ func TestGateRunWorkflowApprovalFlow(t *testing.T) {
 	writeGateConfigForTest(t, &gateConfig{
 		ServerURL:     server.URL,
 		APIKey:        "test-key",
-		ContractsPath: rulesPath,
+		RulesPath:     rulesPath,
 		WorkflowPath:  workflowPath,
 		AuditPath:     filepath.Join(t.TempDir(), "audit"),
 	})
@@ -238,7 +238,7 @@ func TestGateInitRulesDirectorySucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadGateConfigDefault: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(cfg.ContractsPath, "base.yaml")); err != nil {
+	if _, err := os.Stat(filepath.Join(cfg.RulesPath, "base.yaml")); err != nil {
 		t.Fatalf("copied rules file missing: %v", err)
 	}
 }
@@ -263,7 +263,7 @@ func TestGateInitRulesFileStillWorks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadGateConfigDefault: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(cfg.ContractsPath, filepath.Base(rulesPath))); err != nil {
+	if _, err := os.Stat(filepath.Join(cfg.RulesPath, filepath.Base(rulesPath))); err != nil {
 		t.Fatalf("copied rules file missing: %v", err)
 	}
 }
