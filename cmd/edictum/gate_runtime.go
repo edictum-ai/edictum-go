@@ -11,6 +11,8 @@ import (
 
 	edictum "github.com/edictum-ai/edictum-go"
 	"github.com/edictum-ai/edictum-go/guard"
+	"github.com/edictum-ai/edictum-go/session"
+	"github.com/edictum-ai/edictum-go/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -50,9 +52,6 @@ func runGateRun(
 	workflowExecEnabled, workflowExecSet bool,
 	runnerArgs []string,
 ) error {
-	if sessionID == "" {
-		return fmt.Errorf("--session-id is required")
-	}
 	if len(runnerArgs) == 0 {
 		return fmt.Errorf("gate run requires a command after --")
 	}
@@ -97,6 +96,23 @@ func runGateRun(
 		return fmt.Errorf("--workflow-exec requires --workflow or a configured workflow")
 	}
 
+	workflowName := ""
+	if workflowPath != "" {
+		rt, err := loadGateWorkflowRuntime(workflowPath, workflowExecEnabled)
+		if err != nil {
+			return err
+		}
+		workflowName = rt.Definition().Metadata.Name
+	}
+
+	resolvedSessionID, sessionSource, err := resolveSessionID(sessionID, workflowName)
+	if err != nil {
+		return err
+	}
+	if sessionSource != "flag" {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Using session: %s (%s)\n", resolvedSessionID, sessionSource)
+	}
+
 	guardCfg := gateGuardConfig{
 		RulesPath:           rulesPath,
 		WorkflowPath:        workflowPath,
@@ -114,7 +130,7 @@ func runGateRun(
 	}
 
 	callable, capture := gateSubprocessCallable(runnerArgs, raw)
-	result, err := g.Run(context.Background(), toolName, toolArgs, callable, guard.WithSessionID(sessionID))
+	result, err := g.Run(context.Background(), toolName, toolArgs, callable, guard.WithSessionID(resolvedSessionID))
 	if err != nil {
 		var blocked *edictum.BlockedError
 		if errors.As(err, &blocked) {
@@ -176,4 +192,82 @@ func appendGateAuditEvent(cfg *gateConfig, toolName, decision, reason string) {
 		User:      currentUser(),
 		Reason:    reason,
 	})
+}
+
+type gateWorkflowRuntimeContext struct {
+	cfg          *gateConfig
+	workflowPath string
+	workflowName string
+	runtime      *workflow.Runtime
+}
+
+type gateWorkflowStateSnapshot struct {
+	State  workflow.State
+	Exists bool
+}
+
+func loadGateWorkflowContext(workflowOverride string, workflowExecEnabled, workflowExecSet bool) (*gateWorkflowRuntimeContext, error) {
+	cfg, cfgErr := loadGateConfigDefault()
+	if cfgErr != nil && workflowOverride == "" {
+		return nil, fmt.Errorf("no gate config found — run 'edictum gate init'")
+	}
+	if cfgErr != nil {
+		cfg = nil
+	}
+
+	workflowPath := workflowOverride
+	if workflowPath == "" && cfg != nil {
+		workflowPath = cfg.WorkflowPath
+	}
+	if !workflowExecSet && cfg != nil {
+		workflowExecEnabled = cfg.WorkflowExecEnabled
+	}
+	if workflowExecEnabled && workflowPath == "" {
+		return nil, fmt.Errorf("--workflow-exec requires --workflow or a configured workflow")
+	}
+	if workflowPath == "" {
+		return nil, fmt.Errorf("no workflow configured — pass --workflow or run 'edictum gate init --workflow <path>'")
+	}
+
+	rt, err := loadGateWorkflowRuntime(workflowPath, workflowExecEnabled)
+	if err != nil {
+		return nil, err
+	}
+
+	return &gateWorkflowRuntimeContext{
+		cfg:          cfg,
+		workflowPath: workflowPath,
+		workflowName: rt.Definition().Metadata.Name,
+		runtime:      rt,
+	}, nil
+}
+
+func loadGateWorkflowStateSnapshot(rt *workflow.Runtime, sessionID string) (gateWorkflowStateSnapshot, error) {
+	statePath, err := gateSessionStorePath()
+	if err != nil {
+		return gateWorkflowStateSnapshot{}, err
+	}
+	sess, err := session.New(sessionID, newGateFileBackend(statePath))
+	if err != nil {
+		return gateWorkflowStateSnapshot{}, err
+	}
+	raw, err := sess.GetValue(context.Background(), workflowStateStorageKey(rt.Definition().Metadata.Name))
+	if err != nil {
+		return gateWorkflowStateSnapshot{}, err
+	}
+	if raw == "" {
+		return gateWorkflowStateSnapshot{Exists: false}, nil
+	}
+	state, err := rt.State(context.Background(), sess)
+	if err != nil {
+		return gateWorkflowStateSnapshot{}, err
+	}
+	return gateWorkflowStateSnapshot{
+		State:  state,
+		Exists: true,
+	}, nil
+}
+
+func workflowStateStorageKey(workflowName string) string {
+	return "workflow:" + workflowName + ":state"
 }

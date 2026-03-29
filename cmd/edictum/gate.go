@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/edictum-ai/edictum-go/guard"
+	"github.com/edictum-ai/edictum-go/session"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +24,7 @@ func newGateCmd() *cobra.Command {
 		newGateInitCmd(),
 		newGateCheckCmd(),
 		newGateRunCmd(),
+		newGateResetCmd(),
 		newGateInstallCmd(),
 		newGateUninstallCmd(),
 		newGateStatusCmd(),
@@ -230,4 +232,63 @@ func gateCheckError(cmd *cobra.Command, format, msg string) error {
 	// systems treat exit 2 as "allow".
 	_ = writeCheckOutput(cmd, format, "block", "", msg)
 	return &exitError{code: 2}
+}
+
+func newGateResetCmd() *cobra.Command {
+	var (
+		stageID      string
+		sessionID    string
+		workflowPath string
+		workflowExec bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "reset",
+		Short: "Reset the active workflow session to a named stage",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			workflowExecSet := cmd.Flags().Lookup("workflow-exec").Changed
+			return runGateReset(cmd, stageID, sessionID, workflowPath, workflowExec, workflowExecSet)
+		},
+	}
+
+	cmd.Flags().StringVar(&stageID, "stage", "", "stage ID to reset to")
+	cmd.Flags().StringVar(&sessionID, "session-id", "", "stable session ID for persisted runtime state")
+	cmd.Flags().StringVar(&workflowPath, "workflow", "", "override workflow path")
+	cmd.Flags().BoolVar(&workflowExec, "workflow-exec", false, "enable trusted exec(...) workflow conditions")
+	_ = cmd.MarkFlagRequired("stage")
+	return cmd
+}
+
+func runGateReset(cmd *cobra.Command, stageID, explicitSessionID, workflowOverride string, workflowExecEnabled, workflowExecSet bool) error {
+	ctx, err := loadGateWorkflowContext(workflowOverride, workflowExecEnabled, workflowExecSet)
+	if err != nil {
+		return err
+	}
+
+	resolvedSessionID, source, err := resolveSessionID(explicitSessionID, ctx.workflowName)
+	if err != nil {
+		return err
+	}
+
+	statePath, err := gateSessionStorePath()
+	if err != nil {
+		return err
+	}
+	sess, err := session.New(resolvedSessionID, newGateFileBackend(statePath))
+	if err != nil {
+		return fmt.Errorf("session create: %w", err)
+	}
+	if err := ctx.runtime.Reset(context.Background(), sess, stageID); err != nil {
+		return err
+	}
+
+	w := cmd.OutOrStdout()
+	fmt.Fprintf(w, "Reset workflow to stage: %s\n", stageID)
+	if source == "flag" {
+		fmt.Fprintf(w, "Session: %s\n", resolvedSessionID)
+	} else {
+		fmt.Fprintf(w, "Session: %s (%s)\n", resolvedSessionID, source)
+	}
+	fmt.Fprintf(w, "Workflow: %s\n", ctx.workflowName)
+	return nil
 }

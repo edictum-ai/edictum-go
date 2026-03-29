@@ -50,6 +50,26 @@ stages:
     tools: [Bash]
 `
 
+const gateThreeStageWorkflow = `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: m1-three-stage
+stages:
+  - id: read-context
+    tools: [Read]
+    exit:
+      - condition: file_read("spec.md")
+        message: "Read the spec first"
+  - id: implement
+    entry:
+      - condition: stage_complete("read-context")
+    tools: [Edit]
+  - id: verify
+    entry:
+      - condition: stage_complete("implement")
+    tools: [Bash]
+`
+
 func TestGateRunWithoutWorkflowAllowsExistingPath(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
@@ -214,6 +234,36 @@ func TestGateRunWorkflowApprovalFlow(t *testing.T) {
 	if stdout != "runner ok" {
 		t.Fatalf("stdout = %q, want %q", stdout, "runner ok")
 	}
+}
+
+func TestGateRunAutoResolvesSessionIDFromBranch(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	repo := initGitRepo(t, "feat/p3")
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	workflowPath := writeTempFile(t, "workflow.yaml", gateReadThenEditWorkflow)
+	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
+	input := `{"tool_name":"Read","tool_input":{"path":"spec.md"}}`
+
+	withWorkingDir(t, repo, func() {
+		stdout, stderr, err := runGateCommand(t, newGateRunCmd(), input,
+			[]string{
+				"--format", "raw",
+				"--rules", rulesPath,
+				"--workflow", workflowPath,
+				runner,
+			},
+		)
+		if err != nil {
+			t.Fatalf("gate run error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout, stderr)
+		}
+		if stdout != "runner ok" {
+			t.Fatalf("stdout = %q, want %q", stdout, "runner ok")
+		}
+		if !strings.Contains(stderr, "Using session: repo:") || !strings.Contains(stderr, "git-branch") {
+			t.Fatalf("stderr = %q, want auto-resolved session message", stderr)
+		}
+	})
 }
 
 func TestGateInitRulesDirectorySucceeds(t *testing.T) {
@@ -508,6 +558,360 @@ func TestGateSyncPostsEventsToCanonicalEndpoint(t *testing.T) {
 	}
 }
 
+func TestGateStatusConfiguredWorkflowShowsUnresolvedSession(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	workflowPath := writeTempFile(t, "workflow.yaml", gateThreeStageWorkflow)
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath, "--workflow", workflowPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	nonRepoDir := t.TempDir()
+	withWorkingDir(t, nonRepoDir, func() {
+		statusCmd := newGateStatusCmd()
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		statusCmd.SetOut(&stdout)
+		statusCmd.SetErr(&stderr)
+		statusCmd.SetArgs(nil)
+		if err := statusCmd.Execute(); err != nil {
+			t.Fatalf("gate status error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+		}
+
+		output := stdout.String()
+		if !strings.Contains(output, "Workflow:  m1-three-stage") {
+			t.Fatalf("stdout = %q, want workflow name", output)
+		}
+		if !strings.Contains(output, "Workflow State:") {
+			t.Fatalf("stdout = %q, want workflow state section", output)
+		}
+		if !strings.Contains(output, "Session: unresolved") {
+			t.Fatalf("stdout = %q, want unresolved session", output)
+		}
+		if !strings.Contains(output, "Reason: cannot resolve session ID") {
+			t.Fatalf("stdout = %q, want resolution failure reason", output)
+		}
+		if !strings.Contains(output, gateWorkflowResolutionHint) {
+			t.Fatalf("stdout = %q, want resolution hint", output)
+		}
+	})
+}
+
+func TestGateStatusExplicitSessionShowsWorkflowState(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	workflowPath := writeTempFile(t, "workflow.yaml", gateThreeStageWorkflow)
+	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
+	sessionID := "manual-session"
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath, "--workflow", workflowPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	readInput := `{"tool_name":"Read","tool_input":{"path":"spec.md"}}`
+	editInput := `{"tool_name":"Edit","tool_input":{"path":"src/app.go"}}`
+	if _, _, err := runGateCommand(t, newGateRunCmd(), readInput, []string{
+		"--format", "raw",
+		"--session-id", sessionID,
+		runner,
+	}); err != nil {
+		t.Fatalf("read step error: %v", err)
+	}
+	if _, _, err := runGateCommand(t, newGateRunCmd(), editInput, []string{
+		"--format", "raw",
+		"--session-id", sessionID,
+		runner,
+	}); err != nil {
+		t.Fatalf("edit step error: %v", err)
+	}
+
+	nonRepoDir := t.TempDir()
+	withWorkingDir(t, nonRepoDir, func() {
+		statusCmd := newGateStatusCmd()
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		statusCmd.SetOut(&stdout)
+		statusCmd.SetErr(&stderr)
+		statusCmd.SetArgs([]string{"--json", "--session-id", sessionID})
+		if err := statusCmd.Execute(); err != nil {
+			t.Fatalf("gate status error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+		}
+
+		parsed := mustJSONMap(t, &stdout)
+		if parsed["workflow_session_resolved"] != true {
+			t.Fatalf("workflow_session_resolved = %#v, want true", parsed["workflow_session_resolved"])
+		}
+		if parsed["workflow_state_exists"] != true {
+			t.Fatalf("workflow_state_exists = %#v, want true", parsed["workflow_state_exists"])
+		}
+		if parsed["workflow_session_id"] != sessionID {
+			t.Fatalf("workflow_session_id = %#v, want %q", parsed["workflow_session_id"], sessionID)
+		}
+		if parsed["workflow_session_source"] != "flag" {
+			t.Fatalf("workflow_session_source = %#v, want %q", parsed["workflow_session_source"], "flag")
+		}
+		if parsed["workflow_current_stage"] != "implement" {
+			t.Fatalf("workflow_current_stage = %#v, want %q", parsed["workflow_current_stage"], "implement")
+		}
+	})
+}
+
+func TestGateStatusExplicitSessionWithoutStateShowsClearly(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	workflowPath := writeTempFile(t, "workflow.yaml", gateThreeStageWorkflow)
+	sessionID := "empty-session"
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath, "--workflow", workflowPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	nonRepoDir := t.TempDir()
+	withWorkingDir(t, nonRepoDir, func() {
+		statusCmd := newGateStatusCmd()
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		statusCmd.SetOut(&stdout)
+		statusCmd.SetErr(&stderr)
+		statusCmd.SetArgs([]string{"--json", "--session-id", sessionID})
+		if err := statusCmd.Execute(); err != nil {
+			t.Fatalf("gate status error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+		}
+
+		parsed := mustJSONMap(t, &stdout)
+		if parsed["workflow_session_resolved"] != true {
+			t.Fatalf("workflow_session_resolved = %#v, want true", parsed["workflow_session_resolved"])
+		}
+		if parsed["workflow_state_exists"] != false {
+			t.Fatalf("workflow_state_exists = %#v, want false", parsed["workflow_state_exists"])
+		}
+		if parsed["workflow_state"] != "not_started" {
+			t.Fatalf("workflow_state = %#v, want %q", parsed["workflow_state"], "not_started")
+		}
+	})
+}
+
+func TestGateStatusShowsWorkflowSessionProgress(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	repo := initGitRepo(t, "feat/p3")
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	workflowPath := writeTempFile(t, "workflow.yaml", gateThreeStageWorkflow)
+	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath, "--workflow", workflowPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	readInput := `{"tool_name":"Read","tool_input":{"path":"spec.md"}}`
+	editInput := `{"tool_name":"Edit","tool_input":{"path":"src/app.go"}}`
+	withWorkingDir(t, repo, func() {
+		if _, _, err := runGateCommand(t, newGateRunCmd(), readInput, []string{
+			"--format", "raw",
+			runner,
+		}); err != nil {
+			t.Fatalf("gate run error: %v", err)
+		}
+		if _, _, err := runGateCommand(t, newGateRunCmd(), editInput, []string{
+			"--format", "raw",
+			runner,
+		}); err != nil {
+			t.Fatalf("gate run error: %v", err)
+		}
+
+		statusCmd := newGateStatusCmd()
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		statusCmd.SetOut(&stdout)
+		statusCmd.SetErr(&stderr)
+		statusCmd.SetArgs([]string{"--json"})
+		if err := statusCmd.Execute(); err != nil {
+			t.Fatalf("gate status error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+		}
+
+		parsed := mustJSONMap(t, &stdout)
+		if parsed["workflow"] != "m1-three-stage" {
+			t.Fatalf("workflow = %#v, want %q", parsed["workflow"], "m1-three-stage")
+		}
+		if got := parsed["workflow_session_id"]; got == nil || !strings.Contains(got.(string), "branch:feat-p3") {
+			t.Fatalf("workflow_session_id = %#v, want branch-derived session", got)
+		}
+		if parsed["workflow_current_stage"] != "implement" {
+			t.Fatalf("workflow_current_stage = %#v, want %q", parsed["workflow_current_stage"], "implement")
+		}
+		progress := mustJSONMapFromAny(t, parsed["workflow_progress"], "workflow_progress")
+		if progress["current"] != float64(2) || progress["total"] != float64(3) {
+			t.Fatalf("workflow_progress = %#v, want 2/3", progress)
+		}
+		completed := mustSlice(t, parsed["workflow_completed_stages"], "workflow_completed_stages")
+		if len(completed) != 1 || completed[0] != "read-context" {
+			t.Fatalf("workflow_completed_stages = %#v, want [read-context]", completed)
+		}
+		if parsed["workflow_next_stage"] != "verify" {
+			t.Fatalf("workflow_next_stage = %#v, want %q", parsed["workflow_next_stage"], "verify")
+		}
+	})
+}
+
+func TestGateResetUsesResolvedSessionID(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	repo := initGitRepo(t, "feat/p3")
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	workflowPath := writeTempFile(t, "workflow.yaml", gateThreeStageWorkflow)
+	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath, "--workflow", workflowPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	readInput := `{"tool_name":"Read","tool_input":{"path":"spec.md"}}`
+	editInput := `{"tool_name":"Edit","tool_input":{"path":"src/app.go"}}`
+
+	withWorkingDir(t, repo, func() {
+		if _, _, err := runGateCommand(t, newGateRunCmd(), readInput, []string{
+			"--format", "raw",
+			runner,
+		}); err != nil {
+			t.Fatalf("read step error: %v", err)
+		}
+		if _, _, err := runGateCommand(t, newGateRunCmd(), editInput, []string{
+			"--format", "raw",
+			runner,
+		}); err != nil {
+			t.Fatalf("edit step error: %v", err)
+		}
+
+		resetCmd := newGateResetCmd()
+		var resetOut bytes.Buffer
+		var resetErr bytes.Buffer
+		resetCmd.SetOut(&resetOut)
+		resetCmd.SetErr(&resetErr)
+		resetCmd.SetArgs([]string{"--stage", "implement"})
+		if err := resetCmd.Execute(); err != nil {
+			t.Fatalf("gate reset error: %v\nstdout:\n%s\nstderr:\n%s", err, resetOut.String(), resetErr.String())
+		}
+		if !strings.Contains(resetOut.String(), "Session: repo:") || !strings.Contains(resetOut.String(), "git-branch") {
+			t.Fatalf("reset output = %q, want resolved session details", resetOut.String())
+		}
+
+		statusCmd := newGateStatusCmd()
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		statusCmd.SetOut(&stdout)
+		statusCmd.SetErr(&stderr)
+		statusCmd.SetArgs([]string{"--json"})
+		if err := statusCmd.Execute(); err != nil {
+			t.Fatalf("gate status error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+		}
+
+		parsed := mustJSONMap(t, &stdout)
+		if parsed["workflow_current_stage"] != "implement" {
+			t.Fatalf("workflow_current_stage = %#v, want %q", parsed["workflow_current_stage"], "implement")
+		}
+		completed := mustSlice(t, parsed["workflow_completed_stages"], "workflow_completed_stages")
+		if len(completed) != 1 || completed[0] != "read-context" {
+			t.Fatalf("workflow_completed_stages = %#v, want [read-context]", completed)
+		}
+		if parsed["workflow_next_stage"] != "verify" {
+			t.Fatalf("workflow_next_stage = %#v, want %q", parsed["workflow_next_stage"], "verify")
+		}
+	})
+}
+
+func TestGateResetExplicitSessionResetsWorkflowState(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	workflowPath := writeTempFile(t, "workflow.yaml", gateThreeStageWorkflow)
+	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
+	sessionID := "explicit-reset-session"
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath, "--workflow", workflowPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	readInput := `{"tool_name":"Read","tool_input":{"path":"spec.md"}}`
+	editInput := `{"tool_name":"Edit","tool_input":{"path":"src/app.go"}}`
+	if _, _, err := runGateCommand(t, newGateRunCmd(), readInput, []string{
+		"--format", "raw",
+		"--session-id", sessionID,
+		runner,
+	}); err != nil {
+		t.Fatalf("read step error: %v", err)
+	}
+	if _, _, err := runGateCommand(t, newGateRunCmd(), editInput, []string{
+		"--format", "raw",
+		"--session-id", sessionID,
+		runner,
+	}); err != nil {
+		t.Fatalf("edit step error: %v", err)
+	}
+
+	nonRepoDir := t.TempDir()
+	withWorkingDir(t, nonRepoDir, func() {
+		resetCmd := newGateResetCmd()
+		var resetOut bytes.Buffer
+		var resetErr bytes.Buffer
+		resetCmd.SetOut(&resetOut)
+		resetCmd.SetErr(&resetErr)
+		resetCmd.SetArgs([]string{"--stage", "implement", "--session-id", sessionID})
+		if err := resetCmd.Execute(); err != nil {
+			t.Fatalf("gate reset error: %v\nstdout:\n%s\nstderr:\n%s", err, resetOut.String(), resetErr.String())
+		}
+		if !strings.Contains(resetOut.String(), "Session: "+sessionID) {
+			t.Fatalf("reset output = %q, want explicit session", resetOut.String())
+		}
+
+		statusCmd := newGateStatusCmd()
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		statusCmd.SetOut(&stdout)
+		statusCmd.SetErr(&stderr)
+		statusCmd.SetArgs([]string{"--json", "--session-id", sessionID})
+		if err := statusCmd.Execute(); err != nil {
+			t.Fatalf("gate status error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+		}
+
+		parsed := mustJSONMap(t, &stdout)
+		if parsed["workflow_current_stage"] != "implement" {
+			t.Fatalf("workflow_current_stage = %#v, want %q", parsed["workflow_current_stage"], "implement")
+		}
+		completed := mustSlice(t, parsed["workflow_completed_stages"], "workflow_completed_stages")
+		if len(completed) != 1 || completed[0] != "read-context" {
+			t.Fatalf("workflow_completed_stages = %#v, want [read-context]", completed)
+		}
+	})
+}
+
 func runGateCommand(t *testing.T, cmd *cobra.Command, input string, args []string) (string, string, error) {
 	t.Helper()
 
@@ -550,6 +954,16 @@ func writeGateConfigForTest(t *testing.T, cfg *gateConfig) {
 	if err := writeGateConfig(filepath.Join(gateDir, "config.json"), cfg); err != nil {
 		t.Fatalf("writeGateConfig: %v", err)
 	}
+}
+
+func mustJSONMapFromAny(t *testing.T, raw any, name string) map[string]any {
+	t.Helper()
+
+	parsed, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("%s = %#v, want object", name, raw)
+	}
+	return parsed
 }
 
 func newApprovalTestServer() *httptest.Server {
