@@ -178,11 +178,11 @@ func TestGateRunWorkflowApprovalFlow(t *testing.T) {
 	workflowPath := writeTempFile(t, "workflow.yaml", gateApprovalWorkflow)
 	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
 	writeGateConfigForTest(t, &gateConfig{
-		ServerURL:     server.URL,
-		APIKey:        "test-key",
-		RulesPath:     rulesPath,
-		WorkflowPath:  workflowPath,
-		AuditPath:     filepath.Join(t.TempDir(), "audit"),
+		ServerURL:    server.URL,
+		APIKey:       "test-key",
+		RulesPath:    rulesPath,
+		WorkflowPath: workflowPath,
+		AuditPath:    filepath.Join(t.TempDir(), "audit"),
 	})
 
 	sessionID := "gate-run-approval"

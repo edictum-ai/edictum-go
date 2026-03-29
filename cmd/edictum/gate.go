@@ -83,10 +83,10 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, rulesPath, workflowPath 
 	}
 
 	cfg := &gateConfig{
-		ServerURL:     serverURL,
-		APIKey:        apiKey,
-		RulesPath:     filepath.Join(gateDir, "rules"),
-		AuditPath:     filepath.Join(gateDir, "audit"),
+		ServerURL: serverURL,
+		APIKey:    apiKey,
+		RulesPath: filepath.Join(gateDir, "rules"),
+		AuditPath: filepath.Join(gateDir, "audit"),
 	}
 
 	if rulesPath != "" {
@@ -138,9 +138,9 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, rulesPath, workflowPath 
 
 func newGateCheckCmd() *cobra.Command {
 	var (
-		format        string
-		rulesPath     string
-		jsonFlag      bool
+		format    string
+		rulesPath string
+		jsonFlag  bool
 	)
 
 	cmd := &cobra.Command{
