@@ -22,6 +22,7 @@ func newGateCmd() *cobra.Command {
 	cmd.AddCommand(
 		newGateInitCmd(),
 		newGateCheckCmd(),
+		newGateRunCmd(),
 		newGateInstallCmd(),
 		newGateUninstallCmd(),
 		newGateStatusCmd(),
@@ -36,6 +37,8 @@ func newGateInitCmd() *cobra.Command {
 		serverURL      string
 		apiKey         string
 		contractsPath  string
+		workflowPath   string
+		workflowExec   bool
 		nonInteractive bool
 	)
 
@@ -43,18 +46,24 @@ func newGateInitCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Set up Edictum Gate governance",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runGateInit(cmd, serverURL, apiKey, contractsPath, nonInteractive)
+			return runGateInit(cmd, serverURL, apiKey, contractsPath, workflowPath, workflowExec, nonInteractive)
 		},
 	}
 
 	cmd.Flags().StringVar(&serverURL, "server", "", "Console server URL")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "Console API key")
 	cmd.Flags().StringVar(&contractsPath, "rules", "", "custom Ruleset YAML")
+	cmd.Flags().StringVar(&workflowPath, "workflow", "", "custom Workflow YAML")
+	cmd.Flags().BoolVar(&workflowExec, "workflow-exec", false, "enable trusted exec(...) workflow conditions")
 	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "skip prompts, use defaults")
 	return cmd
 }
 
-func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ bool) error {
+func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath, workflowPath string, workflowExec bool, _ bool) error {
+	if workflowExec && workflowPath == "" {
+		return fmt.Errorf("--workflow-exec requires --workflow")
+	}
+
 	gateDir, err := gateDirectory()
 	if err != nil {
 		return err
@@ -63,6 +72,8 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ 
 	dirs := []string{
 		gateDir,
 		filepath.Join(gateDir, "rules"),
+		filepath.Join(gateDir, "workflows"),
+		filepath.Join(gateDir, "state"),
 		filepath.Join(gateDir, "audit"),
 	}
 	for _, d := range dirs {
@@ -88,6 +99,18 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ 
 			return fmt.Errorf("rule validation failed: %w", buildErr)
 		}
 	}
+	if workflowPath != "" {
+		dst := filepath.Join(gateDir, "workflows", filepath.Base(workflowPath))
+		if cpErr := copyFile(workflowPath, dst); cpErr != nil {
+			return fmt.Errorf("copying workflow: %w", cpErr)
+		}
+		if _, loadErr := loadGateWorkflowRuntime(dst, workflowExec); loadErr != nil {
+			_ = os.Remove(dst)
+			return fmt.Errorf("workflow validation failed: %w", loadErr)
+		}
+		cfg.WorkflowPath = dst
+		cfg.WorkflowExecEnabled = workflowExec
+	}
 
 	configPath := filepath.Join(gateDir, "config.json")
 	if wErr := writeGateConfig(configPath, cfg); wErr != nil {
@@ -98,6 +121,12 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, contractsPath string, _ 
 	fmt.Fprintln(w, "Edictum Gate initialized.")
 	fmt.Fprintf(w, "  Config:    %s\n", configPath)
 	fmt.Fprintf(w, "  Contracts: %s\n", cfg.ContractsPath)
+	if cfg.WorkflowPath != "" {
+		fmt.Fprintf(w, "  Workflow:  %s\n", cfg.WorkflowPath)
+		if cfg.WorkflowExecEnabled {
+			fmt.Fprintln(w, "  Workflow exec(...): enabled")
+		}
+	}
 	fmt.Fprintf(w, "  Audit:     %s\n", cfg.AuditPath)
 	if serverURL != "" {
 		fmt.Fprintf(w, "  Server:    %s\n", serverURL)

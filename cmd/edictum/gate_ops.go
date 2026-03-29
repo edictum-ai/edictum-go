@@ -92,11 +92,17 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 		if installed == nil {
 			installed = []string{}
 		}
+		workflowName := ""
+		if cfg.WorkflowPath != "" {
+			workflowName = filepath.Base(cfg.WorkflowPath)
+		}
 		out := map[string]any{
-			"rules":          ruleNames,
-			"server_url":     cfg.ServerURL,
-			"pending_events": pending,
-			"installed":      installed,
+			"rules":                 ruleNames,
+			"workflow":              workflowName,
+			"workflow_exec_enabled": cfg.WorkflowExecEnabled,
+			"server_url":            cfg.ServerURL,
+			"pending_events":        pending,
+			"installed":             installed,
 		}
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		return enc.Encode(out)
@@ -113,6 +119,15 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 		}
 	} else {
 		fmt.Fprintln(w, "  Contracts: none")
+	}
+	if cfg.WorkflowPath != "" {
+		hash := fileHash(cfg.WorkflowPath)
+		fmt.Fprintf(w, "  Workflow:  %s (sha256: %s)\n", filepath.Base(cfg.WorkflowPath), hash)
+		if cfg.WorkflowExecEnabled {
+			fmt.Fprintln(w, "  Workflow exec(...): enabled")
+		}
+	} else {
+		fmt.Fprintln(w, "  Workflow:  none")
 	}
 
 	if cfg.ServerURL != "" {

@@ -15,11 +15,13 @@ import (
 // ---------------------------------------------------------------------------
 
 type gateConfig struct {
-	ServerURL     string   `json:"server_url"`
-	APIKey        string   `json:"api_key"`
-	ContractsPath string   `json:"contracts_path"`
-	AuditPath     string   `json:"audit_path"`
-	Installed     []string `json:"installed_assistants"`
+	ServerURL           string   `json:"server_url"`
+	APIKey              string   `json:"api_key"`
+	ContractsPath       string   `json:"contracts_path"`
+	WorkflowPath        string   `json:"workflow_path,omitempty"`
+	WorkflowExecEnabled bool     `json:"workflow_exec_enabled,omitempty"`
+	AuditPath           string   `json:"audit_path"`
+	Installed           []string `json:"installed_assistants"`
 }
 
 // ---------------------------------------------------------------------------

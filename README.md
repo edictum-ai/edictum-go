@@ -84,6 +84,41 @@ func main() {
 }
 ```
 
+## Gate Workflow Runtime
+
+`edictum gate check` remains a preflight hook path in M1. It evaluates rules only.
+Workflow Gates are enforced by the real execution path: `edictum gate run`.
+
+Initialize Gate with separate rules and workflow documents:
+
+```bash
+edictum gate init \
+  --rules ./policy/rules \
+  --workflow ./policy/workflow.yaml
+```
+
+If the workflow uses trusted `exec(...)` conditions, opt in explicitly:
+
+```bash
+edictum gate init \
+  --rules ./policy/rules \
+  --workflow ./policy/workflow.yaml \
+  --workflow-exec
+```
+
+Run actual tool execution through the full runtime with a stable session ID:
+
+```bash
+echo '{"tool_name":"Read","tool_input":{"path":"spec.md"}}' \
+  | edictum gate run --format raw --session-id mimi-task-42 -- ./openclaw-tool-runner
+```
+
+For M1 dogfood:
+
+- keep ruleset YAML and workflow YAML as separate files
+- reuse the same `--session-id` across one agent task so workflow state advances
+- route real tool execution through `gate run`; `gate check` will not enforce workflows
+
 ## Adapters
 
 All adapters use `New(g)` + `WrapTool()`. Zero external framework dependencies.
