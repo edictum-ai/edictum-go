@@ -176,25 +176,28 @@ stages:
 	}
 
 	events := g.LocalSink().Events()
-	sawStageAdvanced := false
-	sawApprovalRequested := false
-	for _, event := range events {
+	stageAdvancedIdx := -1
+	approvalRequestedIdx := -1
+	for idx, event := range events {
 		if event.Action == audit.ActionWorkflowStageAdvanced && event.Workflow != nil {
 			if event.Workflow["workflow_name"] == "approval-pause-process" && event.Workflow["stage_id"] == "implement" && event.Workflow["to_stage_id"] == "review" {
-				sawStageAdvanced = true
+				stageAdvancedIdx = idx
 			}
 		}
 		if event.Action == audit.ActionCallApprovalRequested && event.Workflow != nil {
 			if event.Workflow["workflow_name"] == "approval-pause-process" {
-				sawApprovalRequested = true
+				approvalRequestedIdx = idx
 			}
 		}
 	}
-	if !sawStageAdvanced {
+	if stageAdvancedIdx == -1 {
 		t.Fatal("expected workflow stage advanced event before approval resolution")
 	}
-	if !sawApprovalRequested {
+	if approvalRequestedIdx == -1 {
 		t.Fatal("expected approval requested audit event")
+	}
+	if stageAdvancedIdx >= approvalRequestedIdx {
+		t.Fatalf("expected stage advance before approval request, got stage idx=%d approval idx=%d", stageAdvancedIdx, approvalRequestedIdx)
 	}
 }
 
@@ -237,23 +240,89 @@ stages:
 	}
 
 	events := g.LocalSink().Events()
-	sawStageAdvanced := false
-	sawLimitBlock := false
-	for _, event := range events {
+	stageAdvancedIdx := -1
+	limitBlockIdx := -1
+	for idx, event := range events {
 		if event.Action == audit.ActionWorkflowStageAdvanced && event.Workflow != nil {
 			if event.Workflow["workflow_name"] == "limit-block-process" && event.Workflow["stage_id"] == "read-context" && event.Workflow["to_stage_id"] == "implement" {
-				sawStageAdvanced = true
+				stageAdvancedIdx = idx
 			}
 		}
 		if event.Action == audit.ActionCallBlocked && event.DecisionSource == "operation_limit" {
-			sawLimitBlock = true
+			limitBlockIdx = idx
 		}
 	}
-	if !sawStageAdvanced {
+	if stageAdvancedIdx == -1 {
 		t.Fatal("expected workflow stage advanced event before later pre-execute block")
 	}
-	if !sawLimitBlock {
+	if limitBlockIdx == -1 {
 		t.Fatal("expected later operation limit block audit event")
+	}
+	if stageAdvancedIdx >= limitBlockIdx {
+		t.Fatalf("expected stage advance before block, got stage idx=%d block idx=%d", stageAdvancedIdx, limitBlockIdx)
+	}
+}
+
+func TestRun_WorkflowStageAdvanceEmittedAcrossChainedApprovalRounds(t *testing.T) {
+	rt := mustWorkflowRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: chained-approval-process
+stages:
+  - id: implement
+    tools: [Edit]
+  - id: review
+    entry:
+      - condition: stage_complete("implement")
+    approval:
+      message: Approval required before verify
+  - id: verify
+    entry:
+      - condition: stage_complete("review")
+    approval:
+      message: Approval required before push
+  - id: push
+    entry:
+      - condition: stage_complete("verify")
+    tools: [Bash]
+`)
+	g := New(
+		WithWorkflowRuntime(rt),
+		WithApprovalBackend(&autoApproveBackend{}),
+	)
+
+	if _, err := g.Run(context.Background(), "Edit", map[string]any{"path": "src/app.ts"}, nopCallable); err != nil {
+		t.Fatalf("Run(Edit): %v", err)
+	}
+	if _, err := g.Run(context.Background(), "Bash", map[string]any{"command": "git push origin feature-branch"}, nopCallable); err != nil {
+		t.Fatalf("Run(Bash): %v", err)
+	}
+
+	events := g.LocalSink().Events()
+	reviewAdvanceIdx := -1
+	verifyAdvanceIdx := -1
+	for idx, event := range events {
+		if event.Action != audit.ActionWorkflowStageAdvanced || event.Workflow == nil {
+			continue
+		}
+		if event.Workflow["workflow_name"] != "chained-approval-process" {
+			continue
+		}
+		if event.Workflow["stage_id"] == "implement" && event.Workflow["to_stage_id"] == "review" {
+			reviewAdvanceIdx = idx
+		}
+		if event.Workflow["stage_id"] == "review" && event.Workflow["to_stage_id"] == "verify" {
+			verifyAdvanceIdx = idx
+		}
+	}
+	if reviewAdvanceIdx == -1 {
+		t.Fatal("expected implement -> review stage advance event")
+	}
+	if verifyAdvanceIdx == -1 {
+		t.Fatal("expected review -> verify stage advance event across chained approvals")
+	}
+	if reviewAdvanceIdx >= verifyAdvanceIdx {
+		t.Fatalf("expected implement->review before review->verify, got %d >= %d", reviewAdvanceIdx, verifyAdvanceIdx)
 	}
 }
 

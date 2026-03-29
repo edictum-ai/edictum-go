@@ -165,6 +165,7 @@ func (g *Guard) handleWorkflowApproval(
 		if nextPre.Action != "pending_approval" {
 			return g.handlePreDecision(ctx, env2, sess, pipe, nextPre, mode, policyVersion, toolCallable, args)
 		}
+		g.emitWorkflowEvents(ctx, env2, nextPre.WorkflowEvents, mode, policyVersion)
 		if nextPre.DecisionSource != "workflow" || nextPre.WorkflowStageID == "" {
 			return g.handleApproval(ctx, env2, sess, pipe, nextPre, mode, policyVersion, toolCallable, args)
 		}

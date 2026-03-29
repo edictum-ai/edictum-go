@@ -156,8 +156,8 @@ func (g *Guard) handlePreDecision(
 		if mode == "observe" {
 			action = audit.ActionCallWouldBlock
 		}
-		g.emitPreAudit(ctx, env2, sess, action, pre, mode, policyVersion)
 		g.emitWorkflowEvents(ctx, env2, pre.WorkflowEvents, mode, policyVersion)
+		g.emitPreAudit(ctx, env2, sess, action, pre, mode, policyVersion)
 
 		if mode == "enforce" {
 			telemetry.SetSpanError(trace.SpanFromContext(ctx), "rule blocked: "+pre.DecisionName)

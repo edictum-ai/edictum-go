@@ -96,7 +96,7 @@ stages:
 	}
 }
 
-func TestRuntime_ToolsAllowlistIsAuthoritativeWhenPresent(t *testing.T) {
+func TestSecurityRuntime_ToolsAllowlistIsAuthoritativeWhenPresent(t *testing.T) {
 	rt := mustRuntime(t, `apiVersion: edictum/v1
 kind: Workflow
 metadata:
