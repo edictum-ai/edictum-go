@@ -192,19 +192,28 @@ golangci-lint run ./...               # lint (includes govet, gosec, staticcheck
 
 > **Note:** `go vet` is included in golangci-lint via the `govet` linter and does not need to be run separately.
 
-## Pre-Merge Verification
-
-Every change MUST pass these checks before committing:
+## Pre-Merge Verification (Tier 1 — every PR)
 
 ```bash
 gofmt -l .                            # formatting check (must return empty)
 go build ./...                        # all packages build
+go test ./...                         # test suite
+golangci-lint run ./...               # lint (includes govet)
+```
+
+## Release Review (Tier 2 — before milestones)
+
+```bash
 go test -race ./...                   # full test suite with race detector
 go test -run "TestSecurity" ./...     # security boundary tests
-golangci-lint run ./...               # lint (includes govet)
 # If touching adapters:
 go test -run "TestAdapterParity" ./adapter/...
 ```
+
+Plus:
+- Full review against `.claude/agents/code-reviewer.md`
+- Cross-model adversarial review
+- Security audit
 
 ## YAML Schema
 
