@@ -143,7 +143,7 @@ func (w *SSEWatcher) Watch(ctx context.Context) error {
 }
 
 func (w *SSEWatcher) connectAndListen(ctx context.Context) error {
-	streamPath := "/api/v1/stream?env=" + neturl.QueryEscape(w.client.Env())
+	streamPath := "/v1/stream?env=" + neturl.QueryEscape(w.client.Env())
 	if bn := w.client.BundleName(); bn != "" {
 		streamPath += "&bundle_name=" + neturl.QueryEscape(bn)
 	}
@@ -268,7 +268,7 @@ func (w *SSEWatcher) handleAssignmentChange(ctx context.Context, bundle map[stri
 		return
 	}
 
-	resp, err := w.client.Get(ctx, fmt.Sprintf("/api/v1/bundles/%s/current", newName))
+	resp, err := w.client.Get(ctx, fmt.Sprintf("/v1/rulesets/%s/current", newName))
 	if err != nil {
 		log.Printf("server: failed to fetch assigned bundle %q: %v", newName, err)
 		return
@@ -280,7 +280,7 @@ func (w *SSEWatcher) handleAssignmentChange(ctx context.Context, bundle map[stri
 
 	yamlBytes, sigB64 := extractYAMLFromResponse(resp)
 	if yamlBytes == nil {
-		log.Printf("server: assigned bundle %q response missing yaml_bytes", newName)
+		log.Printf("server: assigned bundle %q response missing yaml or yaml_bytes", newName)
 		return
 	}
 
@@ -318,9 +318,13 @@ func extractYAML(bundle map[string]any) (yamlBytes []byte, sigB64 string) {
 }
 
 // extractYAMLFromResponse extracts YAML bytes from a server HTTP response
-// (e.g., /api/v1/bundles/{name}/current). Uses "yaml_bytes" (base64).
+// (e.g., /v1/rulesets/{name}/current). Tries "yaml" first, then "yaml_bytes".
 func extractYAMLFromResponse(resp map[string]any) (yamlBytes []byte, sigB64 string) {
 	sigB64, _ = resp["signature"].(string)
+
+	if raw, _ := resp["yaml"].(string); raw != "" {
+		return []byte(raw), sigB64
+	}
 
 	b64, _ := resp["yaml_bytes"].(string)
 	if b64 == "" {

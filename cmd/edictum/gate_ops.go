@@ -264,12 +264,12 @@ func runGateSync(cmd *cobra.Command, jsonFlag bool) error {
 		return nil
 	}
 
-	payload, jErr := json.Marshal(events)
+	payload, jErr := json.Marshal(map[string]any{"events": events})
 	if jErr != nil {
 		return fmt.Errorf("marshaling events: %w", jErr)
 	}
 
-	url := strings.TrimRight(cfg.ServerURL, "/") + "/api/v1/audit/ingest"
+	url := strings.TrimRight(cfg.ServerURL, "/") + "/v1/events"
 	if pErr := postJSON(url, cfg.APIKey, payload); pErr != nil {
 		return fmt.Errorf("sync failed: %w", pErr)
 	}

@@ -62,7 +62,7 @@ func (b *ApprovalBackend) RequestApproval(
 		"timeout_action": timeoutEffect,
 	}
 
-	resp, err := b.client.Post(ctx, "/api/v1/approvals", body)
+	resp, err := b.client.Post(ctx, "/v1/approvals", body)
 	if err != nil {
 		return approval.Request{}, err
 	}
@@ -78,7 +78,7 @@ func (b *ApprovalBackend) PollApprovalStatus(
 	approvalID string,
 ) (approval.Decision, error) {
 	for {
-		resp, err := b.client.Get(ctx, "/api/v1/approvals/"+approvalID)
+		resp, err := b.client.Get(ctx, "/v1/approvals/"+approvalID)
 		if err != nil {
 			// Context cancellation/timeout → return StatusTimeout
 			if ctx.Err() != nil {
@@ -101,7 +101,7 @@ func (b *ApprovalBackend) PollApprovalStatus(
 		switch status {
 		case "approved":
 			approver, _ := resp["decided_by"].(string)
-			reason, _ := resp["decision_reason"].(string)
+			reason := approvalReason(resp)
 			return approval.Decision{
 				Approved:  true,
 				Approver:  approver,
@@ -110,9 +110,9 @@ func (b *ApprovalBackend) PollApprovalStatus(
 				Timestamp: time.Now().UTC(),
 			}, nil
 
-		case "denied":
+		case "denied", "rejected":
 			approver, _ := resp["decided_by"].(string)
-			reason, _ := resp["decision_reason"].(string)
+			reason := approvalReason(resp)
 			return approval.Decision{
 				Approved:  false,
 				Approver:  approver,
@@ -121,7 +121,7 @@ func (b *ApprovalBackend) PollApprovalStatus(
 				Timestamp: time.Now().UTC(),
 			}, nil
 
-		case "timeout":
+		case "timeout", "timed_out":
 			return approval.Decision{
 				Approved:  false,
 				Status:    approval.StatusTimeout,
@@ -142,4 +142,12 @@ func (b *ApprovalBackend) PollApprovalStatus(
 		case <-timer.C:
 		}
 	}
+}
+
+func approvalReason(resp map[string]any) string {
+	if reason, _ := resp["reason"].(string); reason != "" {
+		return reason
+	}
+	reason, _ := resp["decision_reason"].(string)
+	return reason
 }

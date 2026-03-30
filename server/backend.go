@@ -26,7 +26,7 @@ func NewBackend(client *Client) *Backend {
 // Get retrieves a value from the server session store.
 // Returns ("", nil) when the key does not exist (HTTP 404).
 func (b *Backend) Get(ctx context.Context, key string) (string, error) {
-	resp, err := b.client.Get(ctx, "/api/v1/sessions/"+url.PathEscape(key))
+	resp, err := b.client.Get(ctx, "/v1/sessions/"+url.PathEscape(key))
 	if err != nil {
 		return "", err
 	}
@@ -43,14 +43,14 @@ func (b *Backend) Get(ctx context.Context, key string) (string, error) {
 
 // Set stores a value in the server session store.
 func (b *Backend) Set(ctx context.Context, key, value string) error {
-	_, err := b.client.Put(ctx, "/api/v1/sessions/"+url.PathEscape(key), map[string]string{"value": value})
+	_, err := b.client.Put(ctx, "/v1/sessions/"+url.PathEscape(key), map[string]string{"value": value})
 	return err
 }
 
 // Delete removes a key from the server session store.
 // Silently succeeds if the key does not exist (404).
 func (b *Backend) Delete(ctx context.Context, key string) error {
-	_, err := b.client.Delete(ctx, "/api/v1/sessions/"+url.PathEscape(key))
+	_, err := b.client.Delete(ctx, "/v1/sessions/"+url.PathEscape(key))
 	if err != nil {
 		var se *Error
 		if errors.As(err, &se) && se.StatusCode == 404 {
@@ -63,7 +63,7 @@ func (b *Backend) Delete(ctx context.Context, key string) error {
 
 // Increment atomically increments a counter on the server.
 func (b *Backend) Increment(ctx context.Context, key string, amount int) (int, error) {
-	resp, err := b.client.Post(ctx, "/api/v1/sessions/"+url.PathEscape(key)+"/increment", map[string]int{"amount": amount})
+	resp, err := b.client.Post(ctx, "/v1/sessions/"+url.PathEscape(key)+"/increment", map[string]int{"amount": amount})
 	if err != nil {
 		return 0, err
 	}
@@ -89,7 +89,7 @@ func (b *Backend) BatchGet(ctx context.Context, keys []string) (map[string]strin
 		return map[string]string{}, nil
 	}
 
-	resp, err := b.client.Post(ctx, "/api/v1/sessions/batch", map[string][]string{"keys": keys})
+	resp, err := b.client.Post(ctx, "/v1/sessions/batch", map[string][]string{"keys": keys})
 	if err != nil {
 		var se *Error
 		if errors.As(err, &se) && (se.StatusCode == 404 || se.StatusCode == 405) {

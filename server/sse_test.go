@@ -222,12 +222,11 @@ func TestEd25519Verification(t *testing.T) {
 
 func TestSSEAssignmentChange(t *testing.T) {
 	bundleYAML := "apiVersion: edictum/v1\nkind: Ruleset"
-	yamlB64 := base64.StdEncoding.EncodeToString([]byte(bundleYAML))
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/bundles/assigned-bundle/current" {
+		if r.URL.Path == "/v1/rulesets/assigned-bundle/current" {
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]string{"yaml_bytes": yamlB64})
+			_ = json.NewEncoder(w).Encode(map[string]string{"yaml": bundleYAML})
 			return
 		}
 		// SSE stream: send an _assignment_changed event.

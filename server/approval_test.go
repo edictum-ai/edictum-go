@@ -17,7 +17,7 @@ import (
 func TestApprovalPolling(t *testing.T) {
 	var pollCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/api/v1/approvals" {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/approvals" {
 			_ = json.NewEncoder(w).Encode(map[string]string{"id": "approval-123"})
 			return
 		}
@@ -73,9 +73,9 @@ func TestApprovalDenied(t *testing.T) {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"status":          "denied",
-			"decided_by":      "security@test.com",
-			"decision_reason": "too risky",
+			"status":     "rejected",
+			"decided_by": "security@test.com",
+			"reason":     "too risky",
 		})
 	}))
 	defer srv.Close()
@@ -98,7 +98,7 @@ func TestApprovalDenied(t *testing.T) {
 		t.Fatal(err)
 	}
 	if decision.Approved {
-		t.Error("expected approved=false for denied")
+		t.Error("expected approved=false for rejected")
 	}
 	if decision.Status != approval.StatusDenied {
 		t.Errorf("status: got %q, want %q", decision.Status, approval.StatusDenied)
@@ -111,7 +111,7 @@ func TestApprovalTimeout(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]string{"id": "approval-789"})
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "timeout"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "timed_out"})
 	}))
 	defer srv.Close()
 

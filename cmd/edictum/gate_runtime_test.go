@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -422,6 +423,85 @@ func TestGateStatusPendingCountReflectsGateRun(t *testing.T) {
 	}
 }
 
+func TestGateSyncPostsEventsToCanonicalEndpoint(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rulesPath := writeTempFile(t, "rules.yaml", validBundleYAML)
+	runner := writeGateRunnerScript(t, "cat >/dev/null\nprintf 'runner ok'\n")
+
+	initCmd := newGateInitCmd()
+	initCmd.SetOut(io.Discard)
+	initCmd.SetErr(io.Discard)
+	initCmd.SetArgs([]string{"--rules", rulesPath})
+	if err := initCmd.Execute(); err != nil {
+		t.Fatalf("gate init error: %v", err)
+	}
+
+	if _, _, err := runGateCommand(t, newGateRunCmd(), `{"tool_name":"Read","tool_input":{"path":"README.md"}}`, []string{
+		"--format", "raw",
+		"--session-id", "gate-sync-canonical-endpoint",
+		runner,
+	}); err != nil {
+		t.Fatalf("gate run error: %v", err)
+	}
+
+	type syncRequest struct {
+		Path          string
+		Authorization string
+		Body          map[string]any
+	}
+
+	reqCh := make(chan syncRequest, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode sync body: %v", err)
+		}
+		reqCh <- syncRequest{
+			Path:          r.URL.Path,
+			Authorization: r.Header.Get("Authorization"),
+			Body:          body,
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer server.Close()
+
+	cfg, err := loadGateConfigDefault()
+	if err != nil {
+		t.Fatalf("loadGateConfigDefault: %v", err)
+	}
+	cfg.ServerURL = server.URL
+	cfg.APIKey = "test-key"
+	writeGateConfigForTest(t, cfg)
+
+	syncCmd := newGateSyncCmd()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	syncCmd.SetOut(&stdout)
+	syncCmd.SetErr(&stderr)
+	syncCmd.SetArgs([]string{"--json"})
+	if err := syncCmd.Execute(); err != nil {
+		t.Fatalf("gate sync error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+
+	req := <-reqCh
+	if req.Path != "/v1/events" {
+		t.Fatalf("sync path = %q, want %q", req.Path, "/v1/events")
+	}
+	if req.Authorization != "Bearer test-key" {
+		t.Fatalf("authorization = %q, want %q", req.Authorization, "Bearer test-key")
+	}
+	events, ok := req.Body["events"].([]any)
+	if !ok {
+		t.Fatalf("sync body missing events array: %#v", req.Body)
+	}
+	if len(events) != 1 {
+		t.Fatalf("events length = %d, want 1", len(events))
+	}
+}
+
 func runGateCommand(t *testing.T, cmd *cobra.Command, input string, args []string) (string, string, error) {
 	t.Helper()
 
@@ -471,9 +551,9 @@ func newApprovalTestServer() *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/approvals":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/approvals":
 			_, _ = fmt.Fprint(w, `{"id":"approval-1"}`)
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/approvals/approval-1":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/approvals/approval-1":
 			_, _ = fmt.Fprint(w, `{"status":"approved","decided_by":"reviewer","decision_reason":"approved"}`)
 		default:
 			http.NotFound(w, r)

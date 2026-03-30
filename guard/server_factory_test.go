@@ -34,16 +34,15 @@ rules:
       message: "Cannot run rm -rf"
 `
 
-// bundleServer returns an httptest.Server that serves a valid base64-encoded
-// bundle at /api/v1/bundles/{name}/current. It validates the Authorization
+// bundleServer returns an httptest.Server that serves a valid bundle
+// at /v1/rulesets/{name}/current. It validates the Authorization
 // header and records the last request for inspection.
 func bundleServer(t *testing.T, bundleName, apiKey string) (*httptest.Server, *atomic.Value) {
 	t.Helper()
 	var lastReq atomic.Value
-	yamlB64 := base64.StdEncoding.EncodeToString([]byte(validBundleYAML))
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		lastReq.Store(r)
-		expectedPath := "/api/v1/bundles/" + bundleName + "/current"
+		expectedPath := "/v1/rulesets/" + bundleName + "/current"
 		if r.URL.Path != expectedPath {
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = w.Write([]byte(`{"detail":"not found"}`))
@@ -57,7 +56,7 @@ func bundleServer(t *testing.T, bundleName, apiKey string) (*httptest.Server, *a
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{
-			"yaml_bytes": yamlB64,
+			"yaml": validBundleYAML,
 		})
 	}))
 	return srv, &lastReq
@@ -74,8 +73,6 @@ func signedBundleServer(
 ) *httptest.Server {
 	t.Helper()
 	yamlBytes := []byte(validBundleYAML)
-	yamlB64 := base64.StdEncoding.EncodeToString(yamlBytes)
-
 	sig := ed25519.Sign(privateKey, yamlBytes)
 	sigB64 := base64.StdEncoding.EncodeToString(sig)
 
@@ -89,7 +86,7 @@ func signedBundleServer(
 	}
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		expectedPath := "/api/v1/bundles/" + bundleName + "/current"
+		expectedPath := "/v1/rulesets/" + bundleName + "/current"
 		if r.URL.Path != expectedPath {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -98,7 +95,7 @@ func signedBundleServer(
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		resp := map[string]string{"yaml_bytes": yamlB64}
+		resp := map[string]string{"yaml": validBundleYAML}
 		if !missingSig {
 			resp["signature"] = sigB64
 		}
@@ -380,23 +377,21 @@ func TestFromServer_Close(t *testing.T) {
 }
 
 func TestFromServer_ServerAssignedMode(t *testing.T) {
-	yamlB64 := base64.StdEncoding.EncodeToString([]byte(validBundleYAML))
-
 	// Gate: bundle endpoint blocks until SSE has pushed the assignment.
 	bundleReady := make(chan struct{})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/api/v1/bundles/auto-bundle/current":
+		case r.URL.Path == "/v1/rulesets/auto-bundle/current":
 			<-bundleReady // wait until SSE has pushed the assignment
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]string{"yaml_bytes": yamlB64})
+			_ = json.NewEncoder(w).Encode(map[string]string{"yaml": validBundleYAML})
 
-		case strings.HasPrefix(r.URL.Path, "/api/v1/bundles/") && strings.HasSuffix(r.URL.Path, "/current"):
+		case strings.HasPrefix(r.URL.Path, "/v1/rulesets/") && strings.HasSuffix(r.URL.Path, "/current"):
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = w.Write([]byte(`{"detail":"not found"}`))
 
-		case strings.HasPrefix(r.URL.Path, "/api/v1/stream"):
+		case strings.HasPrefix(r.URL.Path, "/v1/stream"):
 			w.Header().Set("Content-Type", "text/event-stream")
 			w.Header().Set("Cache-Control", "no-cache")
 			flusher, ok := w.(http.Flusher)
