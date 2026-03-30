@@ -162,7 +162,7 @@ func (s *AuditSink) flush(ctx context.Context) {
 	s.buffer = nil
 	s.mu.Unlock()
 
-	_, err := s.client.Post(ctx, "/api/v1/events", map[string]any{"events": events})
+	_, err := s.client.Post(ctx, "/v1/events", map[string]any{"events": events})
 	if err != nil {
 		// 4xx client errors (except 429) are permanent failures — don't retry.
 		// Restoring events on auth errors (401/403) would cause infinite retry

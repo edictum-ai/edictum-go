@@ -45,9 +45,13 @@ func startWatcher(g *Guard, client *server.Client, fc *factoryCfg) {
 }
 
 func decodeYAMLResponse(resp map[string]any) ([]byte, error) {
+	if raw, _ := resp["yaml"].(string); raw != "" {
+		return []byte(raw), nil
+	}
+
 	yamlB64, _ := resp["yaml_bytes"].(string)
 	if yamlB64 == "" {
-		return nil, fmt.Errorf("server response missing yaml_bytes")
+		return nil, fmt.Errorf("server response missing yaml or yaml_bytes")
 	}
 	decoded, err := base64.StdEncoding.DecodeString(yamlB64)
 	if err != nil {

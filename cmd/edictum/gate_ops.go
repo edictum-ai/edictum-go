@@ -215,7 +215,7 @@ func newGateSyncCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "sync",
-		Short: "Flush buffered audit events to Console",
+		Short: "Flush buffered audit events to server",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runGateSync(cmd, jsonFlag)
 		},
@@ -232,11 +232,11 @@ func runGateSync(cmd *cobra.Command, jsonFlag bool) error {
 	}
 	if cfg.ServerURL == "" {
 		if jsonFlag {
-			out := map[string]any{"synced": 0, "success": false, "error": "Console not configured"}
+			out := map[string]any{"synced": 0, "success": false, "error": "server not configured"}
 			enc := json.NewEncoder(cmd.OutOrStdout())
 			_ = enc.Encode(out)
 		} else {
-			fmt.Fprintln(cmd.ErrOrStderr(), "Console not configured. Run 'edictum gate init --server <url>'")
+			fmt.Fprintln(cmd.ErrOrStderr(), "Server not configured. Run 'edictum gate init --server <url>'")
 		}
 		return &exitError{code: 1}
 	}
@@ -264,12 +264,12 @@ func runGateSync(cmd *cobra.Command, jsonFlag bool) error {
 		return nil
 	}
 
-	payload, jErr := json.Marshal(events)
+	payload, jErr := json.Marshal(map[string]any{"events": events})
 	if jErr != nil {
 		return fmt.Errorf("marshaling events: %w", jErr)
 	}
 
-	url := strings.TrimRight(cfg.ServerURL, "/") + "/api/v1/audit/ingest"
+	url := strings.TrimRight(cfg.ServerURL, "/") + "/v1/events"
 	if pErr := postJSON(url, cfg.APIKey, payload); pErr != nil {
 		return fmt.Errorf("sync failed: %w", pErr)
 	}
@@ -297,7 +297,7 @@ func runGateSync(cmd *cobra.Command, jsonFlag bool) error {
 		return enc.Encode(out)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Synced %d events to Console.\n", len(events))
+	fmt.Fprintf(cmd.OutOrStdout(), "Synced %d events to server.\n", len(events))
 	return nil
 }
 

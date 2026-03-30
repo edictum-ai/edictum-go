@@ -197,7 +197,7 @@ func TestFailClosedOnNetworkError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = client.Get(context.Background(), "/api/v1/test")
+	_, err = client.Get(context.Background(), "/v1/test")
 	if err == nil {
 		t.Fatal("expected error on network failure, got nil")
 	}
@@ -217,7 +217,7 @@ func TestGetReturnsNilOn404(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := client.Get(context.Background(), "/api/v1/sessions/missing")
+	resp, err := client.Get(context.Background(), "/v1/sessions/missing")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

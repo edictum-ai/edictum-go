@@ -12,7 +12,7 @@ import (
 
 func TestBackendBatchGet(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/sessions/batch" {
+		if r.URL.Path == "/v1/sessions/batch" {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"values": map[string]any{
 					"key1": "val1",
@@ -48,16 +48,16 @@ func TestBackendBatchGet(t *testing.T) {
 
 func TestBackendBatchGetFallback(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/sessions/batch" {
+		if r.URL.Path == "/v1/sessions/batch" {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			_, _ = w.Write([]byte("not supported"))
 			return
 		}
-		if r.URL.Path == "/api/v1/sessions/k1" {
+		if r.URL.Path == "/v1/sessions/k1" {
 			_ = json.NewEncoder(w).Encode(map[string]string{"value": "v1"})
 			return
 		}
-		if r.URL.Path == "/api/v1/sessions/k2" {
+		if r.URL.Path == "/v1/sessions/k2" {
 			_ = json.NewEncoder(w).Encode(map[string]string{"value": "v2"})
 			return
 		}
