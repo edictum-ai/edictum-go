@@ -318,7 +318,8 @@ func extractYAML(bundle map[string]any) (yamlBytes []byte, sigB64 string) {
 }
 
 // extractYAMLFromResponse extracts YAML bytes from a server HTTP response
-// (e.g., /v1/rulesets/{name}/current). Tries "yaml" first, then "yaml_bytes".
+// (e.g., /v1/rulesets/{name}/current). The canonical API returns raw "yaml",
+// while old servers may still return base64 "yaml_bytes" during transition.
 func extractYAMLFromResponse(resp map[string]any) (yamlBytes []byte, sigB64 string) {
 	sigB64, _ = resp["signature"].(string)
 

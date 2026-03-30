@@ -449,6 +449,7 @@ func TestGateSyncPostsEventsToCanonicalEndpoint(t *testing.T) {
 		Path          string
 		Authorization string
 		Body          map[string]any
+		Err           string
 	}
 
 	reqCh := make(chan syncRequest, 1)
@@ -457,7 +458,9 @@ func TestGateSyncPostsEventsToCanonicalEndpoint(t *testing.T) {
 
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decode sync body: %v", err)
+			reqCh <- syncRequest{Err: fmt.Sprintf("decode sync body: %v", err)}
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		reqCh <- syncRequest{
 			Path:          r.URL.Path,
@@ -487,6 +490,9 @@ func TestGateSyncPostsEventsToCanonicalEndpoint(t *testing.T) {
 	}
 
 	req := <-reqCh
+	if req.Err != "" {
+		t.Fatal(req.Err)
+	}
 	if req.Path != "/v1/events" {
 		t.Fatalf("sync path = %q, want %q", req.Path, "/v1/events")
 	}

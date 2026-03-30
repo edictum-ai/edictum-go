@@ -28,9 +28,9 @@ func TestApprovalPolling(t *testing.T) {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"status":          "approved",
-			"decided_by":      "admin@test.com",
-			"decision_reason": "looks good",
+			"status":     "approved",
+			"decided_by": "admin@test.com",
+			"reason":     "looks good",
 		})
 	}))
 	defer srv.Close()
