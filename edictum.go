@@ -5,4 +5,4 @@
 package edictum
 
 // VERSION is the current library version.
-const VERSION = "0.2.0"
+const VERSION = "0.3.0"
