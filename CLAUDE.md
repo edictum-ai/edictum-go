@@ -6,7 +6,7 @@
 
 Runtime rule enforcement for AI agent tool calls. Deterministic pipeline: checks, output checks, session rules, principal-aware enforcement. Framework adapters (Google ADK Go, LangChainGo, Eino, Anthropic SDK Go, Genkit). Zero runtime deps in core. Full feature parity with the Python library (`edictum` on PyPI, v0.15.0).
 
-Current version: 0.2.0 (`github.com/edictum-ai/edictum-go`)
+Current version: 0.3.0 (`github.com/edictum-ai/edictum-go`)
 
 ## THE ONE RULE
 

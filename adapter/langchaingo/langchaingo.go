@@ -15,7 +15,7 @@ import (
 )
 
 // VERSION is the adapter version.
-const VERSION = "0.2.0"
+const VERSION = "0.3.0"
 
 // Adapter wraps a guard.Guard for use with LangChainGo tool functions.
 type Adapter struct {
