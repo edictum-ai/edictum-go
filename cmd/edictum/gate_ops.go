@@ -9,8 +9,26 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/edictum-ai/edictum-go/workflow"
 	"github.com/spf13/cobra"
 )
+
+type gateWorkflowStatus struct {
+	SessionID       string
+	SessionSource   string
+	WorkflowName    string
+	CurrentStage    string
+	ProgressCurrent int
+	ProgressTotal   int
+	CompletedStages []string
+	NextStage       string
+	Resolved        bool
+	StateExists     bool
+	ResolutionError string
+	Hint            string
+}
+
+const gateWorkflowResolutionHint = "run from a git worktree, create .edictum-session, or pass --session-id"
 
 func newGateInstallCmd() *cobra.Command {
 	return &cobra.Command{
@@ -53,21 +71,25 @@ func newGateUninstallCmd() *cobra.Command {
 }
 
 func newGateStatusCmd() *cobra.Command {
-	var jsonFlag bool
+	var (
+		jsonFlag  bool
+		sessionID string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show current gate configuration and health",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runGateStatus(cmd, jsonFlag)
+			return runGateStatus(cmd, jsonFlag, sessionID)
 		},
 	}
 
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "output as JSON")
+	cmd.Flags().StringVar(&sessionID, "session-id", "", "inspect a specific workflow session")
 	return cmd
 }
 
-func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
+func runGateStatus(cmd *cobra.Command, jsonFlag bool, explicitSessionID string) error {
 	cfg, err := loadGateConfigDefault()
 	if err != nil {
 		return fmt.Errorf("no gate config found — run 'edictum gate init' first: %w", err)
@@ -93,8 +115,17 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 			installed = []string{}
 		}
 		workflowName := ""
+		var workflowStatus *gateWorkflowStatus
 		if cfg.WorkflowPath != "" {
-			workflowName = filepath.Base(cfg.WorkflowPath)
+			ctx, err := loadGateWorkflowContext("", cfg.WorkflowExecEnabled, true)
+			if err != nil {
+				return err
+			}
+			workflowName = ctx.workflowName
+			workflowStatus, err = resolveGateWorkflowStatus(ctx, explicitSessionID)
+			if err != nil {
+				return err
+			}
 		}
 		out := map[string]any{
 			"rules":                 ruleNames,
@@ -104,6 +135,32 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 			"server_url":            cfg.ServerURL,
 			"pending_events":        pending,
 			"installed":             installed,
+		}
+		if workflowStatus != nil {
+			out["workflow_session_resolved"] = workflowStatus.Resolved
+			out["workflow_state_exists"] = workflowStatus.StateExists
+			if workflowStatus.Resolved {
+				out["workflow_session_id"] = workflowStatus.SessionID
+				out["workflow_session_source"] = workflowStatus.SessionSource
+			}
+			if workflowStatus.Resolved && workflowStatus.StateExists {
+				out["workflow_current_stage"] = workflowStatus.CurrentStage
+				out["workflow_progress"] = map[string]int{
+					"current": workflowStatus.ProgressCurrent,
+					"total":   workflowStatus.ProgressTotal,
+				}
+				out["workflow_completed_stages"] = workflowStatus.CompletedStages
+				if workflowStatus.NextStage != "" {
+					out["workflow_next_stage"] = workflowStatus.NextStage
+				}
+			}
+			if !workflowStatus.Resolved {
+				out["workflow_resolution_error"] = workflowStatus.ResolutionError
+				out["workflow_resolution_hint"] = workflowStatus.Hint
+			}
+			if workflowStatus.Resolved && !workflowStatus.StateExists {
+				out["workflow_state"] = "not_started"
+			}
 		}
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		return enc.Encode(out)
@@ -121,11 +178,20 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 	} else {
 		fmt.Fprintln(w, "  Rules:     none")
 	}
+	var workflowStatus *gateWorkflowStatus
 	if cfg.WorkflowPath != "" {
+		ctx, err := loadGateWorkflowContext("", cfg.WorkflowExecEnabled, true)
+		if err != nil {
+			return err
+		}
 		hash := fileHash(cfg.WorkflowPath)
-		fmt.Fprintf(w, "  Workflow:  %s (sha256: %s)\n", filepath.Base(cfg.WorkflowPath), hash)
+		fmt.Fprintf(w, "  Workflow:  %s (sha256: %s)\n", ctx.workflowName, hash)
 		if cfg.WorkflowExecEnabled {
 			fmt.Fprintln(w, "  Workflow exec(...): enabled")
+		}
+		workflowStatus, err = resolveGateWorkflowStatus(ctx, explicitSessionID)
+		if err != nil {
+			return err
 		}
 	} else {
 		fmt.Fprintln(w, "  Workflow:  none")
@@ -144,6 +210,35 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool) error {
 		fmt.Fprintf(w, "  Installed: %s\n", strings.Join(installed, ", "))
 	} else {
 		fmt.Fprintln(w, "  Installed: none")
+	}
+	if workflowStatus != nil {
+		fmt.Fprintln(w, "  Workflow State:")
+		fmt.Fprintf(w, "    Workflow: %s\n", workflowStatus.WorkflowName)
+		if !workflowStatus.Resolved {
+			fmt.Fprintln(w, "    Session: unresolved")
+			fmt.Fprintf(w, "    Reason: %s\n", workflowStatus.ResolutionError)
+			fmt.Fprintf(w, "    Hint: %s\n", workflowStatus.Hint)
+			return nil
+		}
+		if workflowStatus.SessionSource == "flag" {
+			fmt.Fprintf(w, "    Session: %s\n", workflowStatus.SessionID)
+		} else {
+			fmt.Fprintf(w, "    Session: %s (%s)\n", workflowStatus.SessionID, workflowStatus.SessionSource)
+		}
+		if !workflowStatus.StateExists {
+			fmt.Fprintln(w, "    State: not started yet")
+			return nil
+		}
+		fmt.Fprintf(w, "    Stage: %s\n", workflowStatus.CurrentStage)
+		fmt.Fprintf(w, "    Progress: %d/%d\n", workflowStatus.ProgressCurrent, workflowStatus.ProgressTotal)
+		if len(workflowStatus.CompletedStages) > 0 {
+			fmt.Fprintf(w, "    Completed: %s\n", strings.Join(workflowStatus.CompletedStages, " -> "))
+		} else {
+			fmt.Fprintln(w, "    Completed: none")
+		}
+		if workflowStatus.NextStage != "" {
+			fmt.Fprintf(w, "    Next: %s\n", workflowStatus.NextStage)
+		}
 	}
 
 	return nil
@@ -312,4 +407,66 @@ func fileHash(path string) string {
 		return h[:12] + "..."
 	}
 	return h
+}
+
+func resolveGateWorkflowStatus(ctx *gateWorkflowRuntimeContext, explicitSessionID string) (*gateWorkflowStatus, error) {
+	status := &gateWorkflowStatus{
+		WorkflowName:  ctx.workflowName,
+		ProgressTotal: len(ctx.runtime.Definition().Stages),
+		Hint:          gateWorkflowResolutionHint,
+	}
+
+	sessionID := ""
+	if resolvedSessionID, resolvedSource, resolveErr := resolveSessionID(explicitSessionID, ctx.workflowName); resolveErr != nil {
+		status.ResolutionError = resolveErr.Error()
+	} else {
+		status.Resolved = true
+		status.SessionID = resolvedSessionID
+		status.SessionSource = resolvedSource
+		sessionID = resolvedSessionID
+	}
+	if !status.Resolved {
+		return status, nil
+	}
+
+	snapshot, snapshotErr := loadGateWorkflowStateSnapshot(ctx.runtime, sessionID)
+	if snapshotErr != nil {
+		return nil, snapshotErr
+	}
+	if !snapshot.Exists {
+		return status, nil
+	}
+
+	status.StateExists = true
+	state := snapshot.State
+
+	progressCurrent := len(state.CompletedStages)
+	currentStage := state.ActiveStage
+	if currentStage == "" {
+		currentStage = "completed"
+		progressCurrent = len(ctx.runtime.Definition().Stages)
+	} else {
+		progressCurrent++
+	}
+
+	status.CurrentStage = currentStage
+	status.ProgressCurrent = progressCurrent
+	status.CompletedStages = append([]string{}, state.CompletedStages...)
+	status.NextStage = nextWorkflowStage(ctx.runtime.Definition(), state)
+	return status, nil
+}
+
+func nextWorkflowStage(def workflow.Definition, state workflow.State) string {
+	if state.ActiveStage == "" {
+		return ""
+	}
+	idx, ok := def.StageIndex(state.ActiveStage)
+	if !ok {
+		return ""
+	}
+	next := idx + 1
+	if next >= len(def.Stages) {
+		return ""
+	}
+	return def.Stages[next].ID
 }
