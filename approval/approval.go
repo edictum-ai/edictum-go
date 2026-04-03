@@ -13,8 +13,12 @@ type Status string
 const (
 	StatusPending  Status = "pending"
 	StatusApproved Status = "approved"
-	StatusDenied   Status = "denied"
-	StatusTimeout  Status = "timeout"
+	// StatusDenied uses "denied" for wire compatibility with the Python reference
+	// implementation (edictum.approval.ApprovalStatus.DENIED). The Go style guide
+	// prefers "blocked" — a full rename requires cross-SDK coordination.
+	// See: terminology enforcement table in CLAUDE.md.
+	StatusDenied  Status = "denied"
+	StatusTimeout Status = "timeout"
 )
 
 // Request represents a pending approval request.

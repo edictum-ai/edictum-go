@@ -49,9 +49,12 @@ func AllActions() []Action {
 
 // Event represents a structured audit event.
 type Event struct {
-	SchemaVersion         string           `json:"schema_version"`
-	Timestamp             time.Time        `json:"timestamp"`
-	SessionID             string           `json:"session_id,omitempty"`
+	SchemaVersion string    `json:"schema_version"`
+	Timestamp     time.Time `json:"timestamp"`
+	SessionID     string    `json:"session_id,omitempty"`
+	// ParentSessionID is populated by SDK integrations that support parent->child
+	// session lineage. The guard pipeline does not set this field; it is passed
+	// through from adapter configuration.
 	ParentSessionID       string           `json:"parent_session_id,omitempty"`
 	RunID                 string           `json:"run_id"`
 	CallID                string           `json:"call_id"`

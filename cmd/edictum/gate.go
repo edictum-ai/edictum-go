@@ -278,9 +278,13 @@ func runGateReset(cmd *cobra.Command, stageID, explicitSessionID, workflowOverri
 	if err != nil {
 		return fmt.Errorf("session create: %w", err)
 	}
-	if _, err := ctx.runtime.Reset(context.Background(), sess, stageID); err != nil {
+	// CLI reset operates outside guard.Run(); audit event emission requires a guard context.
+	// Reset events are emitted when Reset() is called through guard.Run() in SDK integrations.
+	resetEvents, err := ctx.runtime.Reset(context.Background(), sess, stageID)
+	if err != nil {
 		return err
 	}
+	_ = resetEvents // See comment above: CLI path intentionally does not emit these.
 
 	w := cmd.OutOrStdout()
 	fmt.Fprintf(w, "Reset workflow to stage: %s\n", stageID)
