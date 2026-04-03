@@ -13,6 +13,7 @@ func (g *Guard) emitWorkflowEvents(
 	env2 toolcall.ToolCall,
 	events []map[string]any,
 	mode, policyVersion string,
+	sessionID string,
 ) {
 	for _, record := range events {
 		actionName, _ := record["action"].(string)
@@ -22,6 +23,7 @@ func (g *Guard) emitWorkflowEvents(
 		}
 
 		event := audit.NewEvent()
+		event.SessionID = sessionID
 		event.RunID = env2.RunID()
 		event.CallID = env2.CallID()
 		event.CallIndex = env2.CallIndex()

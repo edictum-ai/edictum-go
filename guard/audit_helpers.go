@@ -22,6 +22,7 @@ func (g *Guard) emitPreAudit(
 	attempts, _ := sess.AttemptCount(ctx)
 	execs, _ := sess.ExecutionCount(ctx)
 	event := audit.NewEvent()
+	event.SessionID = sess.ID()
 	event.RunID = env2.RunID()
 	event.CallID = env2.CallID()
 	event.CallIndex = env2.CallIndex()
@@ -61,6 +62,7 @@ func (g *Guard) emitPostAudit(
 	attempts, _ := sess.AttemptCount(ctx)
 	execs, _ := sess.ExecutionCount(ctx)
 	event := audit.NewEvent()
+	event.SessionID = sess.ID()
 	event.RunID = env2.RunID()
 	event.CallID = env2.CallID()
 	event.CallIndex = env2.CallIndex()
@@ -92,12 +94,14 @@ func (g *Guard) emitObservedDenials(
 	env2 toolcall.ToolCall,
 	pre pipeline.PreDecision,
 	policyVersion string,
+	sessionID string,
 ) {
 	for _, cr := range pre.RulesEvaluated {
 		observed, _ := cr["observed"].(bool)
 		passed, _ := cr["passed"].(bool)
 		if observed && !passed {
 			event := audit.NewEvent()
+			event.SessionID = sessionID
 			event.RunID = env2.RunID()
 			event.CallID = env2.CallID()
 			event.CallIndex = env2.CallIndex()
@@ -131,6 +135,7 @@ func (g *Guard) emitObserveResults(
 	env2 toolcall.ToolCall,
 	pre pipeline.PreDecision,
 	policyVersion string,
+	sessionID string,
 ) {
 	for _, sr := range pre.ObserveResults {
 		passed, _ := sr["passed"].(bool)
@@ -139,6 +144,7 @@ func (g *Guard) emitObserveResults(
 			action = audit.ActionCallWouldBlock
 		}
 		event := audit.NewEvent()
+		event.SessionID = sessionID
 		event.RunID = env2.RunID()
 		event.CallID = env2.CallID()
 		event.CallIndex = env2.CallIndex()

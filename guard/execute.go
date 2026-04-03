@@ -80,7 +80,7 @@ func (g *Guard) executeAndPost(
 		postAction = audit.ActionCallFailed
 	}
 	g.emitPostAudit(ctx, env2, sess, postAction, post, mode, policyVersion)
-	g.emitWorkflowEvents(ctx, env2, workflowEvents, mode, policyVersion)
+	g.emitWorkflowEvents(ctx, env2, workflowEvents, mode, policyVersion, sess.ID())
 
 	if !toolSuccess {
 		// Tool execution failed — Error status reflects the tool outcome.

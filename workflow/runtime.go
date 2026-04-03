@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/edictum-ai/edictum-go/audit"
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
@@ -78,18 +79,22 @@ func (r *Runtime) State(ctx context.Context, sess *session.Session) (State, erro
 }
 
 // Reset moves the workflow back to the named stage and clears later state.
-func (r *Runtime) Reset(ctx context.Context, sess *session.Session, stageID string) error {
+// Returns progress events suitable for audit emission (same pattern as
+// RecordResult). The caller should emit the returned events through the
+// guard's workflow event emitter.
+func (r *Runtime) Reset(ctx context.Context, sess *session.Session, stageID string) ([]map[string]any, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	idx, ok := r.definition.StageIndex(stageID)
 	if !ok {
-		return fmt.Errorf("workflow: unknown reset stage %q", stageID)
+		return nil, fmt.Errorf("workflow: unknown reset stage %q", stageID)
 	}
 	state, err := loadState(ctx, sess, r.definition)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	previousStage := state.ActiveStage
 	state.ActiveStage = stageID
 	state.CompletedStages = append([]string{}, stageIDs(r.definition.Stages[:idx])...)
 	for _, stage := range r.definition.Stages[idx:] {
@@ -99,7 +104,16 @@ func (r *Runtime) Reset(ctx context.Context, sess *session.Session, stageID stri
 	if idx == 0 {
 		state.Evidence.Reads = []string{}
 	}
-	return saveState(ctx, sess, r.definition, state)
+	if err := saveState(ctx, sess, r.definition, state); err != nil {
+		return nil, err
+	}
+	event := workflowProgressEvent(
+		string(audit.ActionWorkflowStateUpdated),
+		r.definition.Metadata.Name,
+		previousStage,
+		stageID,
+	)
+	return []map[string]any{event}, nil
 }
 
 // RecordApproval persists approval for a boundary stage.

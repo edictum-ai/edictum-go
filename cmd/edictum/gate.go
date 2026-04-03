@@ -278,7 +278,7 @@ func runGateReset(cmd *cobra.Command, stageID, explicitSessionID, workflowOverri
 	if err != nil {
 		return fmt.Errorf("session create: %w", err)
 	}
-	if err := ctx.runtime.Reset(context.Background(), sess, stageID); err != nil {
+	if _, err := ctx.runtime.Reset(context.Background(), sess, stageID); err != nil {
 		return err
 	}
 

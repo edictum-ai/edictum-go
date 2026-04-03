@@ -108,8 +108,15 @@ stages:
 		t.Fatalf("unexpected decision after approval: %+v", decision)
 	}
 
-	if err := rt.Reset(ctx, sess, "implement"); err != nil {
+	resetEvents, err := rt.Reset(ctx, sess, "implement")
+	if err != nil {
 		t.Fatalf("Reset: %v", err)
+	}
+	if len(resetEvents) != 1 {
+		t.Fatalf("expected 1 reset event, got %d", len(resetEvents))
+	}
+	if resetEvents[0]["action"] != "workflow_state_updated" {
+		t.Fatalf("expected workflow_state_updated action, got %v", resetEvents[0]["action"])
 	}
 	state, err := rt.State(ctx, sess)
 	if err != nil {
