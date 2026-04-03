@@ -21,11 +21,29 @@ type Evaluation struct {
 
 // State is the persisted workflow instance state.
 type State struct {
-	SessionID       string            `json:"session_id" yaml:"session_id"`
-	ActiveStage     string            `json:"active_stage" yaml:"active_stage"`
-	CompletedStages []string          `json:"completed_stages" yaml:"completed_stages"`
-	Approvals       map[string]string `json:"approvals" yaml:"approvals"`
-	Evidence        Evidence          `json:"evidence" yaml:"evidence"`
+	SessionID         string            `json:"session_id" yaml:"session_id"`
+	ActiveStage       string            `json:"active_stage" yaml:"active_stage"`
+	CompletedStages   []string          `json:"completed_stages" yaml:"completed_stages"`
+	Approvals         map[string]string `json:"approvals" yaml:"approvals"`
+	Evidence          Evidence          `json:"evidence" yaml:"evidence"`
+	BlockedReason     string            `json:"blocked_reason,omitempty" yaml:"blocked_reason,omitempty"`
+	PendingApproval   *PendingApproval  `json:"pending_approval,omitempty" yaml:"pending_approval,omitempty"`
+	LastBlockedAction *BlockedAction    `json:"last_blocked_action,omitempty" yaml:"last_blocked_action,omitempty"`
+}
+
+// PendingApproval describes an outstanding approval gate.
+type PendingApproval struct {
+	Required bool   `json:"required" yaml:"required"`
+	StageID  string `json:"stage_id" yaml:"stage_id"`
+	Message  string `json:"message,omitempty" yaml:"message,omitempty"`
+}
+
+// BlockedAction records the most recent tool call that was blocked.
+type BlockedAction struct {
+	Tool      string `json:"tool" yaml:"tool"`
+	Summary   string `json:"summary,omitempty" yaml:"summary,omitempty"`
+	Message   string `json:"message,omitempty" yaml:"message,omitempty"`
+	Timestamp string `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
 }
 
 // Evidence is the persisted runtime evidence set.

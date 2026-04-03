@@ -27,6 +27,7 @@ type Request struct {
 	timeoutEffect string
 	principal     any // any: avoids import cycle with toolcall.Principal; concrete type varies by integration
 	metadata      map[string]any
+	sessionID     string
 	createdAt     time.Time
 }
 
@@ -53,6 +54,9 @@ func (r Request) Principal() any { return r.principal }
 func (r Request) Metadata() map[string]any {
 	return deepCopyMap(r.metadata)
 }
+
+// SessionID returns the session ID associated with the request.
+func (r Request) SessionID() string { return r.sessionID }
 
 // CreatedAt returns the time the request was created.
 func (r Request) CreatedAt() time.Time { return r.createdAt }
@@ -89,6 +93,11 @@ func WithTimeout(d time.Duration) RequestOption {
 // WithTimeoutEffect sets the effect when timeout occurs ("block" or "allow").
 func WithTimeoutEffect(effect string) RequestOption {
 	return func(r *Request) { r.timeoutEffect = effect }
+}
+
+// WithSessionID sets the session ID on an approval request.
+func WithSessionID(id string) RequestOption {
+	return func(r *Request) { r.sessionID = id }
 }
 
 // deepCopyMap recursively copies a map[string]any.

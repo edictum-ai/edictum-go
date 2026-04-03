@@ -28,6 +28,7 @@ const (
 	// excluded from AllActions(), which preserves the canonical parity set.
 	ActionWorkflowStageAdvanced Action = "workflow_stage_advanced"
 	ActionWorkflowCompleted     Action = "workflow_completed"
+	ActionWorkflowStateUpdated  Action = "workflow_state_updated"
 )
 
 // AllActions returns all 10 canonical audit actions.
@@ -50,6 +51,8 @@ func AllActions() []Action {
 type Event struct {
 	SchemaVersion         string           `json:"schema_version"`
 	Timestamp             time.Time        `json:"timestamp"`
+	SessionID             string           `json:"session_id,omitempty"`
+	ParentSessionID       string           `json:"parent_session_id,omitempty"`
 	RunID                 string           `json:"run_id"`
 	CallID                string           `json:"call_id"`
 	CallIndex             int              `json:"call_index"`

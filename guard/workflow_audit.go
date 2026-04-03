@@ -40,6 +40,8 @@ func (g *Guard) emitWorkflowEvents(
 			event.Action = audit.ActionWorkflowStageAdvanced
 		case string(audit.ActionWorkflowCompleted):
 			event.Action = audit.ActionWorkflowCompleted
+		case string(audit.ActionWorkflowStateUpdated):
+			event.Action = audit.ActionWorkflowStateUpdated
 		default:
 			continue
 		}
