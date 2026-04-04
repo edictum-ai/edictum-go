@@ -155,7 +155,7 @@ func (s *AuditSink) mapEvent(event *audit.Event) map[string]any {
 		"call_index":              event.CallIndex,
 		"parent_call_id":          nullableString(event.ParentCallID),
 		"session_id":              event.SessionID,
-		"parent_session_id":       event.ParentSessionID,
+		"parent_session_id":       nullableString(event.ParentSessionID),
 		"workflow":                optionalMapValue(event.Workflow),
 		"tool_success":            boolValue(event.ToolSuccess),
 		"postconditions_passed":   boolValue(event.PostconditionsPassed),

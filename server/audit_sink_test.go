@@ -197,6 +197,9 @@ func TestAuditSinkMapEventPreservesNilOptionalFields(t *testing.T) {
 	if got := payload["parent_call_id"]; got != nil {
 		t.Fatalf("parent_call_id = %#v, want nil", got)
 	}
+	if got := payload["parent_session_id"]; got != nil {
+		t.Fatalf("parent_session_id = %#v, want nil", got)
+	}
 	if got := payload["tool_success"]; got != nil {
 		t.Fatalf("tool_success = %#v, want nil", got)
 	}
