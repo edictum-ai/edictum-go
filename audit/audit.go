@@ -81,7 +81,9 @@ type Event struct {
 	PolicyError           bool             `json:"policy_error"`
 }
 
-const schemaVersion = "0.5.0"
+// Keep the 0.4.x audit schema version for additive event fields so existing
+// consumers that ignore unknown fields remain wire-compatible.
+const schemaVersion = "0.4.0"
 
 // NewEvent creates a new Event with defaults.
 func NewEvent() Event {
