@@ -131,6 +131,8 @@ func (s *AuditSink) BufferCallIDs() []string {
 }
 
 func (s *AuditSink) mapEvent(event *audit.Event) map[string]any {
+	// bundle_name only existed inside the legacy nested payload shape.
+	// The /v1/events contract does not include it as a top-level field.
 	return map[string]any{
 		"schema_version":          event.SchemaVersion,
 		"call_id":                 event.CallID,
@@ -154,7 +156,7 @@ func (s *AuditSink) mapEvent(event *audit.Event) map[string]any {
 		"parent_call_id":          nullableString(event.ParentCallID),
 		"session_id":              event.SessionID,
 		"parent_session_id":       event.ParentSessionID,
-		"workflow":                deepcopy.Map(event.Workflow),
+		"workflow":                optionalMapValue(event.Workflow),
 		"tool_success":            boolValue(event.ToolSuccess),
 		"postconditions_passed":   boolValue(event.PostconditionsPassed),
 		"duration_ms":             durationMsValue(event.DurationMs),
@@ -180,6 +182,8 @@ func copyPrincipal(principal any) any {
 	if pm, ok := principal.(map[string]any); ok {
 		return deepcopy.Map(pm)
 	}
+	// Non-map principals are a pre-existing limitation: the current
+	// audit payload only deep-copies generic records, not arbitrary structs.
 	return principal
 }
 
@@ -192,6 +196,13 @@ func copyRecords(records []map[string]any) []map[string]any {
 		cp[i] = deepcopy.Map(record)
 	}
 	return cp
+}
+
+func optionalMapValue(value map[string]any) any {
+	if value == nil {
+		return nil
+	}
+	return deepcopy.Map(value)
 }
 
 func nullableString(value string) any {
@@ -208,16 +219,16 @@ func boolValue(value *bool) any {
 	return *value
 }
 
-func durationMsValue(value *float64) int64 {
+func durationMsValue(value *float64) any {
 	if value == nil {
-		return 0
+		return nil
 	}
 	return int64(math.Round(*value))
 }
 
-func intValue(value *int) int {
+func intValue(value *int) any {
 	if value == nil {
-		return 0
+		return nil
 	}
 	return *value
 }

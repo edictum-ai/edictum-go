@@ -168,6 +168,60 @@ func TestAuditSinkMapEventUsesFlatV1WireFormat(t *testing.T) {
 	}
 }
 
+func TestAuditSinkMapEventPreservesNilOptionalFields(t *testing.T) {
+	client, err := NewClient(ClientConfig{
+		BaseURL: "https://api.edictum.test",
+		APIKey:  "key",
+		AgentID: "agent-123",
+		Env:     "staging",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sink := NewAuditSink(client)
+	defer sink.Close(context.Background())
+
+	event := audit.NewEvent()
+	event.Timestamp = time.Date(2026, 4, 4, 10, 31, 0, 0, time.UTC)
+	event.CallID = "call-nil"
+	event.ToolName = "Read"
+	event.ToolArgs = map[string]any{"path": "spec.md"}
+
+	payload := sink.mapEvent(&event)
+
+	if got := payload["environment"]; got != "staging" {
+		t.Fatalf("environment = %#v, want %q", got, "staging")
+	}
+	if got := payload["parent_call_id"]; got != nil {
+		t.Fatalf("parent_call_id = %#v, want nil", got)
+	}
+	if got := payload["tool_success"]; got != nil {
+		t.Fatalf("tool_success = %#v, want nil", got)
+	}
+	if got := payload["postconditions_passed"]; got != nil {
+		t.Fatalf("postconditions_passed = %#v, want nil", got)
+	}
+	if got := payload["duration_ms"]; got != nil {
+		t.Fatalf("duration_ms = %#v, want nil", got)
+	}
+	if got := payload["error"]; got != nil {
+		t.Fatalf("error = %#v, want nil", got)
+	}
+	if got := payload["result_summary"]; got != nil {
+		t.Fatalf("result_summary = %#v, want nil", got)
+	}
+	if got := payload["session_attempt_count"]; got != nil {
+		t.Fatalf("session_attempt_count = %#v, want nil", got)
+	}
+	if got := payload["session_execution_count"]; got != nil {
+		t.Fatalf("session_execution_count = %#v, want nil", got)
+	}
+	if got := payload["workflow"]; got != nil {
+		t.Fatalf("workflow = %#v, want nil", got)
+	}
+}
+
 // --- 10.7: Audit batching ---
 
 func TestAuditSinkBatching(t *testing.T) {
