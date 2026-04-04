@@ -114,7 +114,7 @@ func (s *State) markBlocked(env toolcall.ToolCall, reason string) bool {
 	}
 	next := BlockedAction{
 		Tool:      env.ToolName(),
-		Summary:   actionSummary(env),
+		Summary:   blockedActionSummary(env),
 		Message:   reason,
 		Timestamp: actionTimestamp(env),
 	}
@@ -128,10 +128,10 @@ func (s *State) markBlocked(env toolcall.ToolCall, reason string) bool {
 
 func (s *State) markPendingApproval(stageID, message string) bool {
 	// Approval pauses are not hard workflow blocks, so they update the
-	// pending approval snapshot without overwriting the last hard block.
+	// pending approval snapshot without overwriting the last blocked action.
 	changed := false
-	if s.BlockedReason != message {
-		s.BlockedReason = message
+	if s.BlockedReason != "" {
+		s.BlockedReason = ""
 		changed = true
 	}
 	if !s.PendingApproval.Required || s.PendingApproval.StageID != stageID || s.PendingApproval.Message != message {

@@ -99,7 +99,7 @@ func (g *Guard) resolveApproval(
 		return false, approval.Decision{}, ctx, fmt.Errorf("request approval: %w", err)
 	}
 
-	g.emitPreAudit(ctx, env2, sess, audit.ActionCallApprovalRequested, pre, mode, policyVersion)
+	g.emitPreAudit(ctx, env2, sess, audit.ActionCallAsked, pre, mode, policyVersion)
 
 	decision, err := g.approvalBackend.PollApprovalStatus(ctx, req.ApprovalID())
 	if err != nil {

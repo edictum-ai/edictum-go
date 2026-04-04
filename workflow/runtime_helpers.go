@@ -32,6 +32,16 @@ func workflowProgressEvent(action string, def Definition, state State) map[strin
 	}
 }
 
+func workflowStageAdvancedEvent(def Definition, state State, stageID, toStageID string) map[string]any {
+	workflow := workflowSnapshot(def, state)
+	workflow["stage_id"] = stageID
+	workflow["to_stage_id"] = toStageID
+	return map[string]any{
+		"action":   "workflow_stage_advanced",
+		"workflow": workflow,
+	}
+}
+
 func workflowGateMetadata(def Definition, state State, kind, condition string, passed bool, evidence string, extra map[string]any) map[string]any {
 	metadata := workflowSnapshot(def, state)
 	metadata["gate_kind"] = kind
@@ -82,6 +92,7 @@ func workflowSnapshot(def Definition, state State) map[string]any {
 		"name":             def.Metadata.Name,
 		"active_stage":     state.ActiveStage,
 		"completed_stages": toAnySlice(state.CompletedStages),
+		"blocked_reason":   nil,
 		"pending_approval": map[string]any{"required": state.PendingApproval.Required},
 	}
 	if def.Metadata.Version != "" {
@@ -123,6 +134,13 @@ func actionSummary(env toolcall.ToolCall) string {
 	default:
 		return env.ToolName()
 	}
+}
+
+func blockedActionSummary(env toolcall.ToolCall) string {
+	if env.BashCommand() != "" {
+		return env.BashCommand()
+	}
+	return actionSummary(env)
 }
 
 func bashCommandSummary(command string) string {

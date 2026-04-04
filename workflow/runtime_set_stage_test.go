@@ -45,8 +45,8 @@ func TestRuntime_SetStageMovesWithoutClearingEvidenceOrApprovals(t *testing.T) {
 	if pending["required"] != false {
 		t.Fatalf("SetStage pending_approval.required = %#v, want false", pending["required"])
 	}
-	if _, ok := workflowData["blocked_reason"]; ok {
-		t.Fatalf("SetStage blocked_reason = %#v, want omitted", workflowData["blocked_reason"])
+	if blocked, ok := workflowData["blocked_reason"]; !ok || blocked != nil {
+		t.Fatalf("SetStage blocked_reason = %#v, want nil", blocked)
 	}
 	if _, ok := workflowData["last_blocked_action"]; ok {
 		t.Fatalf("SetStage last_blocked_action = %#v, want omitted", workflowData["last_blocked_action"])

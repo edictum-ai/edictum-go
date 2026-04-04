@@ -13,16 +13,16 @@ type Action string
 
 // Audit action types. 10 canonical actions matching Python parity.
 const (
-	ActionCallBlocked           Action = "call_blocked"
-	ActionCallWouldBlock        Action = "call_would_block"
-	ActionCallAllowed           Action = "call_allowed"
-	ActionCallExecuted          Action = "call_executed"
-	ActionCallFailed            Action = "call_failed"
-	ActionPostconditionWarning  Action = "postcondition_warning"
-	ActionCallApprovalRequested Action = "call_approval_requested"
-	ActionCallApprovalGranted   Action = "call_approval_granted"
-	ActionCallApprovalBlocked   Action = "call_approval_blocked"
-	ActionCallApprovalTimeout   Action = "call_approval_timeout"
+	ActionCallBlocked          Action = "call_blocked"
+	ActionCallWouldBlock       Action = "call_would_block"
+	ActionCallAllowed          Action = "call_allowed"
+	ActionCallExecuted         Action = "call_executed"
+	ActionCallFailed           Action = "call_failed"
+	ActionPostconditionWarning Action = "postcondition_warning"
+	ActionCallAsked            Action = "call_asked"
+	ActionCallApprovalGranted  Action = "call_approval_granted"
+	ActionCallApprovalBlocked  Action = "call_approval_blocked"
+	ActionCallApprovalTimeout  Action = "call_approval_timeout"
 
 	// Additional workflow progress events for M1. These are intentionally
 	// excluded from AllActions(), which preserves the canonical parity set.
@@ -30,6 +30,9 @@ const (
 	ActionWorkflowCompleted     Action = "workflow_completed"
 	ActionWorkflowStateUpdated  Action = "workflow_state_updated"
 )
+
+// ActionCallApprovalRequested is a legacy alias for ActionCallAsked.
+const ActionCallApprovalRequested Action = ActionCallAsked
 
 // AllActions returns all 10 canonical audit actions.
 func AllActions() []Action {
@@ -40,7 +43,7 @@ func AllActions() []Action {
 		ActionCallExecuted,
 		ActionCallFailed,
 		ActionPostconditionWarning,
-		ActionCallApprovalRequested,
+		ActionCallAsked,
 		ActionCallApprovalGranted,
 		ActionCallApprovalBlocked,
 		ActionCallApprovalTimeout,

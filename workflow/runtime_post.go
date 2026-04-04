@@ -18,6 +18,9 @@ func (r *Runtime) advanceAfterSuccess(ctx context.Context, state *State, stageID
 	if _, hasNext := r.nextIndex(stage.ID); hasNext {
 		return nil, nil
 	}
+	if len(stage.Exit) == 0 && stage.Approval == nil {
+		return nil, nil
+	}
 	if len(stage.Exit) > 0 {
 		if _, blocked, err := r.evaluateGates(ctx, stage, *state, env, stage.Exit); err != nil {
 			return nil, err

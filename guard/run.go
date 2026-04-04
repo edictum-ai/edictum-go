@@ -65,6 +65,7 @@ func (g *Guard) Run(
 	g.mu.RUnlock()
 
 	cfg := &runConfig{sessionID: sid, environment: env}
+	applyContextRunOptions(ctx, cfg)
 	for _, opt := range opts {
 		opt(cfg)
 	}
@@ -190,8 +191,8 @@ func (g *Guard) handlePreDecision(
 	} else {
 		// Emit CALL_WOULD_BLOCK for per-rule observed denials
 		g.emitObservedDenials(ctx, env2, sess, pre, policyVersion)
-		g.emitPreAudit(ctx, env2, sess, audit.ActionCallAllowed, pre, mode, policyVersion)
 		g.emitWorkflowEvents(ctx, env2, sess, pre.WorkflowEvents, mode, policyVersion)
+		g.emitPreAudit(ctx, env2, sess, audit.ActionCallAllowed, pre, mode, policyVersion)
 		g.telemetry.RecordAllowed(ctx, env2.ToolName())
 		g.fireOnAllow(env2)
 	}

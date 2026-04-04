@@ -31,6 +31,9 @@ func TestWorkflowGateMetadataUsesSnapshotSchema(t *testing.T) {
 	if _, ok := metadata["stage_id"]; ok {
 		t.Fatalf("unexpected legacy stage_id key: %#v", metadata["stage_id"])
 	}
+	if blocked, ok := metadata["blocked_reason"]; !ok || blocked != nil {
+		t.Fatalf("blocked_reason = %#v, want nil", blocked)
+	}
 	if metadata["gate_kind"] != "approval" {
 		t.Fatalf("gate_kind = %#v, want %q", metadata["gate_kind"], "approval")
 	}

@@ -152,8 +152,8 @@ stages:
 	if err != nil {
 		t.Fatalf("State before approval: %v", err)
 	}
-	if state.BlockedReason != "Approval required before push" {
-		t.Fatalf("BlockedReason = %q, want %q", state.BlockedReason, "Approval required before push")
+	if state.BlockedReason != "" {
+		t.Fatalf("BlockedReason = %q, want empty", state.BlockedReason)
 	}
 	if !state.PendingApproval.Required {
 		t.Fatal("expected PendingApproval.Required to be true")
@@ -226,7 +226,7 @@ stages:
 	}
 }
 
-func TestRuntime_BashSummariesDropArgs(t *testing.T) {
+func TestRuntime_BashSummariesPreserveBlockedCommandAndDropRecordedArgs(t *testing.T) {
 	ctx := context.Background()
 
 	blockedRuntime := mustRuntime(t, `apiVersion: edictum/v1
@@ -253,8 +253,8 @@ stages:
 	if blockedState.LastBlockedAction == nil {
 		t.Fatal("expected LastBlockedAction for blocked bash")
 	}
-	if blockedState.LastBlockedAction.Summary != "deploy" {
-		t.Fatalf("LastBlockedAction.Summary = %q, want %q", blockedState.LastBlockedAction.Summary, "deploy")
+	if blockedState.LastBlockedAction.Summary != "deploy --token=SECRET123" {
+		t.Fatalf("LastBlockedAction.Summary = %q, want %q", blockedState.LastBlockedAction.Summary, "deploy --token=SECRET123")
 	}
 
 	allowedRuntime := mustRuntime(t, `apiVersion: edictum/v1
