@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"log"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/edictum-ai/edictum-go/audit"
+	"github.com/edictum-ai/edictum-go/internal/deepcopy"
 )
 
 const defaultMaxBufferSize = 10_000
@@ -130,24 +132,94 @@ func (s *AuditSink) BufferCallIDs() []string {
 
 func (s *AuditSink) mapEvent(event *audit.Event) map[string]any {
 	return map[string]any{
-		"call_id":   event.CallID,
-		"agent_id":  s.client.agentID,
-		"tool_name": event.ToolName,
-		"decision":  string(event.Action),
-		"mode":      event.Mode,
-		"timestamp": event.Timestamp.Format(time.RFC3339Nano),
-		"payload": map[string]any{
-			"tool_args":       event.ToolArgs,
-			"side_effect":     event.SideEffect,
-			"environment":     event.Environment,
-			"principal":       event.Principal,
-			"decision_source": event.DecisionSource,
-			"decision_name":   event.DecisionName,
-			"reason":          event.Reason,
-			"policy_version":  event.PolicyVersion,
-			"bundle_name":     s.client.BundleName(),
-		},
+		"schema_version":          event.SchemaVersion,
+		"call_id":                 event.CallID,
+		"agent_id":                s.client.agentID,
+		"tool_name":               event.ToolName,
+		"tool_args":               deepcopy.Map(event.ToolArgs),
+		"side_effect":             event.SideEffect,
+		"environment":             eventEnvironment(event, s.client.Env()),
+		"principal":               copyPrincipal(event.Principal),
+		"action":                  string(event.Action),
+		"decision_source":         event.DecisionSource,
+		"decision_name":           event.DecisionName,
+		"reason":                  event.Reason,
+		"hooks_evaluated":         copyRecords(event.HooksEvaluated),
+		"rules_evaluated":         copyRecords(event.RulesEvaluated),
+		"mode":                    event.Mode,
+		"policy_version":          event.PolicyVersion,
+		"timestamp":               event.Timestamp.Format(time.RFC3339Nano),
+		"run_id":                  event.RunID,
+		"call_index":              event.CallIndex,
+		"parent_call_id":          nullableString(event.ParentCallID),
+		"session_id":              event.SessionID,
+		"parent_session_id":       event.ParentSessionID,
+		"workflow":                deepcopy.Map(event.Workflow),
+		"tool_success":            boolValue(event.ToolSuccess),
+		"postconditions_passed":   boolValue(event.PostconditionsPassed),
+		"duration_ms":             durationMsValue(event.DurationMs),
+		"error":                   nullableString(event.Error),
+		"result_summary":          nullableString(event.ResultSummary),
+		"session_attempt_count":   intValue(event.SessionAttemptCount),
+		"session_execution_count": intValue(event.SessionExecutionCount),
+		"policy_error":            event.PolicyError,
 	}
+}
+
+func eventEnvironment(event *audit.Event, fallback string) string {
+	if event.Environment != "" {
+		return event.Environment
+	}
+	return fallback
+}
+
+func copyPrincipal(principal any) any {
+	if principal == nil {
+		return nil
+	}
+	if pm, ok := principal.(map[string]any); ok {
+		return deepcopy.Map(pm)
+	}
+	return principal
+}
+
+func copyRecords(records []map[string]any) []map[string]any {
+	if records == nil {
+		return nil
+	}
+	cp := make([]map[string]any, len(records))
+	for i, record := range records {
+		cp[i] = deepcopy.Map(record)
+	}
+	return cp
+}
+
+func nullableString(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func boolValue(value *bool) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func durationMsValue(value *float64) int64 {
+	if value == nil {
+		return 0
+	}
+	return int64(math.Round(*value))
+}
+
+func intValue(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 // flush grabs the buffer under the lock and sends events outside the lock.

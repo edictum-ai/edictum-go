@@ -13,6 +13,161 @@ import (
 	"github.com/edictum-ai/edictum-go/audit"
 )
 
+func TestAuditSinkMapEventUsesFlatV1WireFormat(t *testing.T) {
+	client, err := NewClient(ClientConfig{
+		BaseURL: "https://api.edictum.test",
+		APIKey:  "key",
+		AgentID: "agent-123",
+		Env:     "staging",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sink := NewAuditSink(client)
+	defer sink.Close(context.Background())
+
+	event := audit.NewEvent()
+	event.Timestamp = time.Date(2026, 4, 4, 10, 30, 0, 123_000_000, time.UTC)
+	event.RunID = "run-1"
+	event.SessionID = "child-session"
+	event.ParentSessionID = "parent-session"
+	event.CallID = "call-1"
+	event.CallIndex = 7
+	event.ParentCallID = "call-0"
+	event.ToolName = "Bash"
+	event.ToolArgs = map[string]any{
+		"command": "go test ./...",
+		"nested":  map[string]any{"path": "server/audit_sink.go"},
+	}
+	event.SideEffect = "filesystem"
+	event.Principal = map[string]any{
+		"user_id": "mimi",
+		"claims":  map[string]any{"role": "admin"},
+	}
+	event.Action = audit.ActionCallFailed
+	event.DecisionSource = "workflow"
+	event.DecisionName = "local-review"
+	event.Reason = "Approval required before push"
+	event.Workflow = map[string]any{
+		"name":             "coding-guard",
+		"version":          "2026-04-03",
+		"active_stage":     "local-review",
+		"completed_stages": []any{"read-context", "implement"},
+		"pending_approval": map[string]any{"required": true, "stage_id": "local-review", "message": "Review the diff"},
+		"last_blocked_action": map[string]any{
+			"tool":      "Bash",
+			"summary":   "git push origin HEAD",
+			"message":   "Approval required before push",
+			"timestamp": "2026-04-04T10:29:00Z",
+		},
+	}
+	event.HooksEvaluated = []map[string]any{{"name": "pre-run", "passed": true}}
+	event.RulesEvaluated = []map[string]any{{"id": "wf-1", "passed": false}}
+	toolSuccess := false
+	postconditionsPassed := false
+	durationMs := 125.7
+	attempts := 4
+	executions := 2
+	event.ToolSuccess = &toolSuccess
+	event.PostconditionsPassed = &postconditionsPassed
+	event.DurationMs = &durationMs
+	event.Error = "exit status 1"
+	event.ResultSummary = "go test ./..."
+	event.SessionAttemptCount = &attempts
+	event.SessionExecutionCount = &executions
+	event.Mode = "enforce"
+	event.PolicyVersion = "sha256:abc123"
+	event.PolicyError = true
+
+	payload := sink.mapEvent(&event)
+
+	if _, ok := payload["payload"]; ok {
+		t.Fatalf("legacy payload wrapper should be absent: %#v", payload)
+	}
+	if _, ok := payload["decision"]; ok {
+		t.Fatalf("legacy decision field should be absent: %#v", payload)
+	}
+	if got := payload["schema_version"]; got != event.SchemaVersion {
+		t.Fatalf("schema_version = %#v, want %q", got, event.SchemaVersion)
+	}
+	if got := payload["agent_id"]; got != "agent-123" {
+		t.Fatalf("agent_id = %#v, want %q", got, "agent-123")
+	}
+	if got := payload["environment"]; got != "staging" {
+		t.Fatalf("environment = %#v, want %q", got, "staging")
+	}
+	if got := payload["action"]; got != string(event.Action) {
+		t.Fatalf("action = %#v, want %q", got, event.Action)
+	}
+	if got := payload["run_id"]; got != event.RunID {
+		t.Fatalf("run_id = %#v, want %q", got, event.RunID)
+	}
+	if got := payload["parent_call_id"]; got != event.ParentCallID {
+		t.Fatalf("parent_call_id = %#v, want %q", got, event.ParentCallID)
+	}
+	if got := payload["session_id"]; got != event.SessionID {
+		t.Fatalf("session_id = %#v, want %q", got, event.SessionID)
+	}
+	if got := payload["parent_session_id"]; got != event.ParentSessionID {
+		t.Fatalf("parent_session_id = %#v, want %q", got, event.ParentSessionID)
+	}
+	if got := payload["timestamp"]; got != event.Timestamp.Format(time.RFC3339Nano) {
+		t.Fatalf("timestamp = %#v, want %q", got, event.Timestamp.Format(time.RFC3339Nano))
+	}
+	if got := payload["duration_ms"]; got != int64(126) {
+		t.Fatalf("duration_ms = %#v, want %d", got, int64(126))
+	}
+	if got := payload["session_attempt_count"]; got != attempts {
+		t.Fatalf("session_attempt_count = %#v, want %d", got, attempts)
+	}
+	if got := payload["session_execution_count"]; got != executions {
+		t.Fatalf("session_execution_count = %#v, want %d", got, executions)
+	}
+
+	toolArgs, ok := payload["tool_args"].(map[string]any)
+	if !ok {
+		t.Fatalf("tool_args type = %T, want map[string]any", payload["tool_args"])
+	}
+	if toolArgs["command"] != "go test ./..." {
+		t.Fatalf("tool_args.command = %#v, want %q", toolArgs["command"], "go test ./...")
+	}
+	workflow, ok := payload["workflow"].(map[string]any)
+	if !ok {
+		t.Fatalf("workflow type = %T, want map[string]any", payload["workflow"])
+	}
+	if workflow["active_stage"] != "local-review" {
+		t.Fatalf("workflow.active_stage = %#v, want %q", workflow["active_stage"], "local-review")
+	}
+	pending, ok := workflow["pending_approval"].(map[string]any)
+	if !ok {
+		t.Fatalf("pending_approval type = %T, want map[string]any", workflow["pending_approval"])
+	}
+	if pending["required"] != true {
+		t.Fatalf("pending_approval.required = %#v, want true", pending["required"])
+	}
+	rules, ok := payload["rules_evaluated"].([]map[string]any)
+	if !ok {
+		t.Fatalf("rules_evaluated type = %T, want []map[string]any", payload["rules_evaluated"])
+	}
+	if len(rules) != 1 || rules[0]["id"] != "wf-1" {
+		t.Fatalf("rules_evaluated = %#v, want rule wf-1", rules)
+	}
+
+	toolArgs["command"] = "mutated"
+	workflow["active_stage"] = "mutated"
+	rules[0]["passed"] = true
+	if event.ToolArgs["command"] != "go test ./..." {
+		t.Fatalf("event.ToolArgs mutated through payload: %#v", event.ToolArgs)
+	}
+	if event.Workflow["active_stage"] != "local-review" {
+		t.Fatalf("event.Workflow mutated through payload: %#v", event.Workflow)
+	}
+	if got, _ := event.RulesEvaluated[0]["passed"].(bool); got {
+		t.Fatalf("event.RulesEvaluated mutated through payload: %#v", event.RulesEvaluated)
+	}
+}
+
 // --- 10.7: Audit batching ---
 
 func TestAuditSinkBatching(t *testing.T) {
