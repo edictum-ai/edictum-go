@@ -89,21 +89,46 @@ func (r *Runtime) Snapshot(ctx context.Context, sess *session.Session) (map[stri
 	return workflowSnapshot(r.definition, state), nil
 }
 
+func (r *Runtime) stageMoveState(ctx context.Context, sess *session.Session, stageID, action string) (State, int, error) {
+	idx, ok := r.definition.StageIndex(stageID)
+	if !ok {
+		return State{}, 0, fmt.Errorf("workflow: unknown %s stage %q", action, stageID)
+	}
+	state, err := loadState(ctx, sess, r.definition)
+	if err != nil {
+		return State{}, 0, err
+	}
+	state.ActiveStage = stageID
+	state.CompletedStages = append([]string{}, stageIDs(r.definition.Stages[:idx])...)
+	return state, idx, nil
+}
+
+// SetStage moves the workflow pointer to the named stage without clearing
+// approvals or previously recorded evidence.
+func (r *Runtime) SetStage(ctx context.Context, sess *session.Session, stageID string) ([]map[string]any, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	state, _, err := r.stageMoveState(ctx, sess, stageID, "set")
+	if err != nil {
+		return nil, err
+	}
+	state.clearStageMoveStatus()
+	if err := saveState(ctx, sess, r.definition, state); err != nil {
+		return nil, err
+	}
+	return []map[string]any{workflowProgressEvent("workflow_state_updated", r.definition, state)}, nil
+}
+
 // Reset moves the workflow back to the named stage and clears later state.
 func (r *Runtime) Reset(ctx context.Context, sess *session.Session, stageID string) ([]map[string]any, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	idx, ok := r.definition.StageIndex(stageID)
-	if !ok {
-		return nil, fmt.Errorf("workflow: unknown reset stage %q", stageID)
-	}
-	state, err := loadState(ctx, sess, r.definition)
+	state, idx, err := r.stageMoveState(ctx, sess, stageID, "reset")
 	if err != nil {
 		return nil, err
 	}
-	state.ActiveStage = stageID
-	state.CompletedStages = append([]string{}, stageIDs(r.definition.Stages[:idx])...)
 	for _, stage := range r.definition.Stages[idx:] {
 		delete(state.Approvals, stage.ID)
 		delete(state.Evidence.StageCalls, stage.ID)
@@ -111,9 +136,8 @@ func (r *Runtime) Reset(ctx context.Context, sess *session.Session, stageID stri
 	if idx == 0 {
 		state.Evidence.Reads = []string{}
 	}
-	state.clearWorkflowStatus()
+	state.clearStageMoveStatus()
 	state.LastRecordedEvidence = nil
-	state.LastBlockedAction = nil
 	if err := saveState(ctx, sess, r.definition, state); err != nil {
 		return nil, err
 	}

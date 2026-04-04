@@ -99,6 +99,15 @@ func (s *State) clearWorkflowStatus() bool {
 	return changed
 }
 
+func (s *State) clearStageMoveStatus() bool {
+	changed := s.clearWorkflowStatus()
+	if s.LastBlockedAction != nil {
+		s.LastBlockedAction = nil
+		changed = true
+	}
+	return changed
+}
+
 func (s *State) markBlocked(env toolcall.ToolCall, reason string) bool {
 	changed := s.clearWorkflowStatus()
 	s.BlockedReason = reason
