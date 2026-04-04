@@ -19,14 +19,20 @@ import (
 type RunOption func(*runConfig)
 
 type runConfig struct {
-	sessionID   string
-	environment string
-	principal   *toolcall.Principal
+	sessionID       string
+	parentSessionID string
+	environment     string
+	principal       *toolcall.Principal
 }
 
 // WithSessionID overrides the guard's session ID for this call.
 func WithSessionID(id string) RunOption {
 	return func(c *runConfig) { c.sessionID = id }
+}
+
+// WithParentSessionID records caller lineage on emitted audit events.
+func WithParentSessionID(id string) RunOption {
+	return func(c *runConfig) { c.parentSessionID = id }
 }
 
 // WithRunEnvironment overrides the guard's environment for this call.
@@ -63,6 +69,14 @@ func (g *Guard) Run(
 		opt(cfg)
 	}
 
+	metadata := map[string]any(nil)
+	if cfg.parentSessionID != "" {
+		if _, err := session.New(cfg.parentSessionID, session.NewMemoryBackend()); err != nil {
+			return nil, fmt.Errorf("invalid parent session ID: %w", err)
+		}
+		metadata = map[string]any{parentSessionIDMetadataKey: cfg.parentSessionID}
+	}
+
 	sess, err := session.New(cfg.sessionID, backend)
 	if err != nil {
 		return nil, fmt.Errorf("session create: %w", err)
@@ -82,6 +96,7 @@ func (g *Guard) Run(
 		RunID:       cfg.sessionID,
 		Environment: cfg.environment,
 		Principal:   principal,
+		Metadata:    metadata,
 		Registry:    registry,
 	})
 	if err != nil {

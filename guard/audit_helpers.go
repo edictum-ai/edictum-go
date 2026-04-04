@@ -10,6 +10,8 @@ import (
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
+const parentSessionIDMetadataKey = "parent_session_id"
+
 // emitPreAudit emits a pre-execution audit event.
 func (g *Guard) emitPreAudit(
 	ctx context.Context,
@@ -24,6 +26,7 @@ func (g *Guard) emitPreAudit(
 	event := audit.NewEvent()
 	event.RunID = env2.RunID()
 	event.SessionID = sess.ID()
+	event.ParentSessionID = parentSessionID(env2)
 	event.CallID = env2.CallID()
 	event.CallIndex = env2.CallIndex()
 	event.ParentCallID = env2.ParentCallID()
@@ -64,6 +67,7 @@ func (g *Guard) emitPostAudit(
 	event := audit.NewEvent()
 	event.RunID = env2.RunID()
 	event.SessionID = sess.ID()
+	event.ParentSessionID = parentSessionID(env2)
 	event.CallID = env2.CallID()
 	event.CallIndex = env2.CallIndex()
 	event.ParentCallID = env2.ParentCallID()
@@ -103,6 +107,7 @@ func (g *Guard) emitObservedDenials(
 			event := audit.NewEvent()
 			event.RunID = env2.RunID()
 			event.SessionID = sess.ID()
+			event.ParentSessionID = parentSessionID(env2)
 			event.CallID = env2.CallID()
 			event.CallIndex = env2.CallIndex()
 			event.ParentCallID = env2.ParentCallID()
@@ -146,6 +151,7 @@ func (g *Guard) emitObserveResults(
 		event := audit.NewEvent()
 		event.RunID = env2.RunID()
 		event.SessionID = sess.ID()
+		event.ParentSessionID = parentSessionID(env2)
 		event.CallID = env2.CallID()
 		event.CallIndex = env2.CallIndex()
 		event.ParentCallID = env2.ParentCallID()
@@ -170,4 +176,11 @@ func (g *Guard) emitObserveResults(
 			log.Printf("audit emit error: %v", err)
 		}
 	}
+}
+
+func parentSessionID(env2 toolcall.ToolCall) string {
+	if value, ok := env2.Metadata()[parentSessionIDMetadataKey].(string); ok {
+		return value
+	}
+	return ""
 }

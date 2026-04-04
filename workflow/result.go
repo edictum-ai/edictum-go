@@ -100,17 +100,23 @@ func (s *State) clearWorkflowStatus() bool {
 }
 
 func (s *State) markBlocked(env toolcall.ToolCall, reason string) bool {
-	s.clearWorkflowStatus()
-	if s.BlockedReason != reason {
-		s.BlockedReason = reason
+	changed := s.clearWorkflowStatus()
+	s.BlockedReason = reason
+	if reason != "" {
+		changed = true
 	}
-	s.LastBlockedAction = &BlockedAction{
+	next := BlockedAction{
 		Tool:      env.ToolName(),
 		Summary:   actionSummary(env),
 		Message:   reason,
 		Timestamp: actionTimestamp(env),
 	}
-	return true
+	if s.LastBlockedAction == nil || *s.LastBlockedAction != next {
+		blocked := next
+		s.LastBlockedAction = &blocked
+		changed = true
+	}
+	return changed
 }
 
 func (s *State) markPendingApproval(stageID, message string) bool {

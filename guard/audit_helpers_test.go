@@ -42,6 +42,7 @@ func TestEmitPreAuditUsesSessionID(t *testing.T) {
 	env2, err := toolcall.CreateToolCall(ctx, toolcall.CreateToolCallOptions{
 		ToolName: "Read",
 		RunID:    "run-456",
+		Metadata: map[string]any{parentSessionIDMetadataKey: "parent-789"},
 	})
 	if err != nil {
 		t.Fatalf("CreateToolCall: %v", err)
@@ -59,6 +60,9 @@ func TestEmitPreAuditUsesSessionID(t *testing.T) {
 	if events[0].SessionID != "session-123" {
 		t.Fatalf("SessionID = %q, want %q", events[0].SessionID, "session-123")
 	}
+	if events[0].ParentSessionID != "parent-789" {
+		t.Fatalf("ParentSessionID = %q, want %q", events[0].ParentSessionID, "parent-789")
+	}
 }
 
 func TestEmitWorkflowEventsUsesSessionID(t *testing.T) {
@@ -71,6 +75,7 @@ func TestEmitWorkflowEventsUsesSessionID(t *testing.T) {
 	env2, err := toolcall.CreateToolCall(ctx, toolcall.CreateToolCallOptions{
 		ToolName: "Bash",
 		RunID:    "run-456",
+		Metadata: map[string]any{parentSessionIDMetadataKey: "parent-789"},
 	})
 	if err != nil {
 		t.Fatalf("CreateToolCall: %v", err)
@@ -95,5 +100,8 @@ func TestEmitWorkflowEventsUsesSessionID(t *testing.T) {
 	}
 	if events[0].SessionID != "session-123" {
 		t.Fatalf("SessionID = %q, want %q", events[0].SessionID, "session-123")
+	}
+	if events[0].ParentSessionID != "parent-789" {
+		t.Fatalf("ParentSessionID = %q, want %q", events[0].ParentSessionID, "parent-789")
 	}
 }

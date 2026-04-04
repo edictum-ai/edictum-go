@@ -117,6 +117,8 @@ func workflowSnapshot(def Definition, state State) map[string]any {
 func actionSummary(env toolcall.ToolCall) string {
 	switch {
 	case env.BashCommand() != "":
+		// Preserve the raw command here for parity with the persisted StageCalls
+		// evidence trail; audit arg redaction still happens separately.
 		return env.BashCommand()
 	case env.FilePath() != "":
 		return env.FilePath()

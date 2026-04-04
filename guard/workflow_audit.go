@@ -26,6 +26,7 @@ func (g *Guard) emitWorkflowEvents(
 		event := audit.NewEvent()
 		event.RunID = env2.RunID()
 		event.SessionID = sess.ID()
+		event.ParentSessionID = parentSessionID(env2)
 		event.CallID = env2.CallID()
 		event.CallIndex = env2.CallIndex()
 		event.ParentCallID = env2.ParentCallID()

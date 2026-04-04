@@ -167,6 +167,57 @@ func TestRunWithSessionID(t *testing.T) {
 	}
 }
 
+func TestRunWithParentSessionID(t *testing.T) {
+	g := New()
+	ctx := context.Background()
+	result, err := g.Run(
+		ctx,
+		"Read",
+		nil,
+		nopCallable,
+		WithSessionID("child-session"),
+		WithParentSessionID("parent-session"),
+	)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if result != "ok" {
+		t.Errorf("result: got %v, want 'ok'", result)
+	}
+
+	events := g.LocalSink().Events()
+	if len(events) < 2 {
+		t.Fatalf("events len = %d, want at least 2", len(events))
+	}
+	for _, event := range events {
+		if event.SessionID != "child-session" {
+			t.Fatalf("SessionID = %q, want %q", event.SessionID, "child-session")
+		}
+		if event.ParentSessionID != "parent-session" {
+			t.Fatalf("ParentSessionID = %q, want %q", event.ParentSessionID, "parent-session")
+		}
+	}
+}
+
+func TestRunWithInvalidParentSessionID(t *testing.T) {
+	g := New()
+	ctx := context.Background()
+	_, err := g.Run(
+		ctx,
+		"Read",
+		nil,
+		nopCallable,
+		WithSessionID("child-session"),
+		WithParentSessionID("../bad"),
+	)
+	if err == nil {
+		t.Fatal("expected invalid parent session ID error")
+	}
+	if !strings.Contains(err.Error(), "invalid parent session ID") {
+		t.Fatalf("error = %v, want invalid parent session ID", err)
+	}
+}
+
 func TestRunWithPrincipalOverride(t *testing.T) {
 	var captured *toolcall.Principal
 	g := New(

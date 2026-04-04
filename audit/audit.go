@@ -81,7 +81,7 @@ type Event struct {
 	PolicyError           bool             `json:"policy_error"`
 }
 
-const schemaVersion = "0.4.0"
+const schemaVersion = "0.5.0"
 
 // NewEvent creates a new Event with defaults.
 func NewEvent() Event {

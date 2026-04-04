@@ -12,8 +12,8 @@ import (
 
 func TestEvent_SchemaVersion(t *testing.T) {
 	e := NewEvent()
-	if e.SchemaVersion != "0.4.0" {
-		t.Fatalf("SchemaVersion = %q, want %q", e.SchemaVersion, "0.4.0")
+	if e.SchemaVersion != "0.5.0" {
+		t.Fatalf("SchemaVersion = %q, want %q", e.SchemaVersion, "0.5.0")
 	}
 }
 
