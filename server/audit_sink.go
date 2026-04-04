@@ -223,7 +223,16 @@ func durationMsValue(value *float64) any {
 	if value == nil {
 		return nil
 	}
-	return int64(math.Round(*value))
+	if math.IsNaN(*value) || math.IsInf(*value, 0) {
+		return nil
+	}
+
+	rounded := math.Round(*value)
+	const maxInt64Exclusive = float64(1 << 63)
+	if rounded < -maxInt64Exclusive || rounded >= maxInt64Exclusive {
+		return nil
+	}
+	return int64(rounded)
 }
 
 func intValue(value *int) any {

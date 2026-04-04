@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -219,6 +220,34 @@ func TestAuditSinkMapEventPreservesNilOptionalFields(t *testing.T) {
 	}
 	if got := payload["workflow"]; got != nil {
 		t.Fatalf("workflow = %#v, want nil", got)
+	}
+}
+
+func TestDurationMsValueHandlesInvalidFloats(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value float64
+		want  any
+	}{
+		{name: "rounds finite values", value: 125.7, want: int64(126)},
+		{name: "accepts min int64 boundary", value: -math.Ldexp(1, 63), want: int64(math.MinInt64)},
+		{name: "rejects nan", value: math.NaN(), want: nil},
+		{name: "rejects positive infinity", value: math.Inf(1), want: nil},
+		{name: "rejects negative infinity", value: math.Inf(-1), want: nil},
+		{name: "rejects positive overflow", value: math.Ldexp(1, 63), want: nil},
+		{name: "rejects negative overflow", value: math.Nextafter(-math.Ldexp(1, 63), math.Inf(-1)), want: nil},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := durationMsValue(&tc.value)
+			if got != tc.want {
+				t.Fatalf("durationMsValue(%v) = %#v, want %#v", tc.value, got, tc.want)
+			}
+		})
 	}
 }
 
