@@ -71,7 +71,7 @@ func (g *Guard) Run(
 
 	metadata := map[string]any(nil)
 	if cfg.parentSessionID != "" {
-		if _, err := session.New(cfg.parentSessionID, session.NewMemoryBackend()); err != nil {
+		if err := session.ValidateID(cfg.parentSessionID); err != nil {
 			return nil, fmt.Errorf("invalid parent session ID: %w", err)
 		}
 		metadata = map[string]any{parentSessionIDMetadataKey: cfg.parentSessionID}

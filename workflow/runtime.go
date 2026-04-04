@@ -12,7 +12,8 @@ import (
 // Runtime evaluates and persists one workflow definition.
 type Runtime struct {
 	definition Definition
-	// mu serializes all session-backed state reads and writes.
+	// mu protects runtime state and serializes session-backed writes while
+	// still allowing concurrent state and snapshot reads.
 	mu         sync.RWMutex
 	evaluators map[string]FactEvaluator
 }

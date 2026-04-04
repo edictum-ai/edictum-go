@@ -226,6 +226,69 @@ stages:
 	}
 }
 
+func TestRuntime_BashSummariesDropArgs(t *testing.T) {
+	ctx := context.Background()
+
+	blockedRuntime := mustRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: blocked-bash
+stages:
+  - id: read-context
+    tools: [Read]
+`)
+	blockedSession := newWorkflowSession(t, "wf-bash-blocked")
+	blockedCall := makeCall(t, "Bash", map[string]any{"command": "deploy --token=SECRET123"})
+	decision, err := blockedRuntime.Evaluate(ctx, blockedSession, blockedCall)
+	if err != nil {
+		t.Fatalf("Evaluate(blocked bash): %v", err)
+	}
+	if decision.Action != ActionBlock {
+		t.Fatalf("blocked decision = %+v, want block", decision)
+	}
+	blockedState, err := blockedRuntime.State(ctx, blockedSession)
+	if err != nil {
+		t.Fatalf("State(blocked bash): %v", err)
+	}
+	if blockedState.LastBlockedAction == nil {
+		t.Fatal("expected LastBlockedAction for blocked bash")
+	}
+	if blockedState.LastBlockedAction.Summary != "deploy" {
+		t.Fatalf("LastBlockedAction.Summary = %q, want %q", blockedState.LastBlockedAction.Summary, "deploy")
+	}
+
+	allowedRuntime := mustRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: allowed-bash
+stages:
+  - id: implement
+    tools: [Bash]
+`)
+	allowedSession := newWorkflowSession(t, "wf-bash-allowed")
+	allowedCall := makeCall(t, "Bash", map[string]any{"command": "deploy --token=SECRET123"})
+	decision, err = allowedRuntime.Evaluate(ctx, allowedSession, allowedCall)
+	if err != nil {
+		t.Fatalf("Evaluate(allowed bash): %v", err)
+	}
+	if decision.Action != ActionAllow || decision.StageID != "implement" {
+		t.Fatalf("allowed decision = %+v, want allow in implement", decision)
+	}
+	if _, err := allowedRuntime.RecordResult(ctx, allowedSession, decision.StageID, allowedCall); err != nil {
+		t.Fatalf("RecordResult(allowed bash): %v", err)
+	}
+	allowedState, err := allowedRuntime.State(ctx, allowedSession)
+	if err != nil {
+		t.Fatalf("State(allowed bash): %v", err)
+	}
+	if allowedState.LastRecordedEvidence == nil {
+		t.Fatal("expected LastRecordedEvidence for allowed bash")
+	}
+	if allowedState.LastRecordedEvidence.Summary != "deploy" {
+		t.Fatalf("LastRecordedEvidence.Summary = %q, want %q", allowedState.LastRecordedEvidence.Summary, "deploy")
+	}
+}
+
 func mustRuntime(t *testing.T, content string) *Runtime {
 	t.Helper()
 	return mustRuntimeWithOpts(t, content)

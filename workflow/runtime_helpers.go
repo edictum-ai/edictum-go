@@ -117,14 +117,20 @@ func workflowSnapshot(def Definition, state State) map[string]any {
 func actionSummary(env toolcall.ToolCall) string {
 	switch {
 	case env.BashCommand() != "":
-		// Preserve the raw command here for parity with the persisted StageCalls
-		// evidence trail; audit arg redaction still happens separately.
-		return env.BashCommand()
+		return bashCommandSummary(env.BashCommand())
 	case env.FilePath() != "":
 		return env.FilePath()
 	default:
 		return env.ToolName()
 	}
+}
+
+func bashCommandSummary(command string) string {
+	fields := strings.Fields(command)
+	if len(fields) == 0 {
+		return command
+	}
+	return fields[0]
 }
 
 func actionTimestamp(env toolcall.ToolCall) string {

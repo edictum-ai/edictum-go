@@ -29,10 +29,15 @@ type Session struct {
 
 // New creates a new Session with the given ID and backend.
 func New(sessionID string, backend StorageBackend) (*Session, error) {
-	if err := validateKeyComponent(sessionID); err != nil {
+	if err := ValidateID(sessionID); err != nil {
 		return nil, fmt.Errorf("invalid session ID: %w", err)
 	}
 	return &Session{sessionID: sessionID, backend: backend}, nil
+}
+
+// ValidateID validates a session identifier for safe storage and transport.
+func ValidateID(sessionID string) error {
+	return validateKeyComponent(sessionID)
 }
 
 // ID returns the session ID.

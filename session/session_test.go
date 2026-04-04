@@ -498,3 +498,12 @@ func TestParity_KeyScheme(t *testing.T) {
 		t.Errorf("tool:Bash key value = %q, want %q", v, "1")
 	}
 }
+
+func TestValidateID(t *testing.T) {
+	if err := ValidateID("parent-session"); err != nil {
+		t.Fatalf("ValidateID(valid): %v", err)
+	}
+	if err := ValidateID("../bad"); err == nil {
+		t.Fatal("expected ValidateID to reject path separators")
+	}
+}

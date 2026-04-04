@@ -78,7 +78,7 @@ func recordResult(state *State, stageID string, env toolcall.ToolCall) {
 			state.Evidence.StageCalls[stageID] = appendCapped(state.Evidence.StageCalls[stageID], cmd, maxWorkflowEvidenceItems)
 			state.LastRecordedEvidence = &EvidenceRecord{
 				Tool:      env.ToolName(),
-				Summary:   cmd,
+				Summary:   actionSummary(env),
 				Timestamp: actionTimestamp(env),
 			}
 		}
