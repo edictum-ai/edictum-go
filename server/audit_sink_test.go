@@ -241,7 +241,6 @@ func TestDurationMsValueHandlesInvalidFloats(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			got := durationMsValue(&tc.value)
 			if got != tc.want {
