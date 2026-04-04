@@ -17,12 +17,10 @@ func TestWorkflowAdapterConformanceFixtures(t *testing.T) {
 	for _, harness := range adapterHarnesses() {
 		t.Run(harness.name, func(t *testing.T) {
 			for _, loaded := range suites {
-				loaded := loaded
 				t.Run(filepath.Base(loaded.path), func(t *testing.T) {
 					runtimes := buildWorkflowRuntimes(t, loaded.suite.Workflows)
 
 					for _, fixture := range loaded.suite.Fixtures {
-						fixture := fixture
 						t.Run(fixture.ID, func(t *testing.T) {
 							rt := runtimes[fixture.Workflow]
 							backend := session.NewMemoryBackend()
@@ -35,7 +33,6 @@ func TestWorkflowAdapterConformanceFixtures(t *testing.T) {
 							seedWorkflowState(t, backend, rt.Definition(), fixture.InitialState)
 
 							for _, step := range fixture.Steps {
-								step := step
 								approvals.SetOutcomes(step.ApprovalOutcomes)
 								mark := g.LocalSink().Mark()
 								ctx := guard.ContextWithRunOptions(
