@@ -126,9 +126,15 @@ func (r *Runtime) Evaluate(ctx context.Context, sess *session.Session, env toolc
 			return Evaluation{Action: ActionAllow, Audit: workflowSnapshot(r.definition, state), Events: events}, nil
 		}
 		nextStageID := r.definition.Stages[nextIndex].ID
+		currentStageID := stage.ID
 		state.ActiveStage = nextStageID
 		state.clearWorkflowStatus()
-		events = append(events, workflowProgressEvent("workflow_stage_advanced", r.definition, state))
+		eventState := state.clone()
+		nextStage := r.definition.Stages[nextIndex]
+		if stageIsBoundaryOnly(nextStage) && nextStage.Approval != nil && eventState.Approvals[nextStage.ID] != approvedStatus {
+			eventState.markPendingApproval(nextStage.ID, nextStage.Approval.Message)
+		}
+		events = append(events, workflowStageAdvancedEvent(r.definition, eventState, currentStageID, nextStageID))
 		changed = true
 	}
 }

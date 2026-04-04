@@ -51,16 +51,16 @@ func TestAllActions_Count(t *testing.T) {
 
 func TestAllActions_Values(t *testing.T) {
 	want := map[Action]bool{
-		ActionCallBlocked:           true,
-		ActionCallWouldBlock:        true,
-		ActionCallAllowed:           true,
-		ActionCallExecuted:          true,
-		ActionCallFailed:            true,
-		ActionPostconditionWarning:  true,
-		ActionCallApprovalRequested: true,
-		ActionCallApprovalGranted:   true,
-		ActionCallApprovalBlocked:   true,
-		ActionCallApprovalTimeout:   true,
+		ActionCallBlocked:          true,
+		ActionCallWouldBlock:       true,
+		ActionCallAllowed:          true,
+		ActionCallExecuted:         true,
+		ActionCallFailed:           true,
+		ActionPostconditionWarning: true,
+		ActionCallAsked:            true,
+		ActionCallApprovalGranted:  true,
+		ActionCallApprovalBlocked:  true,
+		ActionCallApprovalTimeout:  true,
 	}
 	for _, a := range AllActions() {
 		if !want[a] {
@@ -80,7 +80,7 @@ func TestAllActions_StringValues(t *testing.T) {
 		{ActionCallExecuted, "call_executed"},
 		{ActionCallFailed, "call_failed"},
 		{ActionPostconditionWarning, "postcondition_warning"},
-		{ActionCallApprovalRequested, "call_approval_requested"},
+		{ActionCallAsked, "call_asked"},
 		{ActionCallApprovalGranted, "call_approval_granted"},
 		{ActionCallApprovalBlocked, "call_approval_blocked"},
 		{ActionCallApprovalTimeout, "call_approval_timeout"},

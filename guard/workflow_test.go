@@ -124,7 +124,7 @@ stages:
 	sawAllowedWithWorkflow := false
 	sawStageAdvanced := false
 	for _, event := range events {
-		if event.Action == audit.ActionCallApprovalRequested && event.Workflow != nil {
+		if event.Action == audit.ActionCallAsked && event.Workflow != nil {
 			if event.Workflow["name"] == "push-process" {
 				if pending, ok := event.Workflow["pending_approval"].(map[string]any); ok && pending["required"] == true {
 					sawApprovalRequested = true
@@ -146,7 +146,7 @@ stages:
 		}
 	}
 	if !sawApprovalRequested {
-		t.Fatal("expected workflow approval request audit event")
+		t.Fatal("expected workflow call_asked audit event")
 	}
 	if !sawAllowedWithWorkflow {
 		t.Fatal("expected allowed audit event with workflow stage metadata")
@@ -196,7 +196,7 @@ stages:
 				stageAdvancedIdx = idx
 			}
 		}
-		if event.Action == audit.ActionCallApprovalRequested && event.Workflow != nil {
+		if event.Action == audit.ActionCallAsked && event.Workflow != nil {
 			if event.Workflow["name"] == "approval-pause-process" {
 				if pending, ok := event.Workflow["pending_approval"].(map[string]any); ok && pending["required"] == true {
 					approvalRequestedIdx = idx
@@ -208,7 +208,7 @@ stages:
 		t.Fatal("expected workflow stage advanced event before approval resolution")
 	}
 	if approvalRequestedIdx == -1 {
-		t.Fatal("expected approval requested audit event")
+		t.Fatal("expected call_asked audit event")
 	}
 	if stageAdvancedIdx >= approvalRequestedIdx {
 		t.Fatalf("expected stage advance before approval request, got stage idx=%d approval idx=%d", stageAdvancedIdx, approvalRequestedIdx)

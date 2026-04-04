@@ -330,7 +330,7 @@ func TestRun_ObserveMode_ApprovalUsesBackend(t *testing.T) {
 	for _, e := range events {
 		actions = append(actions, e.Action)
 	}
-	if len(actions) < 2 || actions[0] != audit.ActionCallApprovalRequested || actions[1] != audit.ActionCallApprovalGranted {
+	if len(actions) < 2 || actions[0] != audit.ActionCallAsked || actions[1] != audit.ActionCallApprovalGranted {
 		t.Fatalf("unexpected leading audit actions: %v", actions)
 	}
 }
