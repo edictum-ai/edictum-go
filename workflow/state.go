@@ -57,6 +57,7 @@ func saveState(ctx context.Context, sess *session.Session, def Definition, state
 func recordApproval(state *State, stageID string) {
 	state.ensureMaps()
 	state.Approvals[stageID] = approvedStatus
+	state.clearWorkflowStatus()
 }
 
 func recordResult(state *State, stageID string, env toolcall.ToolCall) {
@@ -66,12 +67,23 @@ func recordResult(state *State, stageID string, env toolcall.ToolCall) {
 	case "Read":
 		if path := env.FilePath(); path != "" {
 			state.Evidence.Reads = appendUniqueCapped(state.Evidence.Reads, path, maxWorkflowEvidenceItems)
+			state.LastRecordedEvidence = &EvidenceRecord{
+				Tool:      env.ToolName(),
+				Summary:   path,
+				Timestamp: actionTimestamp(env),
+			}
 		}
 	case "Bash":
 		if cmd := env.BashCommand(); cmd != "" {
 			state.Evidence.StageCalls[stageID] = appendCapped(state.Evidence.StageCalls[stageID], cmd, maxWorkflowEvidenceItems)
+			state.LastRecordedEvidence = &EvidenceRecord{
+				Tool:      env.ToolName(),
+				Summary:   actionSummary(env),
+				Timestamp: actionTimestamp(env),
+			}
 		}
 	}
+	state.clearWorkflowStatus()
 }
 
 func appendUniqueCapped(items []string, item string, limit int) []string {

@@ -32,7 +32,8 @@ func (r *Runtime) advanceAfterSuccess(ctx context.Context, state *State, stageID
 		state.CompletedStages = append(state.CompletedStages, stage.ID)
 	}
 	state.ActiveStage = ""
-	return []map[string]any{workflowProgressEvent("workflow_completed", r.definition.Metadata.Name, stage.ID, "")}, nil
+	state.clearWorkflowStatus()
+	return []map[string]any{workflowProgressEvent("workflow_completed", r.definition, *state)}, nil
 }
 
 func evaluateCheck(check Check, env toolcall.ToolCall) (bool, string, error) {

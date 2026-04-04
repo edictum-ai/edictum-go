@@ -20,6 +20,7 @@ const (
 // Request represents a pending approval request.
 type Request struct {
 	approvalID    string
+	sessionID     string
 	toolName      string
 	toolArgs      map[string]any
 	message       string
@@ -32,6 +33,9 @@ type Request struct {
 
 // ApprovalID returns the unique approval request ID.
 func (r Request) ApprovalID() string { return r.approvalID }
+
+// SessionID returns the session associated with the request.
+func (r Request) SessionID() string { return r.sessionID }
 
 // ToolName returns the tool name.
 func (r Request) ToolName() string { return r.toolName }
@@ -84,6 +88,11 @@ type RequestOption func(*Request)
 // WithTimeout sets the approval timeout.
 func WithTimeout(d time.Duration) RequestOption {
 	return func(r *Request) { r.timeout = d }
+}
+
+// WithSessionID sets the workflow session ID on the request.
+func WithSessionID(sessionID string) RequestOption {
+	return func(r *Request) { r.sessionID = sessionID }
 }
 
 // WithTimeoutEffect sets the effect when timeout occurs ("block" or "allow").

@@ -22,6 +22,7 @@ type Definition struct {
 // Metadata identifies a workflow document.
 type Metadata struct {
 	Name        string `yaml:"name"`
+	Version     string `yaml:"version,omitempty"`
 	Description string `yaml:"description,omitempty"`
 }
 

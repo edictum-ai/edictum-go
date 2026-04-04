@@ -35,6 +35,31 @@ stages:
 	if decision.Action != ActionBlock || decision.Reason != "Read the workflow spec first" {
 		t.Fatalf("unexpected edit decision: %+v", decision)
 	}
+	state, err := rt.State(ctx, sess)
+	if err != nil {
+		t.Fatalf("State after blocked edit: %v", err)
+	}
+	if state.BlockedReason != "Read the workflow spec first" {
+		t.Fatalf("BlockedReason = %q, want %q", state.BlockedReason, "Read the workflow spec first")
+	}
+	if state.PendingApproval.Required {
+		t.Fatalf("PendingApproval.Required = true, want false")
+	}
+	if state.LastBlockedAction == nil {
+		t.Fatal("expected LastBlockedAction to be recorded")
+	}
+	if state.LastBlockedAction.Tool != "Edit" {
+		t.Fatalf("LastBlockedAction.Tool = %q, want %q", state.LastBlockedAction.Tool, "Edit")
+	}
+	if state.LastBlockedAction.Summary != "src/app.ts" {
+		t.Fatalf("LastBlockedAction.Summary = %q, want %q", state.LastBlockedAction.Summary, "src/app.ts")
+	}
+	if state.LastBlockedAction.Message != "Read the workflow spec first" {
+		t.Fatalf("LastBlockedAction.Message = %q, want %q", state.LastBlockedAction.Message, "Read the workflow spec first")
+	}
+	if state.LastBlockedAction.Timestamp == "" {
+		t.Fatal("expected LastBlockedAction.Timestamp to be set")
+	}
 
 	read := makeCall(t, "Read", map[string]any{"path": "specs/008.md"})
 	decision, err = rt.Evaluate(ctx, sess, read)
@@ -48,12 +73,27 @@ stages:
 		t.Fatalf("RecordResult(read): %v", err)
 	}
 
-	state, err := rt.State(ctx, sess)
+	state, err = rt.State(ctx, sess)
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
 	if len(state.Evidence.Reads) != 1 || state.Evidence.Reads[0] != "specs/008.md" {
 		t.Fatalf("unexpected reads: %+v", state.Evidence.Reads)
+	}
+	if state.BlockedReason != "" {
+		t.Fatalf("BlockedReason after success = %q, want empty", state.BlockedReason)
+	}
+	if state.LastRecordedEvidence == nil {
+		t.Fatal("expected LastRecordedEvidence after successful read")
+	}
+	if state.LastRecordedEvidence.Tool != "Read" {
+		t.Fatalf("LastRecordedEvidence.Tool = %q, want %q", state.LastRecordedEvidence.Tool, "Read")
+	}
+	if state.LastRecordedEvidence.Summary != "specs/008.md" {
+		t.Fatalf("LastRecordedEvidence.Summary = %q, want %q", state.LastRecordedEvidence.Summary, "specs/008.md")
+	}
+	if state.LastRecordedEvidence.Timestamp == "" {
+		t.Fatal("expected LastRecordedEvidence.Timestamp to be set")
 	}
 
 	decision, err = rt.Evaluate(ctx, sess, edit)
@@ -90,12 +130,39 @@ stages:
 	ctx := context.Background()
 
 	push := makeCall(t, "Bash", map[string]any{"command": "git push origin feature"})
-	decision, err := rt.Evaluate(ctx, sess, push)
+	edit := makeCall(t, "Edit", map[string]any{"path": "src/app.ts"})
+	decision, err := rt.Evaluate(ctx, sess, edit)
+	if err != nil {
+		t.Fatalf("Evaluate(edit before approval): %v", err)
+	}
+	if decision.Action != ActionAllow || decision.StageID != "implement" {
+		t.Fatalf("unexpected edit decision: %+v", decision)
+	}
+	if _, err := rt.RecordResult(ctx, sess, decision.StageID, edit); err != nil {
+		t.Fatalf("RecordResult(edit): %v", err)
+	}
+	decision, err = rt.Evaluate(ctx, sess, push)
 	if err != nil {
 		t.Fatalf("Evaluate(push before approval): %v", err)
 	}
 	if decision.Action != ActionPendingApproval || decision.StageID != "review" {
 		t.Fatalf("unexpected decision: %+v", decision)
+	}
+	state, err := rt.State(ctx, sess)
+	if err != nil {
+		t.Fatalf("State before approval: %v", err)
+	}
+	if state.BlockedReason != "Approval required before push" {
+		t.Fatalf("BlockedReason = %q, want %q", state.BlockedReason, "Approval required before push")
+	}
+	if !state.PendingApproval.Required {
+		t.Fatal("expected PendingApproval.Required to be true")
+	}
+	if state.PendingApproval.StageID != "review" {
+		t.Fatalf("PendingApproval.StageID = %q, want %q", state.PendingApproval.StageID, "review")
+	}
+	if state.PendingApproval.Message != "Approval required before push" {
+		t.Fatalf("PendingApproval.Message = %q, want %q", state.PendingApproval.Message, "Approval required before push")
 	}
 	if err := rt.RecordApproval(ctx, sess, "review"); err != nil {
 		t.Fatalf("RecordApproval: %v", err)
@@ -108,10 +175,40 @@ stages:
 		t.Fatalf("unexpected decision after approval: %+v", decision)
 	}
 
-	if err := rt.Reset(ctx, sess, "implement"); err != nil {
+	events, err := rt.Reset(ctx, sess, "implement")
+	if err != nil {
 		t.Fatalf("Reset: %v", err)
 	}
-	state, err := rt.State(ctx, sess)
+	if len(events) != 1 {
+		t.Fatalf("Reset events len = %d, want 1", len(events))
+	}
+	if got, _ := events[0]["action"].(string); got != "workflow_state_updated" {
+		t.Fatalf("Reset action = %q, want %q", got, "workflow_state_updated")
+	}
+	workflowData, ok := events[0]["workflow"].(map[string]any)
+	if !ok {
+		t.Fatalf("Reset workflow payload type = %T, want map[string]any", events[0]["workflow"])
+	}
+	if workflowData["name"] != "approval-process" {
+		t.Fatalf("Reset workflow name = %#v, want %q", workflowData["name"], "approval-process")
+	}
+	if workflowData["active_stage"] != "implement" {
+		t.Fatalf("Reset active_stage = %#v, want %q", workflowData["active_stage"], "implement")
+	}
+	if pending, ok := workflowData["pending_approval"].(map[string]any); !ok {
+		t.Fatalf("Reset pending_approval type = %T, want map[string]any", workflowData["pending_approval"])
+	} else if pending["required"] != false {
+		t.Fatalf("Reset pending_approval.required = %#v, want false", pending["required"])
+	}
+	completed, ok := workflowData["completed_stages"].([]any)
+	if !ok {
+		t.Fatalf("Reset completed_stages type = %T, want []any", workflowData["completed_stages"])
+	}
+	if len(completed) != 0 {
+		t.Fatalf("Reset completed_stages = %#v, want empty", completed)
+	}
+
+	state, err = rt.State(ctx, sess)
 	if err != nil {
 		t.Fatalf("State after reset: %v", err)
 	}
@@ -120,6 +217,75 @@ stages:
 	}
 	if len(state.Approvals) != 0 {
 		t.Fatalf("expected approvals cleared, got %+v", state.Approvals)
+	}
+	if state.BlockedReason != "" {
+		t.Fatalf("BlockedReason after reset = %q, want empty", state.BlockedReason)
+	}
+	if state.PendingApproval.Required {
+		t.Fatal("expected reset to clear pending approval")
+	}
+}
+
+func TestRuntime_BashSummariesDropArgs(t *testing.T) {
+	ctx := context.Background()
+
+	blockedRuntime := mustRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: blocked-bash
+stages:
+  - id: read-context
+    tools: [Read]
+`)
+	blockedSession := newWorkflowSession(t, "wf-bash-blocked")
+	blockedCall := makeCall(t, "Bash", map[string]any{"command": "deploy --token=SECRET123"})
+	decision, err := blockedRuntime.Evaluate(ctx, blockedSession, blockedCall)
+	if err != nil {
+		t.Fatalf("Evaluate(blocked bash): %v", err)
+	}
+	if decision.Action != ActionBlock {
+		t.Fatalf("blocked decision = %+v, want block", decision)
+	}
+	blockedState, err := blockedRuntime.State(ctx, blockedSession)
+	if err != nil {
+		t.Fatalf("State(blocked bash): %v", err)
+	}
+	if blockedState.LastBlockedAction == nil {
+		t.Fatal("expected LastBlockedAction for blocked bash")
+	}
+	if blockedState.LastBlockedAction.Summary != "deploy" {
+		t.Fatalf("LastBlockedAction.Summary = %q, want %q", blockedState.LastBlockedAction.Summary, "deploy")
+	}
+
+	allowedRuntime := mustRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: allowed-bash
+stages:
+  - id: implement
+    tools: [Bash]
+`)
+	allowedSession := newWorkflowSession(t, "wf-bash-allowed")
+	allowedCall := makeCall(t, "Bash", map[string]any{"command": "deploy --token=SECRET123"})
+	decision, err = allowedRuntime.Evaluate(ctx, allowedSession, allowedCall)
+	if err != nil {
+		t.Fatalf("Evaluate(allowed bash): %v", err)
+	}
+	if decision.Action != ActionAllow || decision.StageID != "implement" {
+		t.Fatalf("allowed decision = %+v, want allow in implement", decision)
+	}
+	if _, err := allowedRuntime.RecordResult(ctx, allowedSession, decision.StageID, allowedCall); err != nil {
+		t.Fatalf("RecordResult(allowed bash): %v", err)
+	}
+	allowedState, err := allowedRuntime.State(ctx, allowedSession)
+	if err != nil {
+		t.Fatalf("State(allowed bash): %v", err)
+	}
+	if allowedState.LastRecordedEvidence == nil {
+		t.Fatal("expected LastRecordedEvidence for allowed bash")
+	}
+	if allowedState.LastRecordedEvidence.Summary != "deploy" {
+		t.Fatalf("LastRecordedEvidence.Summary = %q, want %q", allowedState.LastRecordedEvidence.Summary, "deploy")
 	}
 }
 

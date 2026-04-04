@@ -68,6 +68,9 @@ func TestNewRequest_FieldsPopulated(t *testing.T) {
 func TestNewRequest_Defaults(t *testing.T) {
 	r := NewRequest("req-2", "ReadFile", nil, "")
 
+	if r.SessionID() != "" {
+		t.Errorf("SessionID() = %q, want empty string", r.SessionID())
+	}
 	if r.Timeout() != 0 {
 		t.Errorf("Timeout() = %v, want 0 (zero value)", r.Timeout())
 	}
@@ -171,6 +174,13 @@ func TestWithTimeoutEffect_Allow(t *testing.T) {
 	r := NewRequest("req-10", "Tool", nil, "msg", WithTimeoutEffect("allow"))
 	if r.TimeoutEffect() != "allow" {
 		t.Errorf("TimeoutEffect() = %q, want %q", r.TimeoutEffect(), "allow")
+	}
+}
+
+func TestWithSessionID(t *testing.T) {
+	r := NewRequest("req-10b", "Tool", nil, "msg", WithSessionID("session-123"))
+	if r.SessionID() != "session-123" {
+		t.Errorf("SessionID() = %q, want %q", r.SessionID(), "session-123")
 	}
 }
 

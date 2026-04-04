@@ -87,6 +87,7 @@ func (g *Guard) resolveApproval(
 	}
 
 	var reqOpts []approval.RequestOption
+	reqOpts = append(reqOpts, approval.WithSessionID(sess.ID()))
 	if pre.ApprovalTimeout > 0 {
 		reqOpts = append(reqOpts, approval.WithTimeout(time.Duration(pre.ApprovalTimeout)*time.Second))
 	}
@@ -165,7 +166,7 @@ func (g *Guard) handleWorkflowApproval(
 		if nextPre.Action != "pending_approval" {
 			return g.handlePreDecision(ctx, env2, sess, pipe, nextPre, mode, policyVersion, toolCallable, args)
 		}
-		g.emitWorkflowEvents(ctx, env2, nextPre.WorkflowEvents, mode, policyVersion)
+		g.emitWorkflowEvents(ctx, env2, sess, nextPre.WorkflowEvents, mode, policyVersion)
 		if nextPre.DecisionSource != "workflow" || nextPre.WorkflowStageID == "" {
 			return g.handleApproval(ctx, env2, sess, pipe, nextPre, mode, policyVersion, toolCallable, args)
 		}

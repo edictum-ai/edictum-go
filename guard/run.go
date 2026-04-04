@@ -19,14 +19,20 @@ import (
 type RunOption func(*runConfig)
 
 type runConfig struct {
-	sessionID   string
-	environment string
-	principal   *toolcall.Principal
+	sessionID       string
+	parentSessionID string
+	environment     string
+	principal       *toolcall.Principal
 }
 
 // WithSessionID overrides the guard's session ID for this call.
 func WithSessionID(id string) RunOption {
 	return func(c *runConfig) { c.sessionID = id }
+}
+
+// WithParentSessionID records caller lineage on emitted audit events.
+func WithParentSessionID(id string) RunOption {
+	return func(c *runConfig) { c.parentSessionID = id }
 }
 
 // WithRunEnvironment overrides the guard's environment for this call.
@@ -63,6 +69,14 @@ func (g *Guard) Run(
 		opt(cfg)
 	}
 
+	metadata := map[string]any(nil)
+	if cfg.parentSessionID != "" {
+		if err := session.ValidateID(cfg.parentSessionID); err != nil {
+			return nil, fmt.Errorf("invalid parent session ID: %w", err)
+		}
+		metadata = map[string]any{parentSessionIDMetadataKey: cfg.parentSessionID}
+	}
+
 	sess, err := session.New(cfg.sessionID, backend)
 	if err != nil {
 		return nil, fmt.Errorf("session create: %w", err)
@@ -82,6 +96,7 @@ func (g *Guard) Run(
 		RunID:       cfg.sessionID,
 		Environment: cfg.environment,
 		Principal:   principal,
+		Metadata:    metadata,
 		Registry:    registry,
 	})
 	if err != nil {
@@ -131,7 +146,7 @@ func (g *Guard) Run(
 	// ordinary denies fall through in observe mode; pending_approval still
 	// goes through the approval backend.
 	if pre.Action == "pending_approval" {
-		g.emitWorkflowEvents(ctx, env2, pre.WorkflowEvents, mode, policyVersion)
+		g.emitWorkflowEvents(ctx, env2, sess, pre.WorkflowEvents, mode, policyVersion)
 		return g.handleApproval(ctx, env2, sess, pipe, pre, mode, policyVersion, toolCallable, args)
 	}
 
@@ -156,7 +171,7 @@ func (g *Guard) handlePreDecision(
 		if mode == "observe" {
 			action = audit.ActionCallWouldBlock
 		}
-		g.emitWorkflowEvents(ctx, env2, pre.WorkflowEvents, mode, policyVersion)
+		g.emitWorkflowEvents(ctx, env2, sess, pre.WorkflowEvents, mode, policyVersion)
 		g.emitPreAudit(ctx, env2, sess, action, pre, mode, policyVersion)
 
 		if mode == "enforce" {
@@ -174,15 +189,15 @@ func (g *Guard) handlePreDecision(
 		trace.SpanFromContext(ctx).SetAttributes(attribute.Bool("governance.observed_deny", true))
 	} else {
 		// Emit CALL_WOULD_BLOCK for per-rule observed denials
-		g.emitObservedDenials(ctx, env2, pre, policyVersion)
+		g.emitObservedDenials(ctx, env2, sess, pre, policyVersion)
 		g.emitPreAudit(ctx, env2, sess, audit.ActionCallAllowed, pre, mode, policyVersion)
-		g.emitWorkflowEvents(ctx, env2, pre.WorkflowEvents, mode, policyVersion)
+		g.emitWorkflowEvents(ctx, env2, sess, pre.WorkflowEvents, mode, policyVersion)
 		g.telemetry.RecordAllowed(ctx, env2.ToolName())
 		g.fireOnAllow(env2)
 	}
 
 	// Emit observe-mode audit events
-	g.emitObserveResults(ctx, env2, pre, policyVersion)
+	g.emitObserveResults(ctx, env2, sess, pre, policyVersion)
 
 	return g.executeAndPost(ctx, env2, sess, pipe, pre, mode, policyVersion, toolCallable, args)
 }

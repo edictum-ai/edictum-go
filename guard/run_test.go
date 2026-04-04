@@ -167,6 +167,57 @@ func TestRunWithSessionID(t *testing.T) {
 	}
 }
 
+func TestRunWithParentSessionID(t *testing.T) {
+	g := New()
+	ctx := context.Background()
+	result, err := g.Run(
+		ctx,
+		"Read",
+		nil,
+		nopCallable,
+		WithSessionID("child-session"),
+		WithParentSessionID("parent-session"),
+	)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if result != "ok" {
+		t.Errorf("result: got %v, want 'ok'", result)
+	}
+
+	events := g.LocalSink().Events()
+	if len(events) < 2 {
+		t.Fatalf("events len = %d, want at least 2", len(events))
+	}
+	for _, event := range events {
+		if event.SessionID != "child-session" {
+			t.Fatalf("SessionID = %q, want %q", event.SessionID, "child-session")
+		}
+		if event.ParentSessionID != "parent-session" {
+			t.Fatalf("ParentSessionID = %q, want %q", event.ParentSessionID, "parent-session")
+		}
+	}
+}
+
+func TestRunWithInvalidParentSessionID(t *testing.T) {
+	g := New()
+	ctx := context.Background()
+	_, err := g.Run(
+		ctx,
+		"Read",
+		nil,
+		nopCallable,
+		WithSessionID("child-session"),
+		WithParentSessionID("../bad"),
+	)
+	if err == nil {
+		t.Fatal("expected invalid parent session ID error")
+	}
+	if !strings.Contains(err.Error(), "invalid parent session ID") {
+		t.Fatalf("error = %v, want invalid parent session ID", err)
+	}
+}
+
 func TestRunWithPrincipalOverride(t *testing.T) {
 	var captured *toolcall.Principal
 	g := New(
@@ -395,6 +446,49 @@ func (m *mockApprovalBackend) RequestApproval(ctx context.Context, toolName stri
 
 func (m *mockApprovalBackend) PollApprovalStatus(ctx context.Context, approvalID string) (approval.Decision, error) {
 	return m.onPoll(ctx, approvalID)
+}
+
+func TestRun_WorkflowApprovalPassesSessionIDToApprovalBackend(t *testing.T) {
+	rt := mustWorkflowRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: approval-session
+stages:
+  - id: implement
+    tools: [Edit]
+  - id: review
+    entry:
+      - condition: stage_complete("implement")
+    approval:
+      message: Approval required before push
+  - id: push
+    entry:
+      - condition: stage_complete("review")
+    tools: [Bash]
+`)
+	var gotSessionID string
+	backend := &mockApprovalBackend{
+		onRequest: func(_ context.Context, toolName string, toolArgs map[string]any, message string, opts ...approval.RequestOption) (approval.Request, error) {
+			req := approval.NewRequest("approval-1", toolName, toolArgs, message, opts...)
+			gotSessionID = req.SessionID()
+			return req, nil
+		},
+		onPoll: func(context.Context, string) (approval.Decision, error) {
+			return approval.Decision{Approved: false, Status: approval.StatusDenied}, nil
+		},
+	}
+	g := New(WithWorkflowRuntime(rt), WithApprovalBackend(backend))
+
+	if _, err := g.Run(context.Background(), "Edit", map[string]any{"path": "src/app.ts"}, nopCallable); err != nil {
+		t.Fatalf("Run(Edit): %v", err)
+	}
+	_, err := g.Run(context.Background(), "Bash", map[string]any{"command": "git push origin feature"}, nopCallable)
+	if err == nil {
+		t.Fatal("expected approval block")
+	}
+	if gotSessionID != g.sessionID {
+		t.Fatalf("approval SessionID = %q, want %q", gotSessionID, g.sessionID)
+	}
 }
 
 func TestRunAttemptsIncrement(t *testing.T) {

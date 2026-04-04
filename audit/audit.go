@@ -28,6 +28,7 @@ const (
 	// excluded from AllActions(), which preserves the canonical parity set.
 	ActionWorkflowStageAdvanced Action = "workflow_stage_advanced"
 	ActionWorkflowCompleted     Action = "workflow_completed"
+	ActionWorkflowStateUpdated  Action = "workflow_state_updated"
 )
 
 // AllActions returns all 10 canonical audit actions.
@@ -51,6 +52,8 @@ type Event struct {
 	SchemaVersion         string           `json:"schema_version"`
 	Timestamp             time.Time        `json:"timestamp"`
 	RunID                 string           `json:"run_id"`
+	SessionID             string           `json:"session_id"`
+	ParentSessionID       string           `json:"parent_session_id,omitempty"`
 	CallID                string           `json:"call_id"`
 	CallIndex             int              `json:"call_index"`
 	ParentCallID          string           `json:"parent_call_id,omitempty"`
@@ -78,6 +81,8 @@ type Event struct {
 	PolicyError           bool             `json:"policy_error"`
 }
 
+// Keep the 0.4.x audit schema version for additive event fields so existing
+// consumers that ignore unknown fields remain wire-compatible.
 const schemaVersion = "0.4.0"
 
 // NewEvent creates a new Event with defaults.

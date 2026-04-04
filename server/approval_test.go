@@ -66,6 +66,37 @@ func TestApprovalPolling(t *testing.T) {
 	}
 }
 
+func TestApprovalRequestIncludesSessionID(t *testing.T) {
+	var captured map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method = %s, want POST", r.Method)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("Decode: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"id": "approval-session"})
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(ClientConfig{BaseURL: srv.URL, APIKey: "key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	backend := NewApprovalBackend(client)
+	req, err := backend.RequestApproval(context.Background(), "Bash", nil, "review", approval.WithSessionID("session-123"))
+	if err != nil {
+		t.Fatalf("RequestApproval: %v", err)
+	}
+	if captured["session_id"] != "session-123" {
+		t.Fatalf("session_id = %#v, want %q", captured["session_id"], "session-123")
+	}
+	if req.SessionID() != "session-123" {
+		t.Fatalf("Request.SessionID() = %q, want %q", req.SessionID(), "session-123")
+	}
+}
+
 func TestApprovalDenied(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {

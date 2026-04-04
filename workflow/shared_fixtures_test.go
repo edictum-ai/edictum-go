@@ -91,7 +91,8 @@ func TestSharedWorkflowFixtures(t *testing.T) {
 					t.Fatalf("%s reason = %q, want substring %q", step.ID, decision.Reason, step.Expect.MessageContains)
 				}
 				if step.Expect.ApprovalRequestedFor != "" {
-					if got, _ := decision.Audit["approval_requested_for"].(string); got != step.Expect.ApprovalRequestedFor {
+					pending, _ := decision.Audit["pending_approval"].(map[string]any)
+					if got, _ := pending["stage_id"].(string); got != step.Expect.ApprovalRequestedFor {
 						t.Fatalf("%s approval_requested_for = %q, want %q", step.ID, got, step.Expect.ApprovalRequestedFor)
 					}
 				}

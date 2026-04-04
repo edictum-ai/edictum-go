@@ -61,6 +61,9 @@ func (b *ApprovalBackend) RequestApproval(
 		"timeout":        timeout,
 		"timeout_action": timeoutEffect,
 	}
+	if tmp.SessionID() != "" {
+		body["session_id"] = tmp.SessionID()
+	}
 
 	resp, err := b.client.Post(ctx, "/v1/approvals", body)
 	if err != nil {

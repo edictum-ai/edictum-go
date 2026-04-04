@@ -57,7 +57,10 @@ stages:
 	foundWorkflowBlock := false
 	for _, event := range events {
 		if event.Action == audit.ActionCallBlocked && event.Workflow != nil {
-			if event.Workflow["workflow_name"] == "core-dev-process" {
+			if event.Workflow["name"] == "core-dev-process" && event.Workflow["blocked_reason"] == "Read the workflow spec first" {
+				if event.SessionID != g.sessionID {
+					t.Fatalf("blocked event SessionID = %q, want %q", event.SessionID, g.sessionID)
+				}
 				foundWorkflowBlock = true
 			}
 		}
@@ -122,15 +125,24 @@ stages:
 	sawStageAdvanced := false
 	for _, event := range events {
 		if event.Action == audit.ActionCallApprovalRequested && event.Workflow != nil {
-			sawApprovalRequested = true
+			if event.Workflow["name"] == "push-process" {
+				if pending, ok := event.Workflow["pending_approval"].(map[string]any); ok && pending["required"] == true {
+					sawApprovalRequested = true
+				}
+			}
 		}
 		if event.Action == audit.ActionCallAllowed && event.Workflow != nil {
-			if event.Workflow["stage_id"] == "push" {
+			if event.Workflow["active_stage"] == "push" {
+				if event.SessionID != g.sessionID {
+					t.Fatalf("allowed event SessionID = %q, want %q", event.SessionID, g.sessionID)
+				}
 				sawAllowedWithWorkflow = true
 			}
 		}
 		if event.Action == audit.ActionWorkflowStageAdvanced && event.Workflow != nil {
-			sawStageAdvanced = true
+			if event.Workflow["name"] == "push-process" {
+				sawStageAdvanced = true
+			}
 		}
 	}
 	if !sawApprovalRequested {
@@ -180,13 +192,15 @@ stages:
 	approvalRequestedIdx := -1
 	for idx, event := range events {
 		if event.Action == audit.ActionWorkflowStageAdvanced && event.Workflow != nil {
-			if event.Workflow["workflow_name"] == "approval-pause-process" && event.Workflow["stage_id"] == "implement" && event.Workflow["to_stage_id"] == "review" {
+			if event.Workflow["name"] == "approval-pause-process" && event.Workflow["active_stage"] == "review" {
 				stageAdvancedIdx = idx
 			}
 		}
 		if event.Action == audit.ActionCallApprovalRequested && event.Workflow != nil {
-			if event.Workflow["workflow_name"] == "approval-pause-process" {
-				approvalRequestedIdx = idx
+			if event.Workflow["name"] == "approval-pause-process" {
+				if pending, ok := event.Workflow["pending_approval"].(map[string]any); ok && pending["required"] == true {
+					approvalRequestedIdx = idx
+				}
 			}
 		}
 	}
@@ -244,7 +258,7 @@ stages:
 	limitBlockIdx := -1
 	for idx, event := range events {
 		if event.Action == audit.ActionWorkflowStageAdvanced && event.Workflow != nil {
-			if event.Workflow["workflow_name"] == "limit-block-process" && event.Workflow["stage_id"] == "read-context" && event.Workflow["to_stage_id"] == "implement" {
+			if event.Workflow["name"] == "limit-block-process" && event.Workflow["active_stage"] == "implement" {
 				stageAdvancedIdx = idx
 			}
 		}
@@ -305,13 +319,14 @@ stages:
 		if event.Action != audit.ActionWorkflowStageAdvanced || event.Workflow == nil {
 			continue
 		}
-		if event.Workflow["workflow_name"] != "chained-approval-process" {
+		if event.Workflow["name"] != "chained-approval-process" {
 			continue
 		}
-		if event.Workflow["stage_id"] == "implement" && event.Workflow["to_stage_id"] == "review" {
+		completed := workflowCompletedStages(event.Workflow)
+		if event.Workflow["active_stage"] == "review" && len(completed) == 1 && completed[0] == "implement" {
 			reviewAdvanceIdx = idx
 		}
-		if event.Workflow["stage_id"] == "review" && event.Workflow["to_stage_id"] == "verify" {
+		if event.Workflow["active_stage"] == "verify" && len(completed) == 2 && completed[0] == "implement" && completed[1] == "review" {
 			verifyAdvanceIdx = idx
 		}
 	}
@@ -347,12 +362,23 @@ stages:
 	events := g.LocalSink().Events()
 	for _, event := range events {
 		if event.Action == audit.ActionWorkflowCompleted && event.Workflow != nil {
-			if event.Workflow["workflow_name"] == "completion-process" {
+			if event.Workflow["name"] == "completion-process" {
 				return
 			}
 		}
 	}
 	t.Fatal("expected workflow completed audit event")
+}
+
+func workflowCompletedStages(workflow map[string]any) []string {
+	raw, _ := workflow["completed_stages"].([]any)
+	result := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if stageID, ok := item.(string); ok {
+			result = append(result, stageID)
+		}
+	}
+	return result
 }
 
 func mustWorkflowRuntime(t *testing.T, content string) *workflow.Runtime {
