@@ -258,6 +258,10 @@ jobs:
               echo "Payload is a bare comments array — wrapping in COMMENT event object"
               jq --arg sha "$PR_SHA" '{"commit_id": $sha, "event": "COMMENT", "body": "See summary comment for full review.", "comments": .}' /tmp/review-payload.json > /tmp/review-payload-wrapped.json
               mv /tmp/review-payload-wrapped.json /tmp/review-payload.json
+            elif [ "$TYPE" = "object" ] && jq -e '(.event // empty) == "" and (.comments | type == "array")' /tmp/review-payload.json >/dev/null; then
+              echo "Payload is a comments object without an event — normalizing to COMMENT"
+              jq --arg sha "$PR_SHA" '.commit_id = $sha | .event = "COMMENT" | .body = (.body // "See summary comment for full review.")' /tmp/review-payload.json > /tmp/review-payload-wrapped.json
+              mv /tmp/review-payload-wrapped.json /tmp/review-payload.json
             fi
             EVENT=$(jq -r '.event // empty' /tmp/review-payload.json)
             if [ "$EVENT" != "COMMENT" ]; then
@@ -269,4 +273,3 @@ jobs:
               && echo "Posted inline review comments" \
               || echo "::warning::Inline comments failed (line not in diff?). Summary comment still posted."
           fi
-
