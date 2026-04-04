@@ -34,6 +34,10 @@ func (r *Runtime) Evaluate(ctx context.Context, sess *session.Session, env toolc
 			return Evaluation{}, err
 		}
 		if allowed {
+			if state.clearWorkflowStatus() {
+				changed = true
+			}
+			eval.Audit = workflowSnapshot(r.definition, state)
 			if changed {
 				if err := saveState(ctx, sess, r.definition, state); err != nil {
 					return Evaluation{}, err
@@ -45,6 +49,14 @@ func (r *Runtime) Evaluate(ctx context.Context, sess *session.Session, env toolc
 
 		nextIndex, hasNext := r.nextIndex(stage.ID)
 		if invalid != nil && !hasNext {
+			changed = r.applyDecisionState(&state, *invalid, env) || changed
+			invalid.Audit = workflowSnapshot(r.definition, state)
+			if changed {
+				if err := saveState(ctx, sess, r.definition, state); err != nil {
+					return Evaluation{}, err
+				}
+			}
+			invalid.Events = append(invalid.Events, events...)
 			return *invalid, nil
 		}
 		completion, ok, err := r.evaluateCompletion(ctx, stage, state, env, hasNext)
@@ -53,7 +65,9 @@ func (r *Runtime) Evaluate(ctx context.Context, sess *session.Session, env toolc
 		}
 		if !ok {
 			if completion.Action != "" {
-				if changed && completion.Action == ActionPendingApproval {
+				changed = r.applyDecisionState(&state, completion, env) || changed
+				completion.Audit = workflowSnapshot(r.definition, state)
+				if changed {
 					if err := saveState(ctx, sess, r.definition, state); err != nil {
 						return Evaluation{}, err
 					}
@@ -62,26 +76,73 @@ func (r *Runtime) Evaluate(ctx context.Context, sess *session.Session, env toolc
 				return completion, nil
 			}
 			if invalid != nil {
+				changed = r.applyDecisionState(&state, *invalid, env) || changed
+				invalid.Audit = workflowSnapshot(r.definition, state)
+				if changed {
+					if err := saveState(ctx, sess, r.definition, state); err != nil {
+						return Evaluation{}, err
+					}
+				}
+				invalid.Events = append(invalid.Events, events...)
 				return *invalid, nil
 			}
+			if state.clearWorkflowStatus() {
+				changed = true
+			}
+			completion.Audit = workflowSnapshot(r.definition, state)
+			if changed {
+				if err := saveState(ctx, sess, r.definition, state); err != nil {
+					return Evaluation{}, err
+				}
+			}
+			completion.Events = append(completion.Events, events...)
 			return completion, nil
 		}
 
+		if invalid != nil {
+			nextStage := r.definition.Stages[nextIndex]
+			if !stageIsBoundaryOnly(nextStage) && !toolAllowed(nextStage, env) {
+				changed = r.applyDecisionState(&state, *invalid, env) || changed
+				invalid.Audit = workflowSnapshot(r.definition, state)
+				if changed {
+					if err := saveState(ctx, sess, r.definition, state); err != nil {
+						return Evaluation{}, err
+					}
+				}
+				invalid.Events = append(invalid.Events, events...)
+				return *invalid, nil
+			}
+		}
 		if !state.completed(stage.ID) {
 			state.CompletedStages = append(state.CompletedStages, stage.ID)
 		}
 		if !hasNext {
 			state.ActiveStage = ""
-			events = append(events, workflowProgressEvent("workflow_completed", r.definition.Metadata.Name, stage.ID, ""))
+			state.clearWorkflowStatus()
+			events = append(events, workflowProgressEvent("workflow_completed", r.definition, state))
 			if err := saveState(ctx, sess, r.definition, state); err != nil {
 				return Evaluation{}, err
 			}
-			return Evaluation{Action: ActionAllow, Events: events}, nil
+			return Evaluation{Action: ActionAllow, Audit: workflowSnapshot(r.definition, state), Events: events}, nil
 		}
 		nextStageID := r.definition.Stages[nextIndex].ID
 		state.ActiveStage = nextStageID
-		events = append(events, workflowProgressEvent("workflow_stage_advanced", r.definition.Metadata.Name, stage.ID, nextStageID))
+		state.clearWorkflowStatus()
+		events = append(events, workflowProgressEvent("workflow_stage_advanced", r.definition, state))
 		changed = true
+	}
+}
+
+func (r *Runtime) applyDecisionState(state *State, eval Evaluation, env toolcall.ToolCall) bool {
+	switch eval.Action {
+	case ActionBlock:
+		return state.markBlocked(env, eval.Reason)
+	case ActionPendingApproval:
+		return state.markPendingApproval(eval.StageID, eval.Reason)
+	case ActionAllow:
+		return state.clearWorkflowStatus()
+	default:
+		return false
 	}
 }
 
@@ -113,9 +174,9 @@ func (r *Runtime) evaluateCompletion(ctx context.Context, stage Stage, state Sta
 		return Evaluation{}, false, nil
 	}
 	nextStage := r.definition.Stages[mustIndex(r.definition, stage.ID)+1]
-	nextState := state
+	nextState := state.clone()
 	if !nextState.completed(stage.ID) {
-		nextState.CompletedStages = append(append([]string{}, nextState.CompletedStages...), stage.ID)
+		nextState.CompletedStages = append(nextState.CompletedStages, stage.ID)
 	}
 	if failure, ok, err := r.evaluateGates(ctx, nextStage, nextState, env, nextStage.Entry); err != nil || ok {
 		return failure, false, err

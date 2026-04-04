@@ -23,6 +23,7 @@ func (g *Guard) emitPreAudit(
 	execs, _ := sess.ExecutionCount(ctx)
 	event := audit.NewEvent()
 	event.RunID = env2.RunID()
+	event.SessionID = env2.RunID()
 	event.CallID = env2.CallID()
 	event.CallIndex = env2.CallIndex()
 	event.ParentCallID = env2.ParentCallID()
@@ -62,6 +63,7 @@ func (g *Guard) emitPostAudit(
 	execs, _ := sess.ExecutionCount(ctx)
 	event := audit.NewEvent()
 	event.RunID = env2.RunID()
+	event.SessionID = env2.RunID()
 	event.CallID = env2.CallID()
 	event.CallIndex = env2.CallIndex()
 	event.ParentCallID = env2.ParentCallID()
@@ -99,6 +101,7 @@ func (g *Guard) emitObservedDenials(
 		if observed && !passed {
 			event := audit.NewEvent()
 			event.RunID = env2.RunID()
+			event.SessionID = env2.RunID()
 			event.CallID = env2.CallID()
 			event.CallIndex = env2.CallIndex()
 			event.ParentCallID = env2.ParentCallID()
@@ -140,6 +143,7 @@ func (g *Guard) emitObserveResults(
 		}
 		event := audit.NewEvent()
 		event.RunID = env2.RunID()
+		event.SessionID = env2.RunID()
 		event.CallID = env2.CallID()
 		event.CallIndex = env2.CallIndex()
 		event.ParentCallID = env2.ParentCallID()

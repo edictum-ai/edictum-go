@@ -92,6 +92,22 @@ func TestAllActions_StringValues(t *testing.T) {
 	}
 }
 
+func TestWorkflowActions_StringValues(t *testing.T) {
+	cases := []struct {
+		action Action
+		want   string
+	}{
+		{ActionWorkflowStageAdvanced, "workflow_stage_advanced"},
+		{ActionWorkflowCompleted, "workflow_completed"},
+		{ActionWorkflowStateUpdated, "workflow_state_updated"},
+	}
+	for _, tc := range cases {
+		if string(tc.action) != tc.want {
+			t.Errorf("Action %q != %q", tc.action, tc.want)
+		}
+	}
+}
+
 // --- CompositeSink ---
 
 // countingSink tracks Emit calls.

@@ -87,6 +87,7 @@ func (g *Guard) resolveApproval(
 	}
 
 	var reqOpts []approval.RequestOption
+	reqOpts = append(reqOpts, approval.WithSessionID(sess.ID()))
 	if pre.ApprovalTimeout > 0 {
 		reqOpts = append(reqOpts, approval.WithTimeout(time.Duration(pre.ApprovalTimeout)*time.Second))
 	}

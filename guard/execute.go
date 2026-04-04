@@ -65,6 +65,18 @@ func (g *Guard) executeAndPost(
 			workflowEvents = append(workflowEvents, events...)
 		}
 	}
+	if pre.WorkflowInvolved {
+		g.mu.RLock()
+		rt := g.workflowRuntime
+		g.mu.RUnlock()
+		if rt != nil {
+			snapshot, err := rt.Snapshot(ctx, sess)
+			if err != nil {
+				return nil, fmt.Errorf("workflow snapshot: %w", err)
+			}
+			post.Workflow = snapshot
+		}
+	}
 	if err := sess.RecordExecution(ctx, env2.ToolName(), toolSuccess); err != nil {
 		return nil, fmt.Errorf("record execution: %w", err)
 	}

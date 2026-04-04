@@ -397,6 +397,49 @@ func (m *mockApprovalBackend) PollApprovalStatus(ctx context.Context, approvalID
 	return m.onPoll(ctx, approvalID)
 }
 
+func TestRun_WorkflowApprovalPassesSessionIDToApprovalBackend(t *testing.T) {
+	rt := mustWorkflowRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: approval-session
+stages:
+  - id: implement
+    tools: [Edit]
+  - id: review
+    entry:
+      - condition: stage_complete("implement")
+    approval:
+      message: Approval required before push
+  - id: push
+    entry:
+      - condition: stage_complete("review")
+    tools: [Bash]
+`)
+	var gotSessionID string
+	backend := &mockApprovalBackend{
+		onRequest: func(ctx context.Context, toolName string, toolArgs map[string]any, message string, opts ...approval.RequestOption) (approval.Request, error) {
+			req := approval.NewRequest("approval-1", toolName, toolArgs, message, opts...)
+			gotSessionID = req.SessionID()
+			return req, nil
+		},
+		onPoll: func(context.Context, string) (approval.Decision, error) {
+			return approval.Decision{Approved: false, Status: approval.StatusDenied}, nil
+		},
+	}
+	g := New(WithWorkflowRuntime(rt), WithApprovalBackend(backend))
+
+	if _, err := g.Run(context.Background(), "Edit", map[string]any{"path": "src/app.ts"}, nopCallable); err != nil {
+		t.Fatalf("Run(Edit): %v", err)
+	}
+	_, err := g.Run(context.Background(), "Bash", map[string]any{"command": "git push origin feature"}, nopCallable)
+	if err == nil {
+		t.Fatal("expected approval block")
+	}
+	if gotSessionID != g.sessionID {
+		t.Fatalf("approval SessionID = %q, want %q", gotSessionID, g.sessionID)
+	}
+}
+
 func TestRunAttemptsIncrement(t *testing.T) {
 	g := New()
 	ctx := context.Background()
