@@ -417,7 +417,7 @@ stages:
 `)
 	var gotSessionID string
 	backend := &mockApprovalBackend{
-		onRequest: func(ctx context.Context, toolName string, toolArgs map[string]any, message string, opts ...approval.RequestOption) (approval.Request, error) {
+		onRequest: func(_ context.Context, toolName string, toolArgs map[string]any, message string, opts ...approval.RequestOption) (approval.Request, error) {
 			req := approval.NewRequest("approval-1", toolName, toolArgs, message, opts...)
 			gotSessionID = req.SessionID()
 			return req, nil
