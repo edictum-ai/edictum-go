@@ -23,7 +23,7 @@ func (g *Guard) emitPreAudit(
 	execs, _ := sess.ExecutionCount(ctx)
 	event := audit.NewEvent()
 	event.RunID = env2.RunID()
-	event.SessionID = env2.RunID()
+	event.SessionID = sess.ID()
 	event.CallID = env2.CallID()
 	event.CallIndex = env2.CallIndex()
 	event.ParentCallID = env2.ParentCallID()
@@ -63,7 +63,7 @@ func (g *Guard) emitPostAudit(
 	execs, _ := sess.ExecutionCount(ctx)
 	event := audit.NewEvent()
 	event.RunID = env2.RunID()
-	event.SessionID = env2.RunID()
+	event.SessionID = sess.ID()
 	event.CallID = env2.CallID()
 	event.CallIndex = env2.CallIndex()
 	event.ParentCallID = env2.ParentCallID()
@@ -92,6 +92,7 @@ func (g *Guard) emitPostAudit(
 func (g *Guard) emitObservedDenials(
 	ctx context.Context,
 	env2 toolcall.ToolCall,
+	sess *session.Session,
 	pre pipeline.PreDecision,
 	policyVersion string,
 ) {
@@ -101,7 +102,7 @@ func (g *Guard) emitObservedDenials(
 		if observed && !passed {
 			event := audit.NewEvent()
 			event.RunID = env2.RunID()
-			event.SessionID = env2.RunID()
+			event.SessionID = sess.ID()
 			event.CallID = env2.CallID()
 			event.CallIndex = env2.CallIndex()
 			event.ParentCallID = env2.ParentCallID()
@@ -132,6 +133,7 @@ func (g *Guard) emitObservedDenials(
 func (g *Guard) emitObserveResults(
 	ctx context.Context,
 	env2 toolcall.ToolCall,
+	sess *session.Session,
 	pre pipeline.PreDecision,
 	policyVersion string,
 ) {
@@ -143,7 +145,7 @@ func (g *Guard) emitObserveResults(
 		}
 		event := audit.NewEvent()
 		event.RunID = env2.RunID()
-		event.SessionID = env2.RunID()
+		event.SessionID = sess.ID()
 		event.CallID = env2.CallID()
 		event.CallIndex = env2.CallIndex()
 		event.ParentCallID = env2.ParentCallID()

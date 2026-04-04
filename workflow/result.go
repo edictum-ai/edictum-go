@@ -100,7 +100,7 @@ func (s *State) clearWorkflowStatus() bool {
 }
 
 func (s *State) markBlocked(env toolcall.ToolCall, reason string) bool {
-	_ = s.clearWorkflowStatus()
+	s.clearWorkflowStatus()
 	if s.BlockedReason != reason {
 		s.BlockedReason = reason
 	}

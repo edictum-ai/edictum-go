@@ -13,7 +13,7 @@ import (
 type Runtime struct {
 	definition Definition
 	// mu serializes all session-backed state reads and writes.
-	mu         sync.Mutex
+	mu         sync.RWMutex
 	evaluators map[string]FactEvaluator
 }
 
@@ -72,15 +72,15 @@ func (r *Runtime) Definition() Definition {
 
 // State returns the current persisted workflow state.
 func (r *Runtime) State(ctx context.Context, sess *session.Session) (State, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return loadState(ctx, sess, r.definition)
 }
 
 // Snapshot returns the current workflow context snapshot for audit events.
 func (r *Runtime) Snapshot(ctx context.Context, sess *session.Session) (map[string]any, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	state, err := loadState(ctx, sess, r.definition)
 	if err != nil {
 		return nil, err

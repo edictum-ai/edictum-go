@@ -6,12 +6,14 @@ import (
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
-func (r *Runtime) evaluateCurrentStage(stage Stage, env toolcall.ToolCall) (bool, Evaluation, *Evaluation, error) {
+func (r *Runtime) evaluateCurrentStage(stage Stage, state State, env toolcall.ToolCall) (bool, Evaluation, *Evaluation, error) {
 	if stageIsBoundaryOnly(stage) {
 		return false, Evaluation{}, nil, nil
 	}
 	if !toolAllowed(stage, env) {
-		block := evaluationFromRecord(ActionBlock, stage.ID, "Tool is not allowed in this workflow stage", workflowMetadata(r.definition.Metadata.Name, stage.ID, "tools", strings.Join(stage.Tools, ","), false, env.ToolName(), nil), gateRecord(FactResult{
+		auditState := state.clone()
+		auditState.markBlocked(env, "Tool is not allowed in this workflow stage")
+		block := evaluationFromRecord(ActionBlock, stage.ID, "Tool is not allowed in this workflow stage", workflowGateMetadata(r.definition, auditState, "tools", strings.Join(stage.Tools, ","), false, env.ToolName(), nil), gateRecord(FactResult{
 			Kind:      "tools",
 			Condition: strings.Join(stage.Tools, ","),
 			Message:   "Tool is not allowed in this workflow stage",
@@ -27,7 +29,9 @@ func (r *Runtime) evaluateCurrentStage(stage Stage, env toolcall.ToolCall) (bool
 			return false, Evaluation{}, nil, err
 		}
 		if !passed {
-			block := evaluationFromRecord(ActionBlock, stage.ID, check.Message, workflowMetadata(r.definition.Metadata.Name, stage.ID, "check", condition, false, env.BashCommand(), nil), gateRecord(FactResult{
+			auditState := state.clone()
+			auditState.markBlocked(env, check.Message)
+			block := evaluationFromRecord(ActionBlock, stage.ID, check.Message, workflowGateMetadata(r.definition, auditState, "check", condition, false, env.BashCommand(), nil), gateRecord(FactResult{
 				Kind:      "check",
 				Condition: condition,
 				Message:   check.Message,
@@ -50,5 +54,5 @@ func (r *Runtime) evaluateCurrentStage(stage Stage, env toolcall.ToolCall) (bool
 		Workflow:  r.definition.Metadata.Name,
 		Evidence:  env.ToolName(),
 	}, true)
-	return true, evaluationFromRecord(ActionAllow, stage.ID, "", workflowMetadata(r.definition.Metadata.Name, stage.ID, "tools", condition, true, env.ToolName(), nil), record), nil, nil
+	return true, evaluationFromRecord(ActionAllow, stage.ID, "", workflowGateMetadata(r.definition, state, "tools", condition, true, env.ToolName(), nil), record), nil, nil
 }

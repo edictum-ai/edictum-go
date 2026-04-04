@@ -29,7 +29,7 @@ func (r *Runtime) Evaluate(ctx context.Context, sess *session.Session, env toolc
 			return Evaluation{}, fmt.Errorf("workflow: active stage %q not found", state.ActiveStage)
 		}
 
-		allowed, eval, invalid, err := r.evaluateCurrentStage(stage, env)
+		allowed, eval, invalid, err := r.evaluateCurrentStage(stage, state, env)
 		if err != nil {
 			return Evaluation{}, err
 		}
@@ -153,7 +153,9 @@ func (r *Runtime) evaluateCompletion(ctx context.Context, stage Stage, state Sta
 		}
 	}
 	if stage.Approval != nil && state.Approvals[stage.ID] != approvedStatus {
-		audit := workflowMetadata(r.definition.Metadata.Name, stage.ID, "approval", "stage boundary", false, "", map[string]any{
+		auditState := state.clone()
+		auditState.markPendingApproval(stage.ID, stage.Approval.Message)
+		audit := workflowGateMetadata(r.definition, auditState, "approval", "stage boundary", false, "", map[string]any{
 			"approval_requested_for": stage.ID,
 		})
 		return evaluationFromRecord(ActionPendingApproval, stage.ID, stage.Approval.Message, audit, gateRecord(FactResult{
@@ -206,12 +208,14 @@ func (r *Runtime) evaluateGates(ctx context.Context, stage Stage, state State, e
 		record := gateRecord(result, result.Passed)
 		records = append(records, record)
 		if !result.Passed {
+			auditState := state.clone()
+			auditState.markBlocked(env, result.Message)
 			return Evaluation{
 				Action:  ActionBlock,
 				Reason:  result.Message,
 				StageID: stage.ID,
 				Records: records,
-				Audit:   workflowMetadata(r.definition.Metadata.Name, stage.ID, result.Kind, result.Condition, false, result.Evidence, result.ExtraAudit),
+				Audit:   workflowGateMetadata(r.definition, auditState, result.Kind, result.Condition, false, result.Evidence, result.ExtraAudit),
 			}, true, nil
 		}
 	}

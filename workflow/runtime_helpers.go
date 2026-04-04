@@ -32,15 +32,12 @@ func workflowProgressEvent(action string, def Definition, state State) map[strin
 	}
 }
 
-func workflowMetadata(name, stageID, kind, condition string, passed bool, evidence string, extra map[string]any) map[string]any {
-	metadata := map[string]any{
-		"workflow_name":  name,
-		"stage_id":       stageID,
-		"gate_kind":      kind,
-		"gate_condition": condition,
-		"gate_passed":    passed,
-		"gate_evidence":  evidence,
-	}
+func workflowGateMetadata(def Definition, state State, kind, condition string, passed bool, evidence string, extra map[string]any) map[string]any {
+	metadata := workflowSnapshot(def, state)
+	metadata["gate_kind"] = kind
+	metadata["gate_condition"] = condition
+	metadata["gate_passed"] = passed
+	metadata["gate_evidence"] = evidence
 	for key, value := range extra {
 		metadata[key] = value
 	}

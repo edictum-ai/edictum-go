@@ -5,12 +5,14 @@ import (
 	"log"
 
 	"github.com/edictum-ai/edictum-go/audit"
+	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
 func (g *Guard) emitWorkflowEvents(
 	ctx context.Context,
 	env2 toolcall.ToolCall,
+	sess *session.Session,
 	events []map[string]any,
 	mode, policyVersion string,
 ) {
@@ -23,7 +25,7 @@ func (g *Guard) emitWorkflowEvents(
 
 		event := audit.NewEvent()
 		event.RunID = env2.RunID()
-		event.SessionID = env2.RunID()
+		event.SessionID = sess.ID()
 		event.CallID = env2.CallID()
 		event.CallIndex = env2.CallIndex()
 		event.ParentCallID = env2.ParentCallID()
