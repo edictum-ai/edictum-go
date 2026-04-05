@@ -11,7 +11,7 @@ import (
 )
 
 // VERSION is the adapter version.
-const VERSION = "0.3.0"
+const VERSION = "0.4.0"
 
 // Adapter wraps a guard.Guard for use with Genkit tool functions.
 type Adapter struct {
