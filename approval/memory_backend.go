@@ -58,6 +58,7 @@ func (b *MemoryBackend) RequestApproval(
 		b.mu.Lock()
 		delete(b.requests, id)
 		delete(b.waiters, id)
+		delete(b.decisions, id)
 		b.mu.Unlock()
 		return Request{}, ctx.Err()
 	}

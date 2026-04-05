@@ -3,6 +3,7 @@ package approval
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -131,6 +132,66 @@ func TestMemoryBackend_PollApprovalStatusUnknownID(t *testing.T) {
 	_, err := backend.PollApprovalStatus(context.Background(), "missing")
 	if err == nil || !strings.Contains(err.Error(), "approval not found") {
 		t.Fatalf("PollApprovalStatus error = %v, want approval not found", err)
+	}
+}
+
+func TestMemoryBackend_RequestApprovalContextCancelRemovesRacedDecision(t *testing.T) {
+	backend := NewMemoryBackend()
+
+	for i := 0; i < cap(backend.requestCh); i++ {
+		if _, err := backend.RequestApproval(context.Background(), "Bash", nil, "review"); err != nil {
+			t.Fatalf("RequestApproval fill %d: %v", i, err)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := backend.RequestApproval(ctx, "Bash", nil, "review")
+		errCh <- err
+	}()
+
+	approvalID := fmt.Sprintf("approval-%d", cap(backend.requestCh)+1)
+	deadline := time.Now().Add(time.Second)
+	for {
+		backend.mu.Lock()
+		_, hasRequest := backend.requests[approvalID]
+		_, hasWaiter := backend.waiters[approvalID]
+		backend.mu.Unlock()
+		if hasRequest && hasWaiter {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s registration", approvalID)
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	if err := backend.Approve(approvalID, "reviewer@example.com", "approved"); err != nil {
+		t.Fatalf("Approve: %v", err)
+	}
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("RequestApproval error = %v, want context canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for RequestApproval to return")
+	}
+
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	if _, ok := backend.requests[approvalID]; ok {
+		t.Fatalf("requests[%s] still present after cancellation", approvalID)
+	}
+	if _, ok := backend.waiters[approvalID]; ok {
+		t.Fatalf("waiters[%s] still present after cancellation", approvalID)
+	}
+	if _, ok := backend.decisions[approvalID]; ok {
+		t.Fatalf("decisions[%s] still present after cancellation", approvalID)
 	}
 }
 

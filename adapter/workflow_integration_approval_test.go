@@ -56,14 +56,16 @@ stages:
 
 			bashCall := newWorkflowIntegrationCall("ok", nil)
 			resultCh := make(chan workflowIntegrationResult, 1)
+			runCtx, cancelRun := context.WithCancel(context.Background())
 			t.Cleanup(func() {
+				cancelRun()
 				select {
 				case <-resultCh:
 				default:
 				}
 			})
 			go func() {
-				ctx := guard.ContextWithRunOptions(context.Background(), guard.WithParentSessionID("parent-"+harness.name))
+				ctx := guard.ContextWithRunOptions(runCtx, guard.WithParentSessionID("parent-"+harness.name))
 				result, err := harness.run(
 					ctx,
 					g,
