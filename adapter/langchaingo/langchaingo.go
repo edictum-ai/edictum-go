@@ -20,11 +20,15 @@ const VERSION = "0.3.0"
 // Adapter wraps a guard.Guard for use with LangChainGo tool functions.
 type Adapter struct {
 	guard *guard.Guard
+	opts  []guard.RunOption
 }
 
 // New creates a new LangChainGo adapter.
-func New(g *guard.Guard) *Adapter {
-	return &Adapter{guard: g}
+func New(g *guard.Guard, opts ...guard.RunOption) *Adapter {
+	return &Adapter{
+		guard: g,
+		opts:  append([]guard.RunOption(nil), opts...),
+	}
 }
 
 // WrapTool wraps a LangChainGo tool function with governance.
@@ -38,7 +42,7 @@ func (a *Adapter) WrapTool(
 
 		result, err := a.guard.Run(ctx, toolName, args, func(_ map[string]any) (any, error) {
 			return fn(ctx, input)
-		})
+		}, a.opts...)
 		if err != nil {
 			return "", err
 		}

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/edictum-ai/edictum-go/adapter/adkgo"
+	"github.com/edictum-ai/edictum-go/adapter/eino"
+	"github.com/edictum-ai/edictum-go/adapter/genkit"
 	"github.com/edictum-ai/edictum-go/adapter/langchaingo"
 	"github.com/edictum-ai/edictum-go/approval"
 	"github.com/edictum-ai/edictum-go/guard"
@@ -25,6 +27,8 @@ type adapterHarness struct {
 func adapterHarnesses() []adapterHarness {
 	return []adapterHarness{
 		{name: "adkgo", run: runADKStep},
+		{name: "eino", run: runEinoStep},
+		{name: "genkit", run: runGenkitStep},
 		{name: "langchaingo", run: runLangChainGoStep},
 	}
 }
@@ -41,6 +45,16 @@ func runLangChainGoStep(ctx context.Context, g *guard.Guard, step workflowAdapte
 	}
 	wrapped := langchaingo.New(g).WrapTool(step.Call.Tool, executor.langChainCallable())
 	return wrapped(ctx, string(input))
+}
+
+func runEinoStep(ctx context.Context, g *guard.Guard, step workflowAdapterStep, executor *stepExecutor) (any, error) {
+	wrapped := eino.New(g).WrapTool(step.Call.Tool, executor.adkCallable())
+	return wrapped(ctx, step.Call.Args)
+}
+
+func runGenkitStep(ctx context.Context, g *guard.Guard, step workflowAdapterStep, executor *stepExecutor) (any, error) {
+	wrapped := genkit.New(g).WrapTool(step.Call.Tool, executor.adkCallable())
+	return wrapped(ctx, step.Call.Args)
 }
 
 type stepExecutor struct {
