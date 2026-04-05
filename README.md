@@ -123,36 +123,51 @@ For embedded consumers, the workflow runtime now exposes explicit stage-control 
 state APIs:
 
 ```go
-definition, err := workflow.Load("coding-guard.yaml")
-if err != nil {
-    panic(err)
-}
+package main
 
-runtime, err := workflow.NewRuntime(definition)
-if err != nil {
-    panic(err)
-}
+import (
+    "context"
+    "fmt"
 
-sess, err := session.New("hero-session", backend)
-if err != nil {
-    panic(err)
-}
+    "github.com/edictum-ai/edictum-go/session"
+    "github.com/edictum-ai/edictum-go/workflow"
+)
 
-events, err := runtime.SetStage(ctx, sess, "review")
-if err != nil {
-    panic(err)
-}
-_ = events // emits workflow_state_updated audit payloads
+func main() {
+    ctx := context.Background()
+    backend := session.NewMemoryBackend()
 
-state, err := runtime.State(ctx, sess)
-if err != nil {
-    panic(err)
-}
+    definition, err := workflow.Load("coding-guard.yaml")
+    if err != nil {
+        panic(err)
+    }
 
-fmt.Println(definition.Metadata.Version)
-fmt.Println(state.ActiveStage)
-fmt.Println(state.BlockedReason)
-fmt.Println(state.PendingApproval.Required)
+    runtime, err := workflow.NewRuntime(definition)
+    if err != nil {
+        panic(err)
+    }
+
+    sess, err := session.New("hero-session", backend)
+    if err != nil {
+        panic(err)
+    }
+
+    events, err := runtime.SetStage(ctx, sess, "review")
+    if err != nil {
+        panic(err)
+    }
+    _ = events // emits workflow_state_updated audit payloads
+
+    state, err := runtime.State(ctx, sess)
+    if err != nil {
+        panic(err)
+    }
+
+    fmt.Println(definition.Metadata.Version)
+    fmt.Println(state.ActiveStage)
+    fmt.Println(state.BlockedReason)
+    fmt.Println(state.PendingApproval.Required)
+}
 ```
 
 Audit events emitted from guarded runs now include `session_id`,

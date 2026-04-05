@@ -16,7 +16,7 @@
 
 ### Fixed
 
-- server audit sink payloads now match the `/v1/events` API contract used by the
+- server audit sink payloads now match the `/v1/events` API shape used by the
   control plane
 
 ### Breaking Changes
