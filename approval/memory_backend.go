@@ -36,13 +36,13 @@ func (b *MemoryBackend) RequestApproval(
 	opts ...RequestOption,
 ) (Request, error) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	b.nextID++
 	id := fmt.Sprintf("approval-%d", b.nextID)
 	req := NewRequest(id, toolName, toolArgs, message, opts...)
 	b.requests[id] = req
 	b.waiters[id] = make(chan struct{})
+	b.mu.Unlock()
+
 	b.requestCh <- req
 	return req, nil
 }

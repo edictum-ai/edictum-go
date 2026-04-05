@@ -24,6 +24,9 @@ type Adapter struct {
 }
 
 // New creates a new LangChainGo adapter.
+// Any run options passed here are forwarded on every guard.Run() call
+// and take precedence over options carried in ctx via
+// guard.ContextWithRunOptions.
 func New(g *guard.Guard, opts ...guard.RunOption) *Adapter {
 	return &Adapter{
 		guard: g,
