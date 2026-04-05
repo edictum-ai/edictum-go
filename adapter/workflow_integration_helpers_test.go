@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/edictum-ai/edictum-go/adapter/adkgo"
+	adapteranthropic "github.com/edictum-ai/edictum-go/adapter/anthropic"
 	"github.com/edictum-ai/edictum-go/adapter/eino"
 	"github.com/edictum-ai/edictum-go/adapter/genkit"
 	"github.com/edictum-ai/edictum-go/adapter/langchaingo"
@@ -36,6 +37,7 @@ type workflowIntegrationResult struct {
 func workflowIntegrationHarnesses() []workflowIntegrationHarness {
 	return []workflowIntegrationHarness{
 		{name: "adkgo", run: runADKIntegration},
+		{name: "anthropic", run: runAnthropicIntegration},
 		{name: "eino", run: runEinoIntegration},
 		{name: "genkit", run: runGenkitIntegration},
 		{name: "langchaingo", run: runLangChainGoIntegration},
@@ -66,8 +68,23 @@ func (c *workflowIntegrationCall) langChainCallable() func(context.Context, stri
 	}
 }
 
+func (c *workflowIntegrationCall) anthropicCallable() func(context.Context, json.RawMessage) (any, error) {
+	return func(_ context.Context, _ json.RawMessage) (any, error) {
+		c.called.Store(true)
+		return c.result, c.err
+	}
+}
+
 func runADKIntegration(ctx context.Context, g *guard.Guard, toolName string, args map[string]any, call *workflowIntegrationCall, opts ...guard.RunOption) (any, error) {
 	return adkgo.New(g, opts...).WrapTool(toolName, call.mapCallable())(ctx, args)
+}
+
+func runAnthropicIntegration(ctx context.Context, g *guard.Guard, toolName string, args map[string]any, call *workflowIntegrationCall, opts ...guard.RunOption) (any, error) {
+	input, err := json.Marshal(args)
+	if err != nil {
+		return nil, err
+	}
+	return adapteranthropic.New(g, opts...).WrapTool(toolName, call.anthropicCallable())(ctx, input)
 }
 
 func runEinoIntegration(ctx context.Context, g *guard.Guard, toolName string, args map[string]any, call *workflowIntegrationCall, opts ...guard.RunOption) (any, error) {

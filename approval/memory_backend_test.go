@@ -3,6 +3,7 @@ package approval
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -121,5 +122,29 @@ func TestMemoryBackend_RequestApprovalContextCancelWhenQueueFull(t *testing.T) {
 	}
 	if len(backend.requests) != cap(backend.requestCh) {
 		t.Fatalf("requests len = %d, want %d", len(backend.requests), cap(backend.requestCh))
+	}
+}
+
+func TestMemoryBackend_PollApprovalStatusUnknownID(t *testing.T) {
+	backend := NewMemoryBackend()
+
+	_, err := backend.PollApprovalStatus(context.Background(), "missing")
+	if err == nil || !strings.Contains(err.Error(), "approval not found") {
+		t.Fatalf("PollApprovalStatus error = %v, want approval not found", err)
+	}
+}
+
+func TestMemoryBackend_DoubleDecisionRejected(t *testing.T) {
+	backend := NewMemoryBackend()
+
+	req, err := backend.RequestApproval(context.Background(), "Bash", nil, "review")
+	if err != nil {
+		t.Fatalf("RequestApproval: %v", err)
+	}
+	if err := backend.Approve(req.ApprovalID(), "reviewer@example.com", "approved"); err != nil {
+		t.Fatalf("Approve: %v", err)
+	}
+	if err := backend.Deny(req.ApprovalID(), "reviewer@example.com", "denied"); err == nil || !strings.Contains(err.Error(), "already decided") {
+		t.Fatalf("Deny error = %v, want already decided", err)
 	}
 }

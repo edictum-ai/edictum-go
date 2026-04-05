@@ -19,11 +19,18 @@ const VERSION = "0.3.0"
 // Adapter wraps a guard.Guard for use with Anthropic SDK tool functions.
 type Adapter struct {
 	guard *guard.Guard
+	opts  []guard.RunOption
 }
 
 // New creates a new Anthropic SDK adapter.
-func New(g *guard.Guard) *Adapter {
-	return &Adapter{guard: g}
+// Any run options passed here become default guard.Run() options for
+// wrapped calls. Callers can still override them via
+// guard.ContextWithRunOptions.
+func New(g *guard.Guard, opts ...guard.RunOption) *Adapter {
+	return &Adapter{
+		guard: g,
+		opts:  append([]guard.RunOption(nil), opts...),
+	}
 }
 
 // WrapTool wraps an Anthropic SDK Go tool function with governance.
@@ -32,6 +39,7 @@ func (a *Adapter) WrapTool(
 	fn func(ctx context.Context, input json.RawMessage) (any, error),
 ) func(ctx context.Context, input json.RawMessage) (any, error) {
 	return func(ctx context.Context, input json.RawMessage) (any, error) {
+		ctx = guard.ContextWithDefaultRunOptions(ctx, a.opts...)
 		args, err := parseRawMessage(input)
 		if err != nil {
 			return nil, fmt.Errorf("anthropic adapter: invalid JSON input: %w", err)

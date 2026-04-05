@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+// defaultMemoryBackendQueueSize keeps local/test approval producers decoupled
+// from WaitForRequest consumers while still bounding memory. When the queue
+// fills, RequestApproval waits for space or returns on ctx cancellation.
+const defaultMemoryBackendQueueSize = 128
+
 // MemoryBackend is an in-memory approval backend for tests and local use.
 type MemoryBackend struct {
 	mu        sync.Mutex
@@ -23,7 +28,7 @@ func NewMemoryBackend() *MemoryBackend {
 		requests:  make(map[string]Request),
 		decisions: make(map[string]Decision),
 		waiters:   make(map[string]chan struct{}),
-		requestCh: make(chan Request, 128),
+		requestCh: make(chan Request, defaultMemoryBackendQueueSize),
 	}
 }
 

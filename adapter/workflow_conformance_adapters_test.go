@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/edictum-ai/edictum-go/adapter/adkgo"
+	adapteranthropic "github.com/edictum-ai/edictum-go/adapter/anthropic"
 	"github.com/edictum-ai/edictum-go/adapter/eino"
 	"github.com/edictum-ai/edictum-go/adapter/genkit"
 	"github.com/edictum-ai/edictum-go/adapter/langchaingo"
@@ -27,6 +28,7 @@ type adapterHarness struct {
 func adapterHarnesses() []adapterHarness {
 	return []adapterHarness{
 		{name: "adkgo", run: runADKStep},
+		{name: "anthropic", run: runAnthropicStep},
 		{name: "eino", run: runEinoStep},
 		{name: "genkit", run: runGenkitStep},
 		{name: "langchaingo", run: runLangChainGoStep},
@@ -45,6 +47,15 @@ func runLangChainGoStep(ctx context.Context, g *guard.Guard, step workflowAdapte
 	}
 	wrapped := langchaingo.New(g).WrapTool(step.Call.Tool, executor.langChainCallable())
 	return wrapped(ctx, string(input))
+}
+
+func runAnthropicStep(ctx context.Context, g *guard.Guard, step workflowAdapterStep, executor *stepExecutor) (any, error) {
+	input, err := json.Marshal(step.Call.Args)
+	if err != nil {
+		return nil, err
+	}
+	wrapped := adapteranthropic.New(g).WrapTool(step.Call.Tool, executor.anthropicCallable())
+	return wrapped(ctx, input)
 }
 
 func runEinoStep(ctx context.Context, g *guard.Guard, step workflowAdapterStep, executor *stepExecutor) (any, error) {
@@ -79,6 +90,12 @@ func (e *stepExecutor) langChainCallable() func(context.Context, string) (string
 			return "", err
 		}
 		return fmt.Sprintf("%v", result), nil
+	}
+}
+
+func (e *stepExecutor) anthropicCallable() func(context.Context, json.RawMessage) (any, error) {
+	return func(_ context.Context, _ json.RawMessage) (any, error) {
+		return e.result()
 	}
 }
 
