@@ -10,7 +10,7 @@ Go SDK for runtime rule enforcement on AI agent tool calls.
 **Prompts are suggestions -- rules are enforcement.**
 The LLM cannot talk its way past a rule.
 
-**Zero runtime deps** | **Fail-closed by default** | **485 tests, -race clean**
+**Zero runtime deps** | **Fail-closed by default** | **660+ tests, -race clean**
 
 ## What it does
 
@@ -119,9 +119,67 @@ For M1 dogfood:
 - reuse the same `--session-id` across one agent task so workflow state advances
 - route real tool execution through `gate run`; `gate check` will not enforce workflows
 
+For embedded consumers, the workflow runtime now exposes explicit stage-control and
+state APIs:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/edictum-ai/edictum-go/session"
+    "github.com/edictum-ai/edictum-go/workflow"
+)
+
+func main() {
+    ctx := context.Background()
+    backend := session.NewMemoryBackend()
+
+    definition, err := workflow.Load("coding-guard.yaml")
+    if err != nil {
+        panic(err)
+    }
+
+    runtime, err := workflow.NewRuntime(definition)
+    if err != nil {
+        panic(err)
+    }
+
+    sess, err := session.New("hero-session", backend)
+    if err != nil {
+        panic(err)
+    }
+
+    events, err := runtime.SetStage(ctx, sess, "review")
+    if err != nil {
+        panic(err)
+    }
+    _ = events // emits workflow_state_updated audit payloads
+
+    state, err := runtime.State(ctx, sess)
+    if err != nil {
+        panic(err)
+    }
+
+    fmt.Println(definition.Metadata.Version)
+    fmt.Println(state.ActiveStage)
+    fmt.Println(state.BlockedReason)
+    fmt.Println(state.PendingApproval.Required)
+}
+```
+
+Audit events emitted from guarded runs now include `session_id`,
+`parent_session_id`, and workflow progress actions such as
+`workflow_state_updated`.
+
 ## Adapters
 
-All adapters use `New(g)` + `WrapTool()`. Zero external framework dependencies.
+All adapters use `New(g, opts...)` + `WrapTool()`. Zero external framework dependencies.
+Adapter-level `guard.RunOption` values become default run metadata for wrapped
+calls, which lets external consumers pin session IDs, lineage, environment, or
+principal data without a local fork.
 
 | Framework | Import |
 |-----------|--------|
@@ -134,13 +192,17 @@ All adapters use `New(g)` + `WrapTool()`. Zero external framework dependencies.
 ```go
 import "github.com/edictum-ai/edictum-go/adapter/adkgo"
 
-adapter := adkgo.New(g)
+adapter := adkgo.New(
+    g,
+    guard.WithSessionID("hero-session"),
+    guard.WithRunEnvironment("hero-demo"),
+)
 wrappedTool := adapter.WrapTool("Bash", originalToolFunc)
 ```
 
 ## Feature parity
 
-Full parity with [edictum](https://github.com/edictum-ai/edictum) Python reference -- 485 tests, all passing with `-race`.
+Full parity with [edictum](https://github.com/edictum-ai/edictum) Python reference -- 660+ tests, all passing with `-race`.
 
 ## Security
 
