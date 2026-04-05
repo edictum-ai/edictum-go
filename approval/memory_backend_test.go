@@ -102,3 +102,24 @@ func TestMemoryBackend_PollApprovalStatusContextCancel(t *testing.T) {
 		t.Fatalf("Status = %q, want %q", decision.Status, StatusTimeout)
 	}
 }
+
+func TestMemoryBackend_RequestApprovalContextCancelWhenQueueFull(t *testing.T) {
+	backend := NewMemoryBackend()
+
+	for i := 0; i < cap(backend.requestCh); i++ {
+		if _, err := backend.RequestApproval(context.Background(), "Bash", nil, "review"); err != nil {
+			t.Fatalf("RequestApproval fill %d: %v", i, err)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	_, err := backend.RequestApproval(ctx, "Bash", nil, "review")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("RequestApproval error = %v, want context deadline exceeded", err)
+	}
+	if len(backend.requests) != cap(backend.requestCh) {
+		t.Fatalf("requests len = %d, want %d", len(backend.requests), cap(backend.requestCh))
+	}
+}

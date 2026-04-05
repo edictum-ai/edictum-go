@@ -65,3 +65,43 @@ stages:
 		})
 	}
 }
+
+func TestAdapterRunOptions_ContextOverridesConstructorDefaults(t *testing.T) {
+	for _, harness := range workflowIntegrationHarnesses() {
+		t.Run(harness.name, func(t *testing.T) {
+			sink := audit.NewCollectingSink(16)
+			g := guard.New(guard.WithAuditSink(sink))
+
+			ctx := guard.ContextWithRunOptions(
+				context.Background(),
+				guard.WithSessionID("ctx-session-"+harness.name),
+				guard.WithParentSessionID("ctx-parent-"+harness.name),
+			)
+			_, err := harness.run(
+				ctx,
+				g,
+				"Read",
+				map[string]any{"path": "specs/008.md"},
+				newWorkflowIntegrationCall("ok", nil),
+				guard.WithSessionID("default-session-"+harness.name),
+				guard.WithParentSessionID("default-parent-"+harness.name),
+			)
+			if err != nil {
+				t.Fatalf("run(Read): %v", err)
+			}
+
+			events := sink.Events()
+			if len(events) < 2 {
+				t.Fatalf("events len = %d, want at least 2", len(events))
+			}
+			for _, event := range events {
+				if event.SessionID != "ctx-session-"+harness.name {
+					t.Fatalf("SessionID = %q, want %q", event.SessionID, "ctx-session-"+harness.name)
+				}
+				if event.ParentSessionID != "ctx-parent-"+harness.name {
+					t.Fatalf("ParentSessionID = %q, want %q", event.ParentSessionID, "ctx-parent-"+harness.name)
+				}
+			}
+		})
+	}
+}

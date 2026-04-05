@@ -29,12 +29,15 @@ func NewMemoryBackend() *MemoryBackend {
 
 // RequestApproval stores a pending approval request in memory.
 func (b *MemoryBackend) RequestApproval(
-	_ context.Context,
+	ctx context.Context,
 	toolName string,
 	toolArgs map[string]any,
 	message string,
 	opts ...RequestOption,
 ) (Request, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	b.mu.Lock()
 	b.nextID++
 	id := fmt.Sprintf("approval-%d", b.nextID)
@@ -43,8 +46,16 @@ func (b *MemoryBackend) RequestApproval(
 	b.waiters[id] = make(chan struct{})
 	b.mu.Unlock()
 
-	b.requestCh <- req
-	return req, nil
+	select {
+	case b.requestCh <- req:
+		return req, nil
+	case <-ctx.Done():
+		b.mu.Lock()
+		delete(b.requests, id)
+		delete(b.waiters, id)
+		b.mu.Unlock()
+		return Request{}, ctx.Err()
+	}
 }
 
 // PollApprovalStatus waits for an approval decision or context cancellation.

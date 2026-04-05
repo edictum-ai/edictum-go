@@ -20,8 +20,8 @@ type Adapter struct {
 }
 
 // New creates a new Genkit adapter.
-// Any run options passed here are forwarded on every guard.Run() call
-// and take precedence over options carried in ctx via
+// Any run options passed here become default guard.Run() options for
+// wrapped calls. Callers can still override them via
 // guard.ContextWithRunOptions.
 func New(g *guard.Guard, opts ...guard.RunOption) *Adapter {
 	return &Adapter{
@@ -36,8 +36,9 @@ func (a *Adapter) WrapTool(
 	fn func(ctx context.Context, args map[string]any) (any, error),
 ) func(ctx context.Context, args map[string]any) (any, error) {
 	return func(ctx context.Context, args map[string]any) (any, error) {
+		ctx = guard.ContextWithDefaultRunOptions(ctx, a.opts...)
 		return a.guard.Run(ctx, toolName, args, func(m map[string]any) (any, error) {
 			return fn(ctx, m)
-		}, a.opts...)
+		})
 	}
 }
