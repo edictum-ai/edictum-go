@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// Reloader is the interface for hot-reloading rule bundles.
+// Reloader is the interface for hot-reloading rulesets.
 // Guard implements this via its Reload method (added by the server package).
 type Reloader interface {
 	ReloadFromYAML(yamlBytes []byte) error

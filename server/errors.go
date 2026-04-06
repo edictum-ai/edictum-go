@@ -1,4 +1,4 @@
-// Package server provides the Server SDK for HTTP-backed governance.
+// Package server provides the Server SDK for HTTP-backed dashboard APIs.
 package server
 
 import "fmt"

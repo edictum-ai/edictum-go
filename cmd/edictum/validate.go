@@ -14,8 +14,8 @@ func newValidateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "validate <files...>",
-		Short: "Validate YAML rule bundles",
-		Long:  "Validate one or more YAML rule bundles. Exits 1 if any are invalid.",
+		Short: "Validate YAML rulesets",
+		Long:  "Validate one or more YAML rulesets. Exits 1 if any are invalid.",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runValidate(cmd, args, jsonOutput)

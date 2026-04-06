@@ -1,4 +1,4 @@
-// Package eino provides an edictum adapter for Eino (CloudWeGo).
+// Package eino provides an Edictum adapter for Eino (CloudWeGo).
 //
 // Eino tools use map[string]any for arguments and return any.
 // This is the simplest adapter since the signature matches guard.Run().
@@ -30,7 +30,7 @@ func New(g *guard.Guard, opts ...guard.RunOption) *Adapter {
 	}
 }
 
-// WrapTool wraps an Eino tool function with governance.
+// WrapTool wraps an Eino tool function with Edictum checks.
 func (a *Adapter) WrapTool(
 	toolName string,
 	fn func(ctx context.Context, args map[string]any) (any, error),

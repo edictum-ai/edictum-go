@@ -15,7 +15,7 @@ import (
 )
 
 // executeAndPost executes the tool callable and runs post-execution
-// governance checks, audit emission, and callbacks.
+// checks, audit emission, and callbacks.
 func (g *Guard) executeAndPost(
 	ctx context.Context,
 	env2 toolcall.ToolCall,
@@ -96,7 +96,7 @@ func (g *Guard) executeAndPost(
 
 	if !toolSuccess {
 		// Tool execution failed — Error status reflects the tool outcome.
-		// This intentionally overwrites any prior governance status
+		// This intentionally overwrites any prior pipeline status
 		// (e.g., approval timeout) because the tool itself failed.
 		telemetry.SetSpanError(trace.SpanFromContext(ctx), "tool failed")
 		return nil, &edictum.ToolError{Message: fmt.Sprintf("%v", result)}

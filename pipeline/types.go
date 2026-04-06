@@ -1,6 +1,6 @@
 package pipeline
 
-// PreDecision is the result of pre-execution governance checks.
+// PreDecision is the result of pre-execution checks.
 type PreDecision struct {
 	Action             string
 	Reason             string
@@ -22,7 +22,7 @@ type PreDecision struct {
 	WorkflowSkipReason string
 }
 
-// PostDecision is the result of post-execution governance checks.
+// PostDecision is the result of post-execution checks.
 type PostDecision struct {
 	ToolSuccess          bool
 	PostconditionsPassed bool

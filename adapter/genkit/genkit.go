@@ -1,4 +1,4 @@
-// Package genkit provides an edictum adapter for Firebase Genkit Go.
+// Package genkit provides an Edictum adapter for Firebase Genkit Go.
 //
 // Genkit tools use map[string]any for arguments and return any,
 // similar to Eino. The adapter wraps the tool function with guard.Run().
@@ -30,7 +30,7 @@ func New(g *guard.Guard, opts ...guard.RunOption) *Adapter {
 	}
 }
 
-// WrapTool wraps a Genkit tool function with governance.
+// WrapTool wraps a Genkit tool function with Edictum checks.
 func (a *Adapter) WrapTool(
 	toolName string,
 	fn func(ctx context.Context, args map[string]any) (any, error),

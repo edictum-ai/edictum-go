@@ -11,7 +11,7 @@ func (e *Error) Error() string {
 	return e.Message
 }
 
-// BlockedError indicates a tool call was denied by a rule or hook.
+// BlockedError indicates a tool call was blocked by a rule or hook.
 type BlockedError struct {
 	Reason         string
 	DecisionSource string

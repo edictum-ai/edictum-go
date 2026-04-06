@@ -15,8 +15,8 @@ func newDiffCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "diff <file1> <file2> [file3...]",
-		Short: "Compare rule bundles",
-		Long:  "Compare two or more YAML rule bundles and show differences.",
+		Short: "Compare rulesets",
+		Long:  "Compare two or more YAML rulesets and show differences.",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 2 {

@@ -7,7 +7,7 @@ import (
 	"github.com/edictum-ai/edictum-go/telemetry"
 )
 
-// WithTracerProvider sets an OpenTelemetry TracerProvider for governance spans.
+// WithTracerProvider sets an OpenTelemetry TracerProvider for rule-execution spans.
 // Falls back to the global TracerProvider if not set, which returns no-op
 // spans when no OTel SDK is configured.
 // Safe to combine with WithMeterProvider — both are applied together.
@@ -22,8 +22,8 @@ func WithTracerProvider(tp trace.TracerProvider) Option {
 	}
 }
 
-// WithMeterProvider sets an OpenTelemetry MeterProvider for governance
-// metrics (denied/allowed counters). Falls back to the global
+// WithMeterProvider sets an OpenTelemetry MeterProvider for rule-execution
+// metrics (blocked/allowed counters). Falls back to the global
 // MeterProvider if not set.
 // Safe to combine with WithTracerProvider — both are applied together.
 // Overrides any prior WithTelemetry (last writer wins).

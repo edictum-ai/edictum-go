@@ -1,8 +1,8 @@
-// Package anthropic provides an edictum adapter for the Anthropic Go SDK.
+// Package anthropic provides an Edictum adapter for the Anthropic Go SDK.
 //
 // Anthropic SDK passes tool input as json.RawMessage. The adapter
-// unmarshals to map[string]any for the governance pipeline, preserving
-// the original RawMessage for the underlying tool function.
+// unmarshals to map[string]any for the rules pipeline, preserving the
+// original RawMessage for the underlying tool function.
 package anthropic
 
 import (
@@ -33,7 +33,7 @@ func New(g *guard.Guard, opts ...guard.RunOption) *Adapter {
 	}
 }
 
-// WrapTool wraps an Anthropic SDK Go tool function with governance.
+// WrapTool wraps an Anthropic SDK Go tool function with Edictum checks.
 func (a *Adapter) WrapTool(
 	toolName string,
 	fn func(ctx context.Context, input json.RawMessage) (any, error),

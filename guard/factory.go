@@ -9,7 +9,7 @@ import (
 	yamlpkg "github.com/edictum-ai/edictum-go/yaml"
 )
 
-// FromYAML loads YAML rule bundles from a path and returns a configured Guard.
+// FromYAML loads YAML rulesets from a path and returns a configured Guard.
 // If path is a directory, all .yaml/.yml files are loaded and composed
 // (sorted alphabetically for deterministic ordering). If path is a single
 // file, that file is loaded directly.
@@ -27,7 +27,7 @@ func FromYAMLWithReport(path string, opts ...Option) (*Guard, *yamlpkg.Compositi
 	return fromYAMLInternal(path, opts)
 }
 
-// FromYAMLString loads a YAML rule bundle from a string and returns a
+// FromYAMLString loads a YAML ruleset from a string and returns a
 // configured Guard. Follows the json.Unmarshal / json.NewDecoder convention.
 func FromYAMLString(content string, opts ...Option) (*Guard, error) {
 	fc := extractFactory(opts)

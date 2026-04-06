@@ -10,8 +10,8 @@ import (
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
-// CheckPipeline orchestrates all governance checks.
-// This is the single source of truth for governance logic.
+// CheckPipeline orchestrates all rule and workflow checks.
+// This is the single source of truth for pipeline logic.
 // Adapters call PreExecute() and PostExecute(), then translate
 // the structured results into framework-specific formats.
 type CheckPipeline struct {
@@ -23,7 +23,7 @@ func New(provider RuleProvider) *CheckPipeline {
 	return &CheckPipeline{provider: provider}
 }
 
-// PreExecute runs all pre-execution governance checks.
+// PreExecute runs all pre-execution checks.
 func (p *CheckPipeline) PreExecute(
 	ctx context.Context,
 	env toolcall.ToolCall,

@@ -23,8 +23,8 @@ func newCheckCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "check <files...>",
-		Short: "Evaluate a tool call against rule bundles",
-		Long:  "Evaluate a tool call offline against one or more YAML rule bundles.",
+		Short: "Evaluate a tool call against rulesets",
+		Long:  "Evaluate a tool call offline against one or more YAML rulesets.",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, files []string) error {
 			return runCheck(cmd, files, checkArgs{

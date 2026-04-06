@@ -1,11 +1,11 @@
-// Package adkgo provides an edictum adapter for Google ADK Go.
+// Package adkgo provides an Edictum adapter for Google ADK Go.
 //
-// This adapter wraps an edictum Guard for tool governance without
-// importing the actual ADK Go package. Users wire the wrapped tools
-// into their ADK agent configuration, keeping edictum-go zero-dep.
+// This adapter wraps an Edictum Guard without importing the actual ADK Go
+// package. Users wire the wrapped tools into their ADK agent
+// configuration, keeping edictum-go zero-dep.
 //
 // Integration: use WrapTool() to wrap any tool function with the full
-// governance pipeline (pre-execute → execute → post-execute → audit).
+// rules pipeline (pre-execute -> execute -> post-execute -> audit).
 package adkgo
 
 import (
@@ -34,9 +34,9 @@ func New(g *guard.Guard, opts ...guard.RunOption) *Adapter {
 	}
 }
 
-// WrapTool wraps a tool function with governance enforcement.
+// WrapTool wraps a tool function with rule and workflow enforcement.
 // The adapter calls guard.Run() with the tool callable, running the
-// full governance pipeline: pre-execute checks, tool execution,
+// full rules pipeline: pre-execute checks, tool execution,
 // post-execute checks, and audit emission.
 //
 // On deny, returns an *edictum.BlockedError. On tool failure, returns
