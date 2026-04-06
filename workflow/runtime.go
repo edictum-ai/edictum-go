@@ -103,6 +103,21 @@ func (r *Runtime) stageMoveState(ctx context.Context, sess *session.Session, sta
 	return state, idx, nil
 }
 
+func (r *Runtime) hydrateActiveStageStatus(state *State) error {
+	state.clearStageMoveStatus()
+	if state.ActiveStage == "" {
+		return nil
+	}
+	stage, ok := r.definition.StageByID(state.ActiveStage)
+	if !ok {
+		return fmt.Errorf("workflow: active stage %q not found", state.ActiveStage)
+	}
+	if stage.Approval != nil && state.Approvals[stage.ID] != approvedStatus {
+		state.markPendingApproval(stage.ID, stage.Approval.Message)
+	}
+	return nil
+}
+
 // SetStage moves the workflow pointer to the named stage without clearing
 // approvals or previously recorded evidence.
 func (r *Runtime) SetStage(ctx context.Context, sess *session.Session, stageID string) ([]map[string]any, error) {
@@ -113,7 +128,9 @@ func (r *Runtime) SetStage(ctx context.Context, sess *session.Session, stageID s
 	if err != nil {
 		return nil, err
 	}
-	state.clearStageMoveStatus()
+	if err := r.hydrateActiveStageStatus(&state); err != nil {
+		return nil, err
+	}
 	if err := saveState(ctx, sess, r.definition, state); err != nil {
 		return nil, err
 	}

@@ -94,6 +94,57 @@ func TestRuntime_SetStageMovesWithoutClearingEvidenceOrApprovals(t *testing.T) {
 	}
 }
 
+func TestRuntime_SetStageHydratesTargetStageApproval(t *testing.T) {
+	rt := mustRuntime(t, stageMoveWorkflowYAML)
+	sess := newWorkflowSession(t, "wf-set-stage-review")
+	ctx := context.Background()
+
+	events, err := rt.SetStage(ctx, sess, "review")
+	if err != nil {
+		t.Fatalf("SetStage(review): %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("SetStage(review) events len = %d, want 1", len(events))
+	}
+	workflowData, ok := events[0]["workflow"].(map[string]any)
+	if !ok {
+		t.Fatalf("SetStage(review) workflow payload type = %T, want map[string]any", events[0]["workflow"])
+	}
+	if workflowData["active_stage"] != "review" {
+		t.Fatalf("SetStage(review) active_stage = %#v, want %q", workflowData["active_stage"], "review")
+	}
+	pending, ok := workflowData["pending_approval"].(map[string]any)
+	if !ok {
+		t.Fatalf("SetStage(review) pending_approval type = %T, want map[string]any", workflowData["pending_approval"])
+	}
+	if pending["required"] != true {
+		t.Fatalf("SetStage(review) pending_approval.required = %#v, want true", pending["required"])
+	}
+	if pending["stage_id"] != "review" {
+		t.Fatalf("SetStage(review) pending_approval.stage_id = %#v, want %q", pending["stage_id"], "review")
+	}
+	if pending["message"] != "Approval required before push" {
+		t.Fatalf("SetStage(review) pending_approval.message = %#v, want %q", pending["message"], "Approval required before push")
+	}
+
+	state, err := rt.State(ctx, sess)
+	if err != nil {
+		t.Fatalf("State after SetStage(review): %v", err)
+	}
+	if state.ActiveStage != "review" {
+		t.Fatalf("ActiveStage = %q, want %q", state.ActiveStage, "review")
+	}
+	if !state.PendingApproval.Required {
+		t.Fatal("expected PendingApproval.Required after SetStage(review)")
+	}
+	if state.PendingApproval.StageID != "review" {
+		t.Fatalf("PendingApproval.StageID = %q, want %q", state.PendingApproval.StageID, "review")
+	}
+	if state.PendingApproval.Message != "Approval required before push" {
+		t.Fatalf("PendingApproval.Message = %q, want %q", state.PendingApproval.Message, "Approval required before push")
+	}
+}
+
 func TestRuntime_SetStageRejectsUnknownStage(t *testing.T) {
 	rt := mustRuntime(t, stageMoveWorkflowYAML)
 	sess := newWorkflowSession(t, "wf-set-stage-unknown")

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/edictum-ai/edictum-go/audit"
 	"github.com/edictum-ai/edictum-go/guard"
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/workflow"
@@ -43,10 +44,17 @@ func TestWorkflowAdapterConformanceFixtures(t *testing.T) {
 									ctx = guard.ContextWithRunOptions(ctx, guard.WithParentSessionID(fixture.Lineage.ParentSessionID))
 								}
 
+								var err error
 								executor := newStepExecutor(step.Execution)
-								_, err := harness.run(ctx, g, step, executor)
+								if step.SetStageTo != "" {
+									err = applySetStageFixtureStep(ctx, g, backend, rt, fixture, step)
+								} else {
+									_, err = harness.run(ctx, g, step, executor)
+								}
 								assertStepOutcome(t, fixture.ID, step, err)
-								executor.Assert(t, fixture.ID, step.ID)
+								if step.SetStageTo == "" {
+									executor.Assert(t, fixture.ID, step.ID)
+								}
 								approvals.AssertDrained(t, fixture.ID, step.ID)
 
 								events, err := g.LocalSink().SinceMark(mark)
@@ -71,6 +79,41 @@ func TestWorkflowAdapterConformanceFixtures(t *testing.T) {
 			}
 		})
 	}
+}
+
+func applySetStageFixtureStep(
+	ctx context.Context,
+	g *guard.Guard,
+	backend session.StorageBackend,
+	rt *workflow.Runtime,
+	fixture workflowAdapterFixture,
+	step workflowAdapterStep,
+) error {
+	sess, err := session.New(fixture.InitialState.SessionID, backend)
+	if err != nil {
+		return err
+	}
+	events, err := rt.SetStage(ctx, sess, step.SetStageTo)
+	if err != nil {
+		return err
+	}
+	for _, record := range events {
+		workflowData, _ := record["workflow"].(map[string]any)
+		if workflowData == nil {
+			continue
+		}
+		event := audit.NewEvent()
+		event.Action = audit.ActionWorkflowStateUpdated
+		event.SessionID = fixture.InitialState.SessionID
+		event.ParentSessionID = fixture.Lineage.ParentSessionID
+		event.ToolName = "Workflow.SetStage"
+		event.ToolArgs = map[string]any{"stage_id": step.SetStageTo}
+		event.Workflow = workflowData
+		if err := g.LocalSink().Emit(ctx, &event); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildWorkflowRuntimes(t *testing.T, docs map[string]any) map[string]*workflow.Runtime {

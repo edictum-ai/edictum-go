@@ -100,8 +100,11 @@ func (r *Runtime) Evaluate(ctx context.Context, sess *session.Session, env toolc
 		}
 
 		if invalid != nil {
-			nextStage := r.definition.Stages[nextIndex]
-			if !stageIsBoundaryOnly(nextStage) && !toolAllowed(nextStage, env) {
+			beginsNextWork, err := r.callBeginsNextStageWork(ctx, stage, state, env)
+			if err != nil {
+				return Evaluation{}, err
+			}
+			if !beginsNextWork {
 				changed = r.applyDecisionState(&state, *invalid, env) || changed
 				invalid.Audit = workflowSnapshot(r.definition, state)
 				if changed {
@@ -150,6 +153,46 @@ func (r *Runtime) applyDecisionState(state *State, eval Evaluation, env toolcall
 	default:
 		return false
 	}
+}
+
+func callAllowedInStage(stage Stage, env toolcall.ToolCall) (bool, error) {
+	if stageIsBoundaryOnly(stage) {
+		return false, nil
+	}
+	return toolAllowed(stage, env), nil
+}
+
+func (r *Runtime) callBeginsNextStageWork(ctx context.Context, stage Stage, state State, env toolcall.ToolCall) (bool, error) {
+	nextIndex, hasNext := r.nextIndex(stage.ID)
+	if !hasNext {
+		return false, nil
+	}
+
+	candidate := state.clone()
+	if !candidate.completed(stage.ID) {
+		candidate.CompletedStages = append(candidate.CompletedStages, stage.ID)
+	}
+
+	for idx := nextIndex; idx < len(r.definition.Stages); idx++ {
+		nextStage := r.definition.Stages[idx]
+		if _, blocked, err := r.evaluateGates(ctx, nextStage, candidate, env, nextStage.Entry); err != nil {
+			return false, err
+		} else if blocked {
+			return false, nil
+		}
+		if stageIsBoundaryOnly(nextStage) {
+			if nextStage.Approval != nil {
+				candidate.Approvals[nextStage.ID] = approvedStatus
+			}
+			if !candidate.completed(nextStage.ID) {
+				candidate.CompletedStages = append(candidate.CompletedStages, nextStage.ID)
+			}
+			continue
+		}
+		return callAllowedInStage(nextStage, env)
+	}
+
+	return false, nil
 }
 
 func (r *Runtime) evaluateCompletion(ctx context.Context, stage Stage, state State, env toolcall.ToolCall, hasNext bool) (Evaluation, bool, error) {
