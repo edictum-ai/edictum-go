@@ -145,6 +145,49 @@ func TestRuntime_SetStageHydratesTargetStageApproval(t *testing.T) {
 	}
 }
 
+func TestRuntime_SetStageToApprovedBoundaryStageDoesNotSetPendingApproval(t *testing.T) {
+	rt := mustRuntime(t, stageMoveWorkflowYAML)
+	sess := newWorkflowSession(t, "wf-set-stage-already-approved")
+	ctx := context.Background()
+
+	if err := seedState(ctx, rt, sess, stageMoveSeedState()); err != nil {
+		t.Fatalf("seedState: %v", err)
+	}
+
+	events, err := rt.SetStage(ctx, sess, "review")
+	if err != nil {
+		t.Fatalf("SetStage(review): %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("SetStage(review) events len = %d, want 1", len(events))
+	}
+	workflowData, ok := events[0]["workflow"].(map[string]any)
+	if !ok {
+		t.Fatalf("SetStage(review) workflow payload type = %T, want map[string]any", events[0]["workflow"])
+	}
+	pending, ok := workflowData["pending_approval"].(map[string]any)
+	if !ok {
+		t.Fatalf("SetStage(review) pending_approval type = %T, want map[string]any", workflowData["pending_approval"])
+	}
+	if pending["required"] != false {
+		t.Fatalf("SetStage(review) pending_approval.required = %#v, want false", pending["required"])
+	}
+	if _, ok := pending["stage_id"]; ok {
+		t.Fatalf("SetStage(review) pending_approval.stage_id = %#v, want omitted", pending["stage_id"])
+	}
+	if _, ok := pending["message"]; ok {
+		t.Fatalf("SetStage(review) pending_approval.message = %#v, want omitted", pending["message"])
+	}
+
+	state, err := rt.State(ctx, sess)
+	if err != nil {
+		t.Fatalf("State after SetStage(review): %v", err)
+	}
+	if state.PendingApproval.Required || state.PendingApproval.StageID != "" || state.PendingApproval.Message != "" {
+		t.Fatalf("PendingApproval = %+v, want zero value", state.PendingApproval)
+	}
+}
+
 func TestRuntime_SetStageRejectsUnknownStage(t *testing.T) {
 	rt := mustRuntime(t, stageMoveWorkflowYAML)
 	sess := newWorkflowSession(t, "wf-set-stage-unknown")

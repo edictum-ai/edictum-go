@@ -82,7 +82,7 @@ func TestRuntime_NoExitStageOnlyAdvancesForLegitimateNextStageWork(t *testing.T)
 		if decision.Action != ActionBlock {
 			t.Fatalf("unexpected bash decision: %+v", decision)
 		}
-		if decision.Reason != "Tool is not allowed in this workflow stage" {
+		if decision.Reason != reasonToolNotAllowedInStage {
 			t.Fatalf("Reason = %q, want tool-not-allowed", decision.Reason)
 		}
 
@@ -117,7 +117,7 @@ func TestRuntime_NoExitStageRequiresDownstreamEntryReadinessBeforeAdvance(t *tes
 		if decision.Action != ActionBlock {
 			t.Fatalf("unexpected edit decision: %+v", decision)
 		}
-		if decision.Reason != "Tool is not allowed in this workflow stage" {
+		if decision.Reason != reasonToolNotAllowedInStage {
 			t.Fatalf("Reason = %q, want tool-not-allowed", decision.Reason)
 		}
 

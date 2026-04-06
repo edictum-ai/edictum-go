@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -98,9 +99,13 @@ func applySetStageFixtureStep(
 		return err
 	}
 	for _, record := range events {
-		workflowData, _ := record["workflow"].(map[string]any)
-		if workflowData == nil {
+		rawWorkflow, exists := record["workflow"]
+		if !exists || rawWorkflow == nil {
 			continue
+		}
+		workflowData, ok := rawWorkflow.(map[string]any)
+		if !ok {
+			return fmt.Errorf("SetStage event: workflow key has unexpected type %T", rawWorkflow)
 		}
 		event := audit.NewEvent()
 		event.Action = audit.ActionWorkflowStateUpdated

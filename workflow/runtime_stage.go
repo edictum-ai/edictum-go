@@ -6,17 +6,19 @@ import (
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
+const reasonToolNotAllowedInStage = "Tool is not allowed in this workflow stage"
+
 func (r *Runtime) evaluateCurrentStage(stage Stage, state State, env toolcall.ToolCall) (bool, Evaluation, *Evaluation, error) {
 	if stageIsBoundaryOnly(stage) {
 		return false, Evaluation{}, nil, nil
 	}
 	if !toolAllowed(stage, env) {
 		auditState := state.clone()
-		auditState.markBlocked(env, "Tool is not allowed in this workflow stage")
-		block := evaluationFromRecord(ActionBlock, stage.ID, "Tool is not allowed in this workflow stage", workflowGateMetadata(r.definition, auditState, "tools", strings.Join(stage.Tools, ","), false, env.ToolName(), nil), gateRecord(FactResult{
+		auditState.markBlocked(env, reasonToolNotAllowedInStage)
+		block := evaluationFromRecord(ActionBlock, stage.ID, reasonToolNotAllowedInStage, workflowGateMetadata(r.definition, auditState, "tools", strings.Join(stage.Tools, ","), false, env.ToolName(), nil), gateRecord(FactResult{
 			Kind:      "tools",
 			Condition: strings.Join(stage.Tools, ","),
-			Message:   "Tool is not allowed in this workflow stage",
+			Message:   reasonToolNotAllowedInStage,
 			StageID:   stage.ID,
 			Workflow:  r.definition.Metadata.Name,
 			Evidence:  env.ToolName(),
