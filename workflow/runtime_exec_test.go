@@ -52,7 +52,7 @@ stages:
 	if err != nil {
 		t.Fatalf("Evaluate(main push): %v", err)
 	}
-	if decision.Action != ActionBlock || decision.Reason != "Push to a branch, not main" {
+	if decision.Action != ActionBlock || decision.Reason != "Only go version is allowed" || decision.StageID != "local-verify" {
 		t.Fatalf("unexpected main push decision: %+v", decision)
 	}
 }

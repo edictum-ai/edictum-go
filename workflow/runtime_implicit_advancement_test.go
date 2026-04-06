@@ -43,6 +43,22 @@ stages:
     tools: [Edit]
 `
 
+const noExitCheckFailureWorkflowYAML = `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: no-exit-check-failure
+stages:
+  - id: verify
+    tools: [Bash]
+    checks:
+      - command_not_matches: "^git push origin "
+        message: Do not push during verify
+  - id: push
+    entry:
+      - condition: stage_complete("verify")
+    tools: [Bash]
+`
+
 func TestRuntime_NoExitStageOnlyAdvancesForLegitimateNextStageWork(t *testing.T) {
 	ctx := context.Background()
 	rt := mustRuntime(t, noExitApprovalAdvanceWorkflowYAML)
@@ -100,6 +116,38 @@ func TestRuntime_NoExitStageOnlyAdvancesForLegitimateNextStageWork(t *testing.T)
 			t.Fatalf("PendingApproval = %+v, want zero value", state.PendingApproval)
 		}
 	})
+}
+
+func TestRuntime_NoExitStageCheckFailureDoesNotAdvance(t *testing.T) {
+	ctx := context.Background()
+	rt := mustRuntime(t, noExitCheckFailureWorkflowYAML)
+	sess := newWorkflowSession(t, "wf-no-exit-check-failure")
+
+	push := makeCall(t, "Bash", map[string]any{"command": "git push origin feature-branch"})
+	decision, err := rt.Evaluate(ctx, sess, push)
+	if err != nil {
+		t.Fatalf("Evaluate(push): %v", err)
+	}
+	if decision.Action != ActionBlock || decision.StageID != "verify" {
+		t.Fatalf("unexpected push decision: %+v", decision)
+	}
+	if decision.Reason != "Do not push during verify" {
+		t.Fatalf("Reason = %q, want %q", decision.Reason, "Do not push during verify")
+	}
+
+	state, err := rt.State(ctx, sess)
+	if err != nil {
+		t.Fatalf("State after push: %v", err)
+	}
+	if state.ActiveStage != "verify" {
+		t.Fatalf("ActiveStage = %q, want %q", state.ActiveStage, "verify")
+	}
+	if len(state.CompletedStages) != 0 {
+		t.Fatalf("CompletedStages = %+v, want empty", state.CompletedStages)
+	}
+	if state.BlockedReason != "Do not push during verify" {
+		t.Fatalf("BlockedReason = %q, want %q", state.BlockedReason, "Do not push during verify")
+	}
 }
 
 func TestRuntime_NoExitStageRequiresDownstreamEntryReadinessBeforeAdvance(t *testing.T) {

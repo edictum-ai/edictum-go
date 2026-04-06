@@ -100,6 +100,17 @@ func (r *Runtime) Evaluate(ctx context.Context, sess *session.Session, env toolc
 		}
 
 		if invalid != nil {
+			if toolAllowed(stage, env) {
+				changed = r.applyDecisionState(&state, *invalid, env) || changed
+				invalid.Audit = workflowSnapshot(r.definition, state)
+				if changed {
+					if err := saveState(ctx, sess, r.definition, state); err != nil {
+						return Evaluation{}, err
+					}
+				}
+				invalid.Events = append(invalid.Events, events...)
+				return *invalid, nil
+			}
 			beginsNextWork, err := r.callBeginsNextStageWork(ctx, stage, state, env)
 			if err != nil {
 				return Evaluation{}, err
