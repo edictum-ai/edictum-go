@@ -33,6 +33,7 @@ type workflowAdapterLineage struct {
 
 type workflowAdapterStep struct {
 	ID               string                `yaml:"id"`
+	SetStageTo       string                `yaml:"set_stage_to"`
 	Call             workflowAdapterCall   `yaml:"call"`
 	ApprovalOutcomes []string              `yaml:"approval_outcomes"`
 	Execution        string                `yaml:"execution"`
