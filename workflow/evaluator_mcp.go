@@ -15,7 +15,12 @@ func (mcpResultMatchesEvaluator) Evaluate(_ context.Context, req EvaluateRequest
 	results := req.State.Evidence.MCPResults[toolName]
 	passed := false
 	for _, result := range results {
-		if fmt.Sprintf("%v", result[fieldName]) == value {
+		v, ok := result[fieldName]
+		if !ok {
+			// Field absent — fail closed; absence of evidence does not satisfy a gate.
+			continue
+		}
+		if fmt.Sprintf("%v", v) == value {
 			passed = true
 			break
 		}

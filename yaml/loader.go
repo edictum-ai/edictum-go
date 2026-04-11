@@ -16,32 +16,35 @@ const maxExtendsDepth = 32
 // named ruleset in a registry. Parent rules are prepended before child rules.
 // Returns an error on circular references, missing parents, or chains that
 // exceed maxExtendsDepth (prevents unbounded recursion on long linear chains).
+//
+// Cycle detection is per-path: diamond inheritance (A→B, A→C, B→D, C→D)
+// is permitted because neither path contains a cycle.
 func ResolveExtendsFromRegistry(rulesets map[string]map[string]any, name string) (map[string]any, error) {
-	seen := map[string]bool{}
-	var resolve func(n string, depth int) (map[string]any, error)
-	resolve = func(n string, depth int) (map[string]any, error) {
+	var resolve func(n string, depth int, onStack map[string]bool) (map[string]any, error)
+	resolve = func(n string, depth int, onStack map[string]bool) (map[string]any, error) {
 		if depth > maxExtendsDepth {
 			return nil, fmt.Errorf("yaml: extends: inheritance chain too deep (max %d)", maxExtendsDepth)
 		}
-		if seen[n] {
+		if onStack[n] {
 			return nil, fmt.Errorf("yaml: extends: circular reference detected at %q", n)
 		}
 		bundle, ok := rulesets[n]
 		if !ok {
 			return nil, fmt.Errorf("yaml: extends: parent ruleset %q not found", n)
 		}
-		seen[n] = true
+		onStack[n] = true
+		defer delete(onStack, n)
 		parentName, _ := bundle["extends"].(string)
 		if parentName == "" {
 			return deepCopyBundle(bundle), nil
 		}
-		parent, err := resolve(parentName, depth+1)
+		parent, err := resolve(parentName, depth+1, onStack)
 		if err != nil {
 			return nil, err
 		}
 		return mergeParentBundle(parent, bundle), nil
 	}
-	return resolve(name, 0)
+	return resolve(name, 0, map[string]bool{})
 }
 
 // mergeParentBundle merges parent rules before child rules.

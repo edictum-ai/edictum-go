@@ -147,3 +147,31 @@ stages:
 		}
 	}
 }
+
+func TestSecurity_TerminalStageWithNoToolsDeniesAll(t *testing.T) {
+	// A terminal stage with no tools list must block every tool call once
+	// the stage is entered. This is the security boundary: terminal = true
+	// with no exit conditions means the workflow is permanently complete.
+	rt := mustRuntime(t, `apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: terminal-deny-all
+stages:
+  - id: done
+    terminal: true
+`)
+	sess := newWorkflowSession(t, "wf-terminal-deny-all")
+
+	for _, toolName := range []string{"Read", "Edit", "Bash", "mcp__github__list_prs", "AnyTool"} {
+		decision, err := rt.Evaluate(context.Background(), sess, makeCall(t, toolName, map[string]any{}))
+		if err != nil {
+			t.Fatalf("Evaluate(%s): %v", toolName, err)
+		}
+		if decision.Action != ActionBlock {
+			t.Fatalf("%s: terminal stage with no exit must block, got %+v", toolName, decision)
+		}
+		if decision.Reason == "" {
+			t.Fatalf("%s: block reason must not be empty", toolName)
+		}
+	}
+}
