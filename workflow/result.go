@@ -58,8 +58,9 @@ type State struct {
 
 // Evidence is the persisted runtime evidence set.
 type Evidence struct {
-	Reads      []string            `json:"reads" yaml:"reads"`
-	StageCalls map[string][]string `json:"stage_calls" yaml:"stage_calls"`
+	Reads      []string                    `json:"reads" yaml:"reads"`
+	StageCalls map[string][]string         `json:"stage_calls" yaml:"stage_calls"`
+	MCPResults map[string][]map[string]any `json:"mcp_results,omitempty" yaml:"mcp_results,omitempty"`
 }
 
 func (s State) completed(stageID string) bool {
@@ -77,6 +78,9 @@ func (s *State) ensureMaps() {
 	}
 	if s.Evidence.StageCalls == nil {
 		s.Evidence.StageCalls = map[string][]string{}
+	}
+	if s.Evidence.MCPResults == nil {
+		s.Evidence.MCPResults = map[string][]map[string]any{}
 	}
 	if s.Evidence.Reads == nil {
 		s.Evidence.Reads = []string{}
@@ -154,6 +158,7 @@ func (s *State) clone() State {
 		Evidence: Evidence{
 			Reads:      append([]string{}, s.Evidence.Reads...),
 			StageCalls: map[string][]string{},
+			MCPResults: map[string][]map[string]any{},
 		},
 		BlockedReason:   s.BlockedReason,
 		PendingApproval: s.PendingApproval,
@@ -163,6 +168,17 @@ func (s *State) clone() State {
 	}
 	for key, value := range s.Evidence.StageCalls {
 		cp.Evidence.StageCalls[key] = append([]string{}, value...)
+	}
+	for tool, results := range s.Evidence.MCPResults {
+		copied := make([]map[string]any, len(results))
+		for i, r := range results {
+			m := make(map[string]any, len(r))
+			for k, v := range r {
+				m[k] = v
+			}
+			copied[i] = m
+		}
+		cp.Evidence.MCPResults[tool] = copied
 	}
 	if s.LastRecordedEvidence != nil {
 		record := *s.LastRecordedEvidence

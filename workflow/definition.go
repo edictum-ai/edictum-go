@@ -3,6 +3,7 @@ package workflow
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 
 	"github.com/edictum-ai/edictum-go/toolcall"
@@ -35,6 +36,7 @@ type Stage struct {
 	Checks      []Check   `yaml:"checks,omitempty"`
 	Exit        []Gate    `yaml:"exit,omitempty"`
 	Approval    *Approval `yaml:"approval,omitempty"`
+	Terminal    bool      `yaml:"terminal,omitempty"`
 }
 
 // Gate is a declarative workflow fact check.
@@ -92,6 +94,11 @@ func validateStage(stage *Stage) error {
 	for _, tool := range stage.Tools {
 		if err := toolcall.ValidateToolName(tool); err != nil {
 			return fmt.Errorf("workflow: invalid tool %q in stage %q: %w", tool, stage.ID, err)
+		}
+		// Validate glob syntax so a malformed pattern (e.g. "mcp__[invalid") is
+		// caught at load time instead of silently blocking all tools at runtime.
+		if _, err := path.Match(tool, ""); err != nil {
+			return fmt.Errorf("workflow: invalid tool glob pattern %q in stage %q: %w", tool, stage.ID, err)
 		}
 	}
 	for _, gate := range append(append([]Gate{}, stage.Entry...), stage.Exit...) {

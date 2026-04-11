@@ -15,6 +15,11 @@ func (r *Runtime) advanceAfterSuccess(ctx context.Context, state *State, stageID
 	if !ok {
 		return nil, fmt.Errorf("workflow: active stage %q not found", stageID)
 	}
+	// v0.18: terminal stages never auto-advance via RecordResult.
+	// Their exit evaluation happens on the next Evaluate call.
+	if stage.Terminal {
+		return nil, nil
+	}
 	if _, hasNext := r.nextIndex(stage.ID); hasNext {
 		return nil, nil
 	}

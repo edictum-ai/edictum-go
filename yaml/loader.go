@@ -9,6 +9,87 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// maxExtendsDepth is the maximum allowed extends: inheritance chain depth.
+const maxExtendsDepth = 32
+
+// ResolveExtendsFromRegistry resolves the extends: inheritance chain for a
+// named ruleset in a registry. Parent rules are prepended before child rules.
+// Returns an error on circular references, missing parents, or chains that
+// exceed maxExtendsDepth (prevents unbounded recursion on long linear chains).
+//
+// Cycle detection is per-path: diamond inheritance (A→B, A→C, B→D, C→D)
+// is permitted because neither path contains a cycle.
+func ResolveExtendsFromRegistry(rulesets map[string]map[string]any, name string) (map[string]any, error) {
+	var resolve func(n string, depth int, onStack map[string]bool) (map[string]any, error)
+	resolve = func(n string, depth int, onStack map[string]bool) (map[string]any, error) {
+		if depth > maxExtendsDepth {
+			return nil, fmt.Errorf("yaml: extends: inheritance chain too deep (max %d)", maxExtendsDepth)
+		}
+		if onStack[n] {
+			return nil, fmt.Errorf("yaml: extends: circular reference detected at %q", n)
+		}
+		bundle, ok := rulesets[n]
+		if !ok {
+			return nil, fmt.Errorf("yaml: extends: parent ruleset %q not found", n)
+		}
+		onStack[n] = true
+		defer delete(onStack, n)
+		parentName, _ := bundle["extends"].(string)
+		if parentName == "" {
+			return deepCopyBundle(bundle), nil
+		}
+		parent, err := resolve(parentName, depth+1, onStack)
+		if err != nil {
+			return nil, err
+		}
+		return mergeParentBundle(parent, bundle), nil
+	}
+	return resolve(name, 0, map[string]bool{})
+}
+
+// mergeParentBundle merges parent rules before child rules.
+// Child defaults and metadata override parent values.
+func mergeParentBundle(parent, child map[string]any) map[string]any {
+	merged := deepCopyBundle(parent)
+	parentRules, _ := parent["rules"].([]any)
+	childRules, _ := child["rules"].([]any)
+	combined := make([]any, 0, len(parentRules)+len(childRules))
+	combined = append(combined, parentRules...)
+	combined = append(combined, childRules...)
+	merged["rules"] = combined
+	if defaults, ok := child["defaults"]; ok {
+		merged["defaults"] = deepCopyAny(defaults)
+	}
+	if metadata, ok := child["metadata"]; ok {
+		merged["metadata"] = deepCopyAny(metadata)
+	}
+	delete(merged, "extends")
+	return merged
+}
+
+func deepCopyBundle(m map[string]any) map[string]any {
+	cp := make(map[string]any, len(m))
+	for k, v := range m {
+		cp[k] = deepCopyAny(v)
+	}
+	return cp
+}
+
+func deepCopyAny(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		return deepCopyBundle(val)
+	case []any:
+		cp := make([]any, len(val))
+		for i, item := range val {
+			cp[i] = deepCopyAny(item)
+		}
+		return cp
+	default:
+		return v
+	}
+}
+
 // MaxBundleSize is the maximum allowed size of a YAML bundle in bytes (1 MB).
 const MaxBundleSize = 1_048_576
 
