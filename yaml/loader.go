@@ -9,13 +9,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// maxExtendsDepth is the maximum allowed extends: inheritance chain depth.
+const maxExtendsDepth = 32
+
 // ResolveExtendsFromRegistry resolves the extends: inheritance chain for a
 // named ruleset in a registry. Parent rules are prepended before child rules.
-// Returns an error on circular references or missing parents.
+// Returns an error on circular references, missing parents, or chains that
+// exceed maxExtendsDepth (prevents unbounded recursion on long linear chains).
 func ResolveExtendsFromRegistry(rulesets map[string]map[string]any, name string) (map[string]any, error) {
 	seen := map[string]bool{}
-	var resolve func(n string) (map[string]any, error)
-	resolve = func(n string) (map[string]any, error) {
+	var resolve func(n string, depth int) (map[string]any, error)
+	resolve = func(n string, depth int) (map[string]any, error) {
+		if depth > maxExtendsDepth {
+			return nil, fmt.Errorf("yaml: extends: inheritance chain too deep (max %d)", maxExtendsDepth)
+		}
 		if seen[n] {
 			return nil, fmt.Errorf("yaml: extends: circular reference detected at %q", n)
 		}
@@ -28,13 +35,13 @@ func ResolveExtendsFromRegistry(rulesets map[string]map[string]any, name string)
 		if parentName == "" {
 			return deepCopyBundle(bundle), nil
 		}
-		parent, err := resolve(parentName)
+		parent, err := resolve(parentName, depth+1)
 		if err != nil {
 			return nil, err
 		}
 		return mergeParentBundle(parent, bundle), nil
 	}
-	return resolve(name)
+	return resolve(name, 0)
 }
 
 // mergeParentBundle merges parent rules before child rules.

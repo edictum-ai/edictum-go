@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/edictum-ai/edictum-go/internal/deepcopy"
 	"github.com/edictum-ai/edictum-go/session"
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
@@ -96,12 +97,9 @@ func appendMCPResultCapped(items []map[string]any, item map[string]any, limit in
 	if len(items) >= limit {
 		return items
 	}
-	// Shallow-copy to prevent the caller from mutating recorded evidence after the fact.
-	cp := make(map[string]any, len(item))
-	for k, v := range item {
-		cp[k] = v
-	}
-	return append(items, cp)
+	// Deep-copy to prevent the caller from mutating recorded evidence after the fact,
+	// including nested maps and slices inside the MCP result.
+	return append(items, deepcopy.Map(item))
 }
 
 func appendUniqueCapped(items []string, item string, limit int) []string {

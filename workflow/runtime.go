@@ -154,6 +154,10 @@ func (r *Runtime) Reset(ctx context.Context, sess *session.Session, stageID stri
 	if idx == 0 {
 		state.Evidence.Reads = []string{}
 	}
+	// Clear all MCP result evidence on any reset. MCPResults is keyed by tool
+	// name (not stage ID), so per-stage deletion is not safe — stale evidence
+	// could satisfy mcp_result_matches gates after the workflow is rewound.
+	state.Evidence.MCPResults = map[string][]map[string]any{}
 	state.clearStageMoveStatus()
 	state.LastRecordedEvidence = nil
 	if err := saveState(ctx, sess, r.definition, state); err != nil {

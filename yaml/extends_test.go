@@ -32,7 +32,7 @@ type extendsEnvelope struct {
 }
 
 type extendsExpect struct {
-	Verdict         string `yaml:"verdict"` // "allowed" or "denied"
+	Verdict         string `yaml:"verdict"` // "allowed" or "blocked" (fixture schema uses "denied" as an alias)
 	MessageContains string `yaml:"message_contains"`
 }
 
@@ -98,13 +98,18 @@ func TestV018ExtendsInheritanceFixtures(t *testing.T) {
 					t.Fatalf("[%s] Check: %v", fc.ID, err)
 				}
 				if !dec.Passed() {
-					verdict = "denied"
+					verdict = "blocked"
 					message = dec.Message()
 					break
 				}
 			}
 
-			if verdict != fc.Expected.Verdict {
+			// The fixture schema uses "denied" as an alias for the canonical Go term "blocked".
+			expectedVerdict := fc.Expected.Verdict
+			if expectedVerdict == "denied" {
+				expectedVerdict = "blocked"
+			}
+			if verdict != expectedVerdict {
 				t.Fatalf("[%s] verdict = %q, want %q (message: %q)\n  description: %s",
 					fc.ID, verdict, fc.Expected.Verdict, message, fc.Description)
 			}
