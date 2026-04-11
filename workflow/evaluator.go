@@ -148,10 +148,10 @@ func compileWorkflowRegex(pattern, context string) (*regexp.Regexp, error) {
 }
 
 var (
-	singleStringArgRe      = regexp.MustCompile(`^([a-z_]+)\("((?:[^"\\]|\\.)*)"\)$`)
-	optionalArgRe          = regexp.MustCompile(`^approval\((?:"((?:[^"\\]|\\.)*)")?\)$`)
-	execConditionRe        = regexp.MustCompile(`^exec\("((?:[^"\\]|\\.)*)"(?:,\s*exit_code=(\d+))?\)$`)
-	mcpResultMatchesRe     = regexp.MustCompile(`^mcp_result_matches\("([^"\\]+)",\s*"([^"\\]+)",\s*"([^"\\]+)"\)$`)
+	singleStringArgRe  = regexp.MustCompile(`^([a-z_]+)\("((?:[^"\\]|\\.)*)"\)$`)
+	optionalArgRe      = regexp.MustCompile(`^approval\((?:"((?:[^"\\]|\\.)*)")?\)$`)
+	execConditionRe    = regexp.MustCompile(`^exec\("((?:[^"\\]|\\.)*)"(?:,\s*exit_code=(\d+))?\)$`)
+	mcpResultMatchesRe = regexp.MustCompile(`^mcp_result_matches\("([^"\\]+)",\s*"([^"\\]+)",\s*"([^"\\]+)"\)$`)
 )
 
 func parseSingleStringArg(raw, fn string) (string, error) {

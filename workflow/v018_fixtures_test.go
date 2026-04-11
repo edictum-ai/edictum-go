@@ -15,25 +15,25 @@ import (
 
 // v018FixtureSuite is the top-level structure of a workflow-v0.18 fixture file.
 type v018FixtureSuite struct {
-	Suite     string              `yaml:"suite"`
-	Workflows map[string]any      `yaml:"workflows"`
-	Fixtures  []v018FixtureCase   `yaml:"fixtures"`
+	Suite     string            `yaml:"suite"`
+	Workflows map[string]any    `yaml:"workflows"`
+	Fixtures  []v018FixtureCase `yaml:"fixtures"`
 }
 
 type v018FixtureCase struct {
-	ID           string        `yaml:"id"`
-	Workflow     string        `yaml:"workflow"`
-	Description  string        `yaml:"description"`
-	InitialState State         `yaml:"initial_state"`
-	Steps        []v018Step    `yaml:"steps"`
+	ID           string     `yaml:"id"`
+	Workflow     string     `yaml:"workflow"`
+	Description  string     `yaml:"description"`
+	InitialState State      `yaml:"initial_state"`
+	Steps        []v018Step `yaml:"steps"`
 }
 
 type v018Step struct {
-	ID        string            `yaml:"id"`
-	Call      workflowCall      `yaml:"call"`
-	MCPResult map[string]any    `yaml:"mcp_result,omitempty"`
-	Execution string            `yaml:"execution"`
-	Expect    v018Expect        `yaml:"expect"`
+	ID        string         `yaml:"id"`
+	Call      workflowCall   `yaml:"call"`
+	MCPResult map[string]any `yaml:"mcp_result,omitempty"`
+	Execution string         `yaml:"execution"`
+	Expect    v018Expect     `yaml:"expect"`
 }
 
 type v018Expect struct {
@@ -87,7 +87,6 @@ func TestV018WorkflowFixtures(t *testing.T) {
 		}
 
 		for _, fixture := range suite.Fixtures {
-			fixture := fixture
 			t.Run(fixture.ID, func(t *testing.T) {
 				rt := runtimes[fixture.Workflow]
 				if rt == nil {

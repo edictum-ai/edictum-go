@@ -13,9 +13,9 @@ import (
 
 // extendsFixtureFile is the top-level structure of the extends-inheritance fixture.
 type extendsFixtureFile struct {
-	Suite    string                     `yaml:"suite"`
-	Rulesets map[string]map[string]any  `yaml:"rulesets"`
-	Fixtures []extendsFixtureCase       `yaml:"fixtures"`
+	Suite    string                    `yaml:"suite"`
+	Rulesets map[string]map[string]any `yaml:"rulesets"`
+	Fixtures []extendsFixtureCase      `yaml:"fixtures"`
 }
 
 type extendsFixtureCase struct {
@@ -53,7 +53,6 @@ func TestV018ExtendsInheritanceFixtures(t *testing.T) {
 	}
 
 	for _, fc := range ff.Fixtures {
-		fc := fc
 		t.Run(fc.ID, func(t *testing.T) {
 			// Resolve extends: inheritance chain.
 			bundle, err := ResolveExtendsFromRegistry(ff.Rulesets, fc.Contract)
