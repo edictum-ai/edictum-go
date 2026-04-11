@@ -60,9 +60,15 @@ func recordApproval(state *State, stageID string) {
 	state.clearWorkflowStatus()
 }
 
-func recordResult(state *State, stageID string, env toolcall.ToolCall) {
+// recordResult records post-success evidence. mcpResult is optional; pass nil for non-MCP calls.
+func recordResult(state *State, stageID string, env toolcall.ToolCall, mcpResult ...map[string]any) {
 	state.ensureMaps()
-	// M1 only records file paths from Read and executed commands from Bash.
+	// Record MCP result evidence when provided.
+	if len(mcpResult) > 0 && mcpResult[0] != nil {
+		existing := state.Evidence.MCPResults[env.ToolName()]
+		state.Evidence.MCPResults[env.ToolName()] = appendMCPResultCapped(existing, mcpResult[0], maxWorkflowEvidenceItems)
+	}
+	// Record file paths from Read and executed commands from Bash.
 	switch env.ToolName() {
 	case "Read":
 		if path := env.FilePath(); path != "" {
@@ -84,6 +90,13 @@ func recordResult(state *State, stageID string, env toolcall.ToolCall) {
 		}
 	}
 	state.clearWorkflowStatus()
+}
+
+func appendMCPResultCapped(items []map[string]any, item map[string]any, limit int) []map[string]any {
+	if len(items) >= limit {
+		return items
+	}
+	return append(items, item)
 }
 
 func appendUniqueCapped(items []string, item string, limit int) []string {

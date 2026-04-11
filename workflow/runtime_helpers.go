@@ -1,24 +1,49 @@
 package workflow
 
 import (
+	"path"
 	"strings"
 	"time"
 
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
+const workflowCompleteReason = "workflow complete — no further tool calls are accepted"
+
 func toolAllowed(stage Stage, env toolcall.ToolCall) bool {
-	// M1 keeps tools semantics explicit: omitting tools means the stage is
-	// unrestricted, and providing tools makes that list authoritative.
 	if len(stage.Tools) == 0 {
-		return true
+		// terminal: true with no tools denies everything; otherwise unrestricted.
+		return !stage.Terminal
 	}
-	for _, tool := range stage.Tools {
-		if tool == env.ToolName() {
+	// v0.18: tools entries may be fnmatch-style glob patterns (e.g. "mcp__*").
+	for _, pat := range stage.Tools {
+		matched, err := path.Match(pat, env.ToolName())
+		if err == nil && matched {
 			return true
 		}
 	}
 	return false
+}
+
+// terminalCompleteEval builds the block evaluation returned when a terminal
+// stage has no remaining work to accept.
+func terminalCompleteEval(def Definition, stage Stage) Evaluation {
+	result := FactResult{
+		Kind:      "terminal",
+		Condition: "terminal",
+		Message:   workflowCompleteReason,
+		StageID:   stage.ID,
+		Workflow:  def.Metadata.Name,
+	}
+	audit := map[string]any{
+		"workflow_name":  def.Metadata.Name,
+		"stage_id":       stage.ID,
+		"gate_kind":      "terminal",
+		"gate_condition": "terminal",
+		"gate_passed":    false,
+		"gate_evidence":  "",
+	}
+	return evaluationFromRecord(ActionBlock, stage.ID, workflowCompleteReason, audit, gateRecord(result, false))
 }
 
 func stageIsBoundaryOnly(stage Stage) bool {

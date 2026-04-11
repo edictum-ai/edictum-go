@@ -55,6 +55,7 @@ func NewRuntime(def Definition, opts ...RuntimeOption) (*Runtime, error) {
 		"approval":            approvalEvaluator{},
 		"command_matches":     commandEvaluator{},
 		"command_not_matches": commandEvaluator{},
+		"mcp_result_matches":  mcpResultMatchesEvaluator{},
 	}
 	if cfg.execEvaluatorEnabled {
 		evaluators["exec"] = execEvaluator{}
@@ -179,8 +180,9 @@ func (r *Runtime) RecordApproval(ctx context.Context, sess *session.Session, sta
 
 // RecordResult persists post-success evidence for the stage that accepted the
 // call and completes a terminal workflow stage when the successful call
-// satisfies its final exit conditions.
-func (r *Runtime) RecordResult(ctx context.Context, sess *session.Session, stageID string, env toolcall.ToolCall) ([]map[string]any, error) {
+// satisfies its final exit conditions. mcpResult is optional; pass a non-nil
+// map to record MCP tool result evidence (used by mcp_result_matches gates).
+func (r *Runtime) RecordResult(ctx context.Context, sess *session.Session, stageID string, env toolcall.ToolCall, mcpResult ...map[string]any) ([]map[string]any, error) {
 	if stageID == "" {
 		return nil, nil
 	}
@@ -191,7 +193,7 @@ func (r *Runtime) RecordResult(ctx context.Context, sess *session.Session, stage
 	if err != nil {
 		return nil, err
 	}
-	recordResult(&state, stageID, env)
+	recordResult(&state, stageID, env, mcpResult...)
 	events, err := r.advanceAfterSuccess(ctx, &state, stageID, env)
 	if err != nil {
 		return nil, err

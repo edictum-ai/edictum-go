@@ -35,6 +35,7 @@ type Stage struct {
 	Checks      []Check   `yaml:"checks,omitempty"`
 	Exit        []Gate    `yaml:"exit,omitempty"`
 	Approval    *Approval `yaml:"approval,omitempty"`
+	Terminal    bool      `yaml:"terminal,omitempty"`
 }
 
 // Gate is a declarative workflow fact check.

@@ -29,6 +29,27 @@ func (r *Runtime) Evaluate(ctx context.Context, sess *session.Session, env toolc
 			return Evaluation{}, fmt.Errorf("workflow: active stage %q not found", state.ActiveStage)
 		}
 
+		// v0.18: Terminal stage handling — checked before evaluateCurrentStage so
+		// the "workflow complete" reason is returned (not "tool not allowed").
+		if stage.Terminal {
+			done, err := r.isTerminalComplete(ctx, stage, state, env)
+			if err != nil {
+				return Evaluation{}, err
+			}
+			if done {
+				eval := terminalCompleteEval(r.definition, stage)
+				changed = r.applyDecisionState(&state, eval, env) || changed
+				eval.Audit = workflowSnapshot(r.definition, state)
+				if changed {
+					if err := saveState(ctx, sess, r.definition, state); err != nil {
+						return Evaluation{}, err
+					}
+				}
+				eval.Events = append(events, eval.Events...)
+				return eval, nil
+			}
+		}
+
 		allowed, eval, invalid, err := r.evaluateCurrentStage(stage, state, env)
 		if err != nil {
 			return Evaluation{}, err
@@ -173,6 +194,19 @@ func callAllowedInStage(stage Stage, env toolcall.ToolCall) (bool, error) {
 	return toolAllowed(stage, env), nil
 }
 
+func (r *Runtime) isTerminalComplete(ctx context.Context, stage Stage, state State, env toolcall.ToolCall) (bool, error) {
+	if len(stage.Exit) == 0 {
+		// No exit conditions → terminal stage is always "complete".
+		return true, nil
+	}
+	_, blocked, err := r.evaluateGates(ctx, stage, state, env, stage.Exit)
+	if err != nil {
+		return false, err
+	}
+	// complete when all exit conditions pass (not blocked).
+	return !blocked, nil
+}
+
 func (r *Runtime) callBeginsNextStageWork(ctx context.Context, stage Stage, state State, env toolcall.ToolCall) (bool, error) {
 	nextIndex, hasNext := r.nextIndex(stage.ID)
 	if !hasNext {
@@ -190,6 +224,11 @@ func (r *Runtime) callBeginsNextStageWork(ctx context.Context, stage Stage, stat
 			return false, err
 		} else if blocked {
 			return false, nil
+		}
+		// v0.18: always advance into a terminal stage; the terminal check will
+		// deny the call in the next loop iteration with "workflow complete".
+		if nextStage.Terminal {
+			return true, nil
 		}
 		if stageIsBoundaryOnly(nextStage) {
 			if nextStage.Approval != nil {

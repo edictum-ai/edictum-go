@@ -60,6 +60,7 @@ type parsedCondition struct {
 	exitCode  int
 	regex     *regexp.Regexp
 	condition string
+	extra     []string // tool, field, value for mcp_result_matches
 }
 
 func parseCondition(raw string) (parsedCondition, error) {
@@ -119,6 +120,17 @@ func parseCondition(raw string) (parsedCondition, error) {
 			}
 		}
 		return parsedCondition{kind: "exec", arg: command, exitCode: exitCode, condition: raw}, nil
+	case strings.HasPrefix(raw, `mcp_result_matches(`):
+		match := mcpResultMatchesRe.FindStringSubmatch(raw)
+		if match == nil {
+			return parsedCondition{}, fmt.Errorf("workflow: unsupported mcp_result_matches condition %q", raw)
+		}
+		return parsedCondition{
+			kind:      "mcp_result_matches",
+			arg:       match[1],
+			extra:     []string{match[1], match[2], match[3]},
+			condition: raw,
+		}, nil
 	default:
 		return parsedCondition{}, fmt.Errorf("workflow: unsupported condition %q", raw)
 	}
@@ -136,9 +148,10 @@ func compileWorkflowRegex(pattern, context string) (*regexp.Regexp, error) {
 }
 
 var (
-	singleStringArgRe = regexp.MustCompile(`^([a-z_]+)\("((?:[^"\\]|\\.)*)"\)$`)
-	optionalArgRe     = regexp.MustCompile(`^approval\((?:"((?:[^"\\]|\\.)*)")?\)$`)
-	execConditionRe   = regexp.MustCompile(`^exec\("((?:[^"\\]|\\.)*)"(?:,\s*exit_code=(\d+))?\)$`)
+	singleStringArgRe      = regexp.MustCompile(`^([a-z_]+)\("((?:[^"\\]|\\.)*)"\)$`)
+	optionalArgRe          = regexp.MustCompile(`^approval\((?:"((?:[^"\\]|\\.)*)")?\)$`)
+	execConditionRe        = regexp.MustCompile(`^exec\("((?:[^"\\]|\\.)*)"(?:,\s*exit_code=(\d+))?\)$`)
+	mcpResultMatchesRe     = regexp.MustCompile(`^mcp_result_matches\("([^"\\]+)",\s*"([^"\\]+)",\s*"([^"\\]+)"\)$`)
 )
 
 func parseSingleStringArg(raw, fn string) (string, error) {
