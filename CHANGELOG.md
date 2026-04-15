@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.5.0 - 2026-04-15
+
+### Added
+
+- workflow shared semantics now match the v0.18 line: wildcard stage tools,
+  terminal stages, MCP evidence checks, and ruleset inheritance via `extends`
+
+### Fixed
+
+- workflow runtime stage advancement now blocks on failing checks and aligns
+  with the current Python/TypeScript semantics
+
+### Breaking Changes
+
+- none
+
 ## v0.4.0 - 2026-04-05
 
 ### Added
