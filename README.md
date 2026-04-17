@@ -222,7 +222,8 @@ Every security boundary has bypass tests. Every error path fails closed. Every s
 | edictum | Python SDK (reference) | [github.com/edictum-ai/edictum](https://github.com/edictum-ai/edictum) |
 | edictum-go | Go SDK | [github.com/edictum-ai/edictum-go](https://github.com/edictum-ai/edictum-go) |
 | edictum-ts | TypeScript SDK | [github.com/edictum-ai/edictum-ts](https://github.com/edictum-ai/edictum-ts) |
-| edictum-console | Ops Console | [github.com/edictum-ai/edictum-console](https://github.com/edictum-ai/edictum-console) |
+| edictum-api | Control Plane API | [github.com/edictum-ai/edictum-api](https://github.com/edictum-ai/edictum-api) |
+| edictum-app | Control Plane UI | [github.com/edictum-ai/edictum-app](https://github.com/edictum-ai/edictum-app) |
 | edictum-schemas | Ruleset schemas | [github.com/edictum-ai/edictum-schemas](https://github.com/edictum-ai/edictum-schemas) |
 | edictum-demo | Demos & benchmarks | [github.com/edictum-ai/edictum-demo](https://github.com/edictum-ai/edictum-demo) |
 
