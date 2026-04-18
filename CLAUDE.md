@@ -1,249 +1,269 @@
-# CLAUDE.md — Edictum Go
+# CLAUDE.md - Edictum Go
 
-> Runtime rule enforcement for AI agent tool calls. Go port of the edictum Python library with full feature parity.
+> Go SDK for Edictum. Rules for AI agents, Workflow Gates for coding assistants, five Go adapters, zero runtime deps in core.
 
-## What is Edictum
+## What ships here
 
-Runtime rule enforcement for AI agent tool calls. Deterministic pipeline: checks, output checks, session rules, principal-aware enforcement. Framework adapters (Google ADK Go, LangChainGo, Eino, Anthropic SDK Go, Genkit). Zero runtime deps in core. Full feature parity with the Python library (`edictum` on PyPI, v0.15.0).
+This repo is the Go SDK at `github.com/edictum-ai/edictum-go`.
 
-Current version: 0.3.0 (`github.com/edictum-ai/edictum-go`)
+Current version: `0.4.0`
 
-## THE ONE RULE
+Feature order in this repo:
 
-**Core runs fully standalone. No server dependency. No adapter dependency. No framework dependency.**
+1. Workflow Gates
+2. Rules engine
+3. Cross-framework adapters
+4. Human approvals
+5. Decision log
 
-Core provides interfaces and implementations. The server package provides HTTP-backed implementations. Adapters are thin translation layers — rule enforcement logic stays in the pipeline.
+The short version:
 
-## Architecture: Single Module, Subpackages
+- `guard.Run()` is the embedded path.
+- `edictum gate run` is the CLI path for real assistant tool calls.
+- `edictum gate check` is rules-only preflight.
+- Server connectivity is optional.
 
-```
+## Positioning
+
+Edictum is a developer agent behavior platform.
+
+What it is not:
+
+- not an orchestrator
+- not prompt tooling
+- not a chat moderation layer
+- not a pure dashboard product
+
+The point is simple: write rules and workflow stages outside the model, then block tool calls when the agent ignores them.
+
+## The One Rule
+
+**Core runs standalone. No server required. No adapter required. No framework required.**
+
+Core owns the rules pipeline, workflow runtime, session state, approvals, and decision-log emission.
+
+Adapters only translate framework-specific tool signatures into `guard.Run()`.
+
+## Architecture
+
+```text
 edictum-go/
-├── pipeline/              # Core 5-stage check pipeline
-├── toolcall/              # ToolCall, BashClassifier, Principal, ToolRegistry
-├── rule/                  # Check, OutputCheck, SessionRule, Decision
-├── session/               # Session, StorageBackend, MemoryBackend
-├── audit/                 # AuditSink, CompositeSink, FileSink, CollectingSink
-├── redaction/             # RedactionPolicy
-├── approval/              # ApprovalBackend, LocalApprovalBackend
-├── yaml/                  # YAML ruleset loader (optional dep)
-├── sandbox/               # Path/command/domain sandbox
-├── guard/                 # Top-level Edictum guard (constructor, reload, from_yaml)
-├── adapter/
-│   ├── adkgo/             # Google ADK Go adapter
-│   ├── langchaingo/       # LangChainGo adapter
-│   ├── eino/              # Eino/CloudWeGo adapter
-│   ├── anthropic/         # Anthropic SDK Go adapter
-│   └── genkit/            # Genkit Go adapter
-├── telemetry/             # OpenTelemetry integration (spans + metrics)
-├── server/                # Server SDK (HTTP client, SSE, audit sink)
-└── internal/
-    ├── shlex/             # Shell tokenizer (security-critical)
-    └── deepcopy/          # Deep copy utilities
+├── adapter/             # ADK Go, LangChainGo, Anthropic SDK Go, Eino, Genkit
+├── approval/            # Approval backends and approval request types
+├── audit/               # Structured decision-log events and sinks
+├── cmd/edictum/         # CLI, including Workflow Gates
+├── guard/               # Top-level guard constructors and Run/Evaluate APIs
+├── pipeline/            # Pre, post, session, sandbox evaluation pipeline
+├── redaction/           # Output redaction policy
+├── rule/                # Rule types
+├── sandbox/             # Path, command, and domain allowlists
+├── server/              # Optional HTTP client, approval backend, audit sink
+├── session/             # Persistent session state backends
+├── skill/               # Skill scanner used by the CLI
+├── telemetry/           # OpenTelemetry integration
+├── toolcall/            # ToolCall and Principal types
+├── workflow/            # Workflow definitions and runtime
+└── yaml/                # Ruleset loading, validation, compilation
 ```
 
-## Tech Stack
+## Core ideas
 
-| Layer | Technology | Rationale |
-|-------|-----------|-----------|
-| Language | Go 1.25+ | Oldest supported release, generics, errors.Join, slices/maps |
-| Build | `go build` | Standard toolchain, no third-party build tool |
-| Test | `go test` + testify | Standard testing, testify for assertions |
-| Lint | golangci-lint | gosec, staticcheck, govet, errcheck |
-| Module | Single `go.mod` | Subpackages via Go import paths |
-| Race detection | `go test -race` | Every CI run — concurrency is real in Go |
+### Workflow Gates come first
 
-## Non-Negotiable Principles
+Workflow Gates are the differentiator in this repo.
 
-1. **Full feature parity with Python.** 147 features across 12 categories. Every feature has a parity test ID. If Python passes and Go fails, it's a bug.
-2. **Security is non-negotiable.** This is a security product. No shortcuts, no "good enough", no deferred fixes for vulnerabilities. Fail closed on every error path.
-3. **Zero runtime deps in core.** Optional: `gopkg.in/yaml.v3`, `github.com/santhosh-tekuri/jsonschema`. The `go.opentelemetry.io/otel` API packages (trace, metric) are module-level deps imported by `guard` via `telemetry/` — they are lightweight interfaces with no-op defaults and zero overhead when no SDK is configured. These transitively bring in `go.opentelemetry.io/auto/sdk` as an indirect dep. The full OTel SDK (`go.opentelemetry.io/otel/sdk`) is NOT a dependency.
-4. **Struct literals for rules.** Interfaces define protocols. Structs define data. Functional options for optional config. No reflection magic.
-5. **`context.Context` everywhere.** Every pipeline, session, and audit sink method takes `ctx context.Context` as first parameter.
-6. **Immutability by API design.** Unexported fields + getter methods + value receivers. No `Object.freeze()` in Go — enforce via encapsulation.
-7. **Adapters are thin.** All rule enforcement logic lives in CheckPipeline. Adapters only translate between framework input/output and the pipeline.
-8. **Adversarial tests before ship.** Every security boundary has bypass tests. Positive tests prove it works. Adversarial tests prove it doesn't break.
-9. **`go test -race` must always pass.** Go is multi-threaded — race conditions are real. Every shared state needs mutex protection.
+They let you say:
 
-## Coding Standards
+- read the spec before editing
+- ask for approval before running Bash
+- run `git diff` before leaving implement
+- make tests pass before the task is complete
 
-### Go
+The real workflow shape in this repo is:
 
-- **No `any` unless genuinely unavoidable** and documented with a comment explaining why.
-- **Typed constants for enums.** `type SideEffect string` with `const` block. No iota for string enums.
-- **Interfaces for protocols.** `StorageBackend`, `AuditSink`, `ApprovalBackend` are all interfaces.
-- **`context.Context` as first param.** Every method that does I/O or could be cancelled.
-- **Errors, not panics.** Every function that can fail returns `error`. Use `errors.Is()`/`errors.As()` for typed errors.
-- **`sync.Mutex` / `sync.RWMutex`** for shared state. Document what each mutex protects.
-- **Unexported fields + exported getters** for immutable data types (`ToolCall`, `Principal`, `Decision`).
-- **Value receivers** for immutable types, pointer receivers for mutable types.
-- **`errors.Join()`** for aggregating multiple errors (replaces AggregateError).
-- **No `init()` functions.** Explicit initialization only.
-- **Generics where natural.** `ToolCall[T any]` for typed args. Don't force generics where `any` suffices.
+- `kind: Workflow`
+- `stages`
+- `entry`
+- `exit`
+- `checks`
+- `approval`
 
-### General
+Do not document or generate old `gates.before` / `gates.after` examples. They are not the live format here.
 
-- **Small, focused files (< 200 lines).** If a file grows past 200 lines, split it. Violations need explicit approval.
-- **Conventional commits** (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`).
-- **No premature abstraction.** Don't build extension points until there's a second user.
-- **No over-engineering.** Only make changes that are directly requested or clearly necessary.
+### Rulesets are still the core API
 
-## Rule API Design
+Rulesets use:
 
-Rules use **struct literals** with Go interfaces. Idiomatic, explicit, compile-time validated:
+- `apiVersion: edictum/v1`
+- `kind: Ruleset`
+- `rules:`
+- `when:`
+- `then:`
+- `then.action`
+
+Rule types:
+
+- `pre`
+- `post`
+- `session`
+- `sandbox`
+
+### Adapters stay thin
+
+Every Go adapter uses the same pattern:
 
 ```go
-noRm := rule.Precondition{
-    Tool: "Bash",
-    Check: func(ctx context.Context, call toolcall.ToolCall) (rule.Decision, error) {
-        if strings.Contains(call.BashCommand(), "rm -rf") {
-            return rule.Fail("Cannot run rm -rf"), nil
-        }
-        return rule.Pass(), nil
-    },
-}
-
-g := guard.New(guard.WithRules(noRm))
+adapter := packageName.New(g, opts...)
+wrapped := adapter.WrapTool("ToolName", original)
 ```
 
-## Terminology Enforcement
+Any `guard.RunOption` values passed to `New()` become default metadata for wrapped calls.
 
-Inherited from the Python library. ALL code, comments, docstrings, CLI output, and docs MUST use canonical terms:
+## Terminology
 
-| Wrong | Correct |
-|-------|---------|
-| contract | rule / rules |
-| denied | blocked |
-| finding | violation |
-| engine (for runtime) | pipeline |
-| shadow mode | observe mode |
+Use current M1 naming in prose, comments, docs, and CLI help text.
 
-**No exceptions.**
+Preferred words:
 
-## API Design Checklist
+- `rule` / `rules`
+- `ruleset`
+- `behavior`
+- `workflow gates`
+- `pipeline`
+- `violations`
+- `blocked`
+- `decision log`
+- `Dashboard`
+- `agent overview`
+- `observe mode`
 
-Before adding any new public API:
+For code identifiers, keep the shipped API unless the task explicitly says to rename it.
 
-- **Every accepted parameter has an observable effect.** If unimplemented, return error — never silently ignore.
-- **Collection parameters have documented merge semantics.** Document whether it EXTENDS or REPLACES defaults.
-- **Block decisions propagate end-to-end.** Trace block through every adapter. Never return "allow" after a block.
-- **Callbacks fire exactly once.** Assert callback count == 1 in tests.
-- **All adapters handle the new feature.** Run adapter parity tests after any change.
+## YAML and runtime rules
 
-## Security Review Checklist
+### Ruleset YAML
 
-Before merging ANY code that touches these areas:
+- `kind: Ruleset`
+- top-level collection is `rules:`
+- pre/post rules use `when:` and `then:`
+- actions use `block`, `ask`, `warn`, or `redact`
+- top-level defaults use `defaults.mode: enforce|observe`
 
-- **Path handling**: Uses `filepath.EvalSymlinks()` not just `filepath.Clean()`. Test with symlinks.
-- **Shell command classification**: All shell metacharacters enumerated. Test with: `\n`, `\r`, `|`, `;`, `&&`, `||`, `$()`, `` ` ``, `${}`, `<()`, `<<`, `>`, `>>`
-- **Error handling in backends**: `Get()` and `Increment()` fail-closed. Network errors propagate, only 404/missing returns nil.
-- **Audit action accuracy**: Audit events reflect what actually happened. Timeouts emit TIMEOUT, not GRANTED.
-- **Input validation**: toolName, sessionId, any string used in storage keys validated for control characters.
-- **Regex DoS**: All regex input capped at 10,000 characters.
-- **Concurrency**: Every shared state protected by mutex. `go test -race` passes.
+### Workflow YAML
 
-## Behavior Test Requirement
+- `kind: Workflow`
+- stages are stateful
+- gate conditions live in `entry:` and `exit:`
+- command history checks live in `checks:`
+- human pauses live in `approval:`
+- trusted `exec(...)` conditions require explicit opt-in
 
-Every public API parameter MUST have a behavior test.
+### CLI behavior
 
-A behavior test answers: "What observable effect does this parameter have?"
+- `edictum gate check` evaluates rules only
+- `edictum gate run` runs the real tool path and advances workflow state
+- workflow session IDs resolve from `--session-id`, `.edictum-session`, git branch, or workflow name fallback
 
-- Tests the parameter's effect through the public API
-- Asserts a concrete difference between passing and not passing the parameter
-- Lives in the corresponding package's `_test.go` files
-- Keep test files focused: one file per module, under 200 lines
+## Tech stack
 
-## Negative Security Test Requirement
+| Layer | Technology | Notes |
+|-------|------------|-------|
+| Language | Go 1.25+ | oldest supported release |
+| Build | `go build` | standard toolchain |
+| Test | `go test` | `-race` must stay green |
+| Lint | `golangci-lint` | includes `govet`, `gosec`, `staticcheck` |
+| Module | single `go.mod` | subpackages via import paths |
 
-Every security boundary MUST have bypass tests — tests that attempt to circumvent the boundary and verify the attempt is caught. Named with `TestSecurity` prefix for CI filtering.
+## Non-negotiables
 
-Examples:
-- Sandbox: symlink escape, double-encoding, null byte injection
-- BashClassifier: every shell metacharacter individually
-- Session limits: concurrent access patterns (goroutines)
-- Input validation: null bytes, control characters, path separators in toolName
+1. Core stays usable without the server.
+2. Adapters stay thin.
+3. Fail-closed behavior matters. Do not turn rule or workflow errors into silent allows.
+4. `go test -race ./...` must pass.
+5. Shared semantics must stay aligned with Python and TypeScript.
+6. Public parameters need behavior tests.
+7. Workflow Gates and CLI docs must match source, not aspirational docs.
 
-## Feature Parity Matrix
+## Go standards
 
-147 features across 12 categories must pass in Python, TypeScript, AND Go. See memory file `project_parity_matrix_detail.md` for the full matrix with test IDs.
+- Prefer concrete types and small interfaces.
+- Use `context.Context` as the first parameter for work that can block or be cancelled.
+- Return errors, do not panic, unless the process truly cannot continue.
+- Protect shared mutable state with `sync.Mutex` or `sync.RWMutex`.
+- Keep exported APIs explicit. Do not add parameters that have no observable effect.
+- Keep files focused. If a file starts sprawling, split it.
+- Do not push rule logic into adapters.
 
-Cross-language validation: shared YAML rulesets + JSON input/output fixtures. Same input → same output → parity proven.
+## Public API checklist
 
-## Bug & Issue Triage Rule
+Before adding or changing a public API:
 
-When working in the project, if a bug, security issue, or problem is detected that was NOT in the initial prompt:
+- Every accepted parameter must change behavior in a testable way.
+- Document merge semantics for collections and defaults.
+- Make sure blocked decisions propagate end-to-end.
+- Make sure callbacks fire exactly once.
+- Run the adapter tests if the change touches shared execution behavior.
 
-1. Triage — assess severity and whether it blocks current work
-2. If fixable now without derailing the task → fix immediately and mention it
-3. If not fixable now → create a GitHub issue in the repo with proper labels
-4. **Never silently ignore a discovered issue**
+## Workflow and parity checklist
 
-## Build & Test
+If the change affects ruleset semantics, workflow behavior, YAML validation, or shared fixtures:
+
+1. update shared fixtures if needed
+2. keep Go aligned with Python and TypeScript
+3. run the shared-fixture tests
+4. do not ship source/docs drift for workflow YAML
+
+## Bug triage rule
+
+If you notice a bug that was not in the original prompt:
+
+1. decide whether it blocks the current task
+2. fix it now if the fix is small and directly adjacent
+3. otherwise raise it explicitly
+4. do not silently ignore it
+
+## Build and test
 
 ```bash
-gofmt -l .                            # formatting check (must return empty)
-go build ./...                        # build all packages
-go test ./...                         # test all packages
-go test -race ./...                   # test with race detector
-go test -run "TestSecurity" ./...     # security boundary tests only
-go test ./pipeline/...                # test pipeline only
-go test ./toolcall/...                # test toolcall only
-golangci-lint run ./...               # lint (includes govet, gosec, staticcheck)
+gofmt -l .
+go build ./...
+go test ./...
+go test -race ./...
+go test -run "TestSecurity" ./...
+golangci-lint run ./...
 ```
 
-> **Note:** `go vet` is included in golangci-lint via the `govet` linter and does not need to be run separately.
-
-## Pre-Merge Verification
-
-Every change MUST pass these checks before committing:
+If you touch adapters:
 
 ```bash
-gofmt -l .                            # formatting check (must return empty)
-go build ./...                        # all packages build
-go test -race ./...                   # full test suite with race detector
-go test -run "TestSecurity" ./...     # security boundary tests
-golangci-lint run ./...               # lint (includes govet)
-# If touching adapters:
-go test -run "TestAdapterParity" ./adapter/...
+go test ./adapter/...
 ```
 
-## YAML Schema
-
-The schema lives in the `edictum-schemas` repo — single source of truth. This repo embeds it via `//go:embed`.
-
-- `apiVersion: edictum/v1`, `kind: Ruleset`
-- Rule types: `type: check` (block/ask), `type: check_output` (warn/redact/block), `type: session` (block only), `type: sandbox` (allowlist-based)
-- Conditions: `when:` with boolean AST (`all/any/not`) and leaves (`selector: {operator: value}`)
-- 15 operators: exists, equals, not_equals, in, not_in, contains, contains_any, starts_with, ends_with, matches, matches_any, gt, gte, lt, lte
-- Missing fields evaluate to `false`. Type mismatches yield block/warn + `policyError: true`
-- Top-level collection uses `rules:`
-- Actions use `action:` instead of `effect:`
-
-## Ecosystem Context
-
-Edictum is five repos that work together:
-
-- **edictum** (core Python): `edictum-ai/edictum` — MIT Python library. PyPI: `edictum`.
-- **edictum-ts** (core TypeScript): `edictum-ai/edictum-ts` — MIT TypeScript library. npm: `@edictum/core`.
-- **edictum-go** (core Go): THIS REPO — MIT Go library. `github.com/edictum-ai/edictum-go`.
-- **edictum-console** (server): `edictum-ai/edictum-console` — Self-hostable FastAPI + React SPA.
-- **edictum-schemas** (shared): `edictum-ai/edictum-schemas` — Shared YAML ruleset schema.
-
-All three core libraries (Python, TS, and Go) work standalone. Console is an optional enhancement. Schema repo is the single source of truth for the ruleset format.
-
-## Cross-SDK Conformance Workflow
-
-When a change affects shared semantics, YAML validation, fixture behavior, audit/toolcall wire format, or rule evaluation behavior, you MUST follow this workflow before merging:
-
-1. **Update shared fixtures** in `edictum-schemas` — add or modify `fixtures/rejection/*.rejection.yaml` files as needed
-2. **Update canonical Python behavior** in `edictum` if the change originates there
-3. **Ensure all three SDKs pass** — Python (`edictum`), Go (this repo), and TypeScript (`edictum-ts`) shared-fixture runners must all pass with `EDICTUM_CONFORMANCE_REQUIRED=1`
-4. **Do not merge** parity-affecting behavior without the Parity Check workflow passing in all affected repos
-
-The conformance runner in this repo lives at `yaml/shared_fixtures_test.go` and is executed in CI by:
+If you touch shared YAML behavior:
 
 ```bash
 EDICTUM_FIXTURES_DIR=edictum-schemas/fixtures/rejection EDICTUM_CONFORMANCE_REQUIRED=1 \
   go test -v -run TestSharedRejectionFixtures ./yaml/...
 ```
 
-The `Parity Check` workflow (`.github/workflows/parity-check.yml`) runs on PRs to main, pushes to main, and weekly. It is intended to be a required status check.
+## Pre-merge checks
+
+Every change should leave the repo in this state:
+
+- `gofmt -l .` returns nothing
+- `go build ./...` passes
+- `go test -race ./...` passes
+- adapter tests pass when adapter behavior changed
+- docs match the current CLI and YAML behavior
+
+## Ecosystem
+
+Relevant repos:
+
+- `edictum`: Python SDK
+- `edictum-ts`: TypeScript SDK
+- `edictum-go`: this repo
+- `edictum-console`: Dashboard and server APIs
+- `edictum-schemas`: shared schema and fixtures
+
+All three SDKs should stay semantically aligned.

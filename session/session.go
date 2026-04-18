@@ -21,7 +21,7 @@ type BatchGetter interface {
 	BatchGet(ctx context.Context, keys []string) (map[string]string, error)
 }
 
-// Session tracks per-session governance state (attempts, executions, failures).
+// Session tracks per-session tool-call state (attempts, executions, failures).
 type Session struct {
 	sessionID string
 	backend   StorageBackend

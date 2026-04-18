@@ -1,4 +1,4 @@
-// Package langchaingo provides an edictum adapter for LangChainGo.
+// Package langchaingo provides an Edictum adapter for LangChainGo.
 //
 // LangChainGo tools take a string input and return a string result.
 // The adapter parses input as JSON into map[string]any when possible,
@@ -34,7 +34,7 @@ func New(g *guard.Guard, opts ...guard.RunOption) *Adapter {
 	}
 }
 
-// WrapTool wraps a LangChainGo tool function with governance.
+// WrapTool wraps a LangChainGo tool function with Edictum checks.
 // On deny, returns an error wrapping edictum.BlockedError.
 func (a *Adapter) WrapTool(
 	toolName string,

@@ -1,4 +1,4 @@
-// Package audit provides structured event logging for governance decisions.
+// Package audit provides structured decision-log events.
 package audit
 
 import (
@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Action represents the type of governance event.
+// Action represents the type of decision-log event.
 type Action string
 
 // Audit action types. 10 canonical actions matching Python parity.

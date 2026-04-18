@@ -16,8 +16,8 @@ import (
 func newGateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gate",
-		Short: "Coding assistant governance via hook interception",
-		Long:  "Manage Edictum Gate — governance enforcement for coding assistants (Claude Code, Cursor, Copilot, Gemini, OpenCode).",
+		Short: "Workflow Gates for coding assistants",
+		Long:  "Manage Edictum Gate — hook-based workflow stages and rule checks for Claude Code, Cursor, Copilot, Gemini, and OpenCode.",
 	}
 
 	cmd.AddCommand(
@@ -47,14 +47,14 @@ func newGateInitCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Set up Edictum Gate governance",
+		Short: "Set up Edictum Gate",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runGateInit(cmd, serverURL, apiKey, rulesPath, environment, workflowPath, workflowExec, nonInteractive)
 		},
 	}
 
-	cmd.Flags().StringVar(&serverURL, "server", "", "Console server URL")
-	cmd.Flags().StringVar(&apiKey, "api-key", "", "Console API key")
+	cmd.Flags().StringVar(&serverURL, "server", "", "Dashboard server URL")
+	cmd.Flags().StringVar(&apiKey, "api-key", "", "Dashboard API key")
 	cmd.Flags().StringVar(&rulesPath, "rules", "", "custom Ruleset YAML")
 	cmd.Flags().StringVar(&environment, "environment", "production", "environment name")
 	cmd.Flags().StringVar(&workflowPath, "workflow", "", "custom Workflow YAML")
@@ -135,7 +135,7 @@ func runGateInit(cmd *cobra.Command, serverURL, apiKey, rulesPath, environment, 
 			fmt.Fprintln(w, "  Workflow exec(...): enabled")
 		}
 	}
-	fmt.Fprintf(w, "  Audit:     %s\n", cfg.AuditPath)
+	fmt.Fprintf(w, "  Decision log: %s\n", cfg.AuditPath)
 	if serverURL != "" {
 		fmt.Fprintf(w, "  Server:    %s\n", serverURL)
 	}

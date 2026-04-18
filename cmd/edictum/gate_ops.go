@@ -204,7 +204,7 @@ func runGateStatus(cmd *cobra.Command, jsonFlag bool, explicitSessionID string) 
 	}
 	fmt.Fprintf(w, "  Env:       %s\n", cfg.Environment)
 
-	fmt.Fprintf(w, "  Audit:     %d events pending\n", pending)
+	fmt.Fprintf(w, "  Decision log: %d events pending\n", pending)
 
 	if len(installed) > 0 {
 		fmt.Fprintf(w, "  Installed: %s\n", strings.Join(installed, ", "))
@@ -254,7 +254,7 @@ func newGateAuditCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "audit",
-		Short: "Show recent audit events",
+		Short: "Show recent decision log events",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runGateAudit(cmd, limit, tool, decision, jsonFlag)
 		},
@@ -289,7 +289,7 @@ func runGateAudit(cmd *cobra.Command, limit int, tool, decision string, jsonFlag
 
 	w := cmd.OutOrStdout()
 	if len(events) == 0 {
-		fmt.Fprintln(w, "No audit events found.")
+		fmt.Fprintln(w, "No decision log events found.")
 		return nil
 	}
 
@@ -310,7 +310,7 @@ func newGateSyncCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "sync",
-		Short: "Flush buffered audit events to server",
+		Short: "Flush buffered decision log events to server",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runGateSync(cmd, jsonFlag)
 		},

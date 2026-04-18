@@ -45,7 +45,7 @@ func WithRunPrincipal(p *toolcall.Principal) RunOption {
 	return func(c *runConfig) { c.principal = p }
 }
 
-// Run executes a tool call through the full governance pipeline.
+// Run executes a tool call through the full rules and workflow pipeline.
 // Creates session, envelope, runs pre-execute, approval, execute,
 // post-execute, and audit stages.
 func (g *Guard) Run(
@@ -104,7 +104,7 @@ func (g *Guard) Run(
 		return nil, fmt.Errorf("envelope create: %w", err)
 	}
 
-	// Start governance span. Truncate tool name in span name to prevent
+	// Start telemetry span. Truncate tool name in span name to prevent
 	// very long names from polluting trace backend indexes.
 	spanTool := env2.ToolName()
 	if len(spanTool) > 64 {

@@ -9,7 +9,7 @@ import (
 	"github.com/edictum-ai/edictum-go/toolcall"
 )
 
-// PostExecute runs all post-execution governance checks.
+// PostExecute runs all post-execution checks.
 func (p *CheckPipeline) PostExecute(
 	ctx context.Context,
 	env toolcall.ToolCall,

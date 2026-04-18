@@ -1,4 +1,4 @@
-// Package pipeline implements the 5-stage governance pipeline.
+// Package pipeline implements the 5-stage rules pipeline.
 package pipeline
 
 // OperationLimits defines caps on tool call attempts and executions.

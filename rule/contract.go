@@ -1,4 +1,4 @@
-// Package rule defines the core rule types for edictum governance.
+// Package rule defines the core rule types for Edictum.
 package rule
 
 import (

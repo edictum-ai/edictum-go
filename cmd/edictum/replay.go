@@ -20,8 +20,8 @@ func newReplayCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "replay <bundle>",
-		Short: "Replay audit events against rules",
-		Long:  "Re-evaluate historical audit log entries against a rule bundle to detect decision changes.",
+		Short: "Replay decision log events against rules",
+		Long:  "Re-evaluate historical decision log entries against a ruleset to detect decision changes.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if auditLog == "" {
@@ -31,7 +31,7 @@ func newReplayCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&auditLog, "audit-log", "", "path to JSONL audit log file (required)")
+	cmd.Flags().StringVar(&auditLog, "audit-log", "", "path to JSONL decision log file (required)")
 	cmd.Flags().StringVar(&outputPath, "output", "", "path for detailed JSONL report")
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "output as JSON")
 	return cmd
