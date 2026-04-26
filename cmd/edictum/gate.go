@@ -16,8 +16,8 @@ import (
 func newGateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gate",
-		Short: "Coding assistant governance via hook interception",
-		Long:  "Manage Edictum Gate — governance enforcement for coding assistants (Claude Code, Cursor, Copilot, Gemini, OpenCode).",
+		Short: "Bound coding-assistant agency before tool execution",
+		Long:  "Manage Edictum Gate — runtime enforcement for coding assistants (Claude Code, Cursor, Copilot, Gemini, OpenCode).",
 	}
 
 	cmd.AddCommand(
@@ -47,7 +47,7 @@ func newGateInitCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Set up Edictum Gate governance",
+		Short: "Set up Edictum Gate agency boundaries",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runGateInit(cmd, serverURL, apiKey, rulesPath, environment, workflowPath, workflowExec, nonInteractive)
 		},
@@ -221,14 +221,14 @@ func runGateCheck(cmd *cobra.Command, format, rulesOverride string, jsonFlag boo
 	}
 
 	if result.Decision == "block" {
-		return writeCheckDeny(cmd, format, buildDenyReason(ruleID, reason))
+		return writeCheckBlock(cmd, format, buildBlockReason(ruleID, reason))
 	}
 	return writeCheckOutput(cmd, format, "allow", "", "")
 }
 
 func gateCheckError(cmd *cobra.Command, format, msg string) error {
-	// Output a deny-formatted response to stdout so the assistant sees a
-	// deny even if it ignores exit codes. Defence-in-depth: some hook
+	// Output a block-formatted response to stdout so the assistant sees a
+	// block even if it ignores exit codes. Defence-in-depth: some hook
 	// systems treat exit 2 as "allow".
 	_ = writeCheckOutput(cmd, format, "block", "", msg)
 	return &exitError{code: 2}

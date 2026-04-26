@@ -88,7 +88,7 @@ if [ $exit_code -eq 1 ]; then
   echo "$result" >&2
   exit 1
 fi
-# Fail-closed: if edictum is missing or crashed (non-0, non-1), deny the call
+# Fail-closed: if edictum is missing or crashed (non-0, non-1), block the call
 if [ $exit_code -ne 0 ]; then
   echo "Edictum gate check failed (exit $exit_code)" >&2
   exit 1

@@ -181,7 +181,7 @@ func parseOpenCodeStdin(data map[string]any) (string, map[string]any, error) {
 	return toolName, toolInput, nil
 }
 
-func buildDenyReason(ruleID, reason string) string {
+func buildBlockReason(ruleID, reason string) string {
 	if ruleID != "" && reason != "" {
 		return fmt.Sprintf("Rule '%s': %s", ruleID, reason)
 	}
@@ -205,7 +205,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 				"hookSpecificOutput": map[string]any{
 					"hookEventName":            "PreToolUse",
 					"permissionDecision":       "deny", // Claude Code/Copilot hook protocol value — do not rename,
-					"permissionDecisionReason": buildDenyReason(ruleID, reason),
+					"permissionDecisionReason": buildBlockReason(ruleID, reason),
 				},
 			}
 		} else {
@@ -216,7 +216,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 		if decision == "block" {
 			output = map[string]any{
 				"decision": "block",
-				"reason":   buildDenyReason(ruleID, reason),
+				"reason":   buildBlockReason(ruleID, reason),
 			}
 		} else {
 			output = map[string]any{"decision": "allow"}
@@ -226,7 +226,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 		if decision == "block" {
 			output = map[string]any{
 				"permissionDecision":       "deny", // Claude Code/Copilot hook protocol value — do not rename,
-				"permissionDecisionReason": buildDenyReason(ruleID, reason),
+				"permissionDecisionReason": buildBlockReason(ruleID, reason),
 			}
 		} else {
 			output = map[string]any{}
@@ -236,7 +236,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 		if decision == "block" {
 			output = map[string]any{
 				"decision": "block",
-				"reason":   buildDenyReason(ruleID, reason),
+				"reason":   buildBlockReason(ruleID, reason),
 			}
 		} else {
 			output = map[string]any{}
@@ -246,7 +246,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 		if decision == "block" {
 			output = map[string]any{
 				"allow":  false,
-				"reason": buildDenyReason(ruleID, reason),
+				"reason": buildBlockReason(ruleID, reason),
 			}
 		} else {
 			output = map[string]any{"allow": true}
@@ -272,7 +272,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 	}
 	fmt.Fprintln(w, string(data))
 
-	// Exit code 1 for deny verdicts — consolidated here so callers don't
+	// Exit code 1 for block verdicts — consolidated here so callers don't
 	// need to return their own exitError after calling this function.
 	if decision == "block" {
 		return &exitError{code: 1}
@@ -280,6 +280,6 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 	return nil
 }
 
-func writeCheckDeny(cmd *cobra.Command, format, reason string) error {
+func writeCheckBlock(cmd *cobra.Command, format, reason string) error {
 	return writeCheckOutput(cmd, format, "block", "", reason)
 }
