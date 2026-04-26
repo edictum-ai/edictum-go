@@ -36,11 +36,11 @@ export const EdictumGate = async ({ directory }) => {
         if (!result) return;
         const parsed = JSON.parse(result);
         if (parsed.allow === false) {
-          throw new Error(parsed.reason || "Denied by edictum gate");
+          throw new Error(parsed.reason || "Blocked by edictum gate");
         }
       } catch (e) {
         // Fail-closed: all errors block the tool call, preserving
-        // the original message for deny reasons.
+        // the original message for block reasons.
         throw e;
       }
     }

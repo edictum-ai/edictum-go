@@ -112,19 +112,19 @@ func compiledToGuardOpts(c yamlpkg.CompiledRuleset, env string) []guard.Option {
 		opts = append(opts, guard.WithTools(c.Tools))
 	}
 
-	contractArgs := make([]any, 0,
+	ruleArgs := make([]any, 0,
 		len(c.Preconditions)+len(c.Postconditions)+len(c.SessionRules))
 	for _, p := range c.Preconditions {
-		contractArgs = append(contractArgs, p)
+		ruleArgs = append(ruleArgs, p)
 	}
 	for _, p := range c.Postconditions {
-		contractArgs = append(contractArgs, p)
+		ruleArgs = append(ruleArgs, p)
 	}
 	for _, s := range c.SessionRules {
-		contractArgs = append(contractArgs, s)
+		ruleArgs = append(ruleArgs, s)
 	}
-	if len(contractArgs) > 0 {
-		opts = append(opts, guard.WithRules(contractArgs...))
+	if len(ruleArgs) > 0 {
+		opts = append(opts, guard.WithRules(ruleArgs...))
 	}
 	if len(c.SandboxRules) > 0 {
 		opts = append(opts, guard.WithSandboxRules(c.SandboxRules...))
@@ -142,8 +142,8 @@ func buildGuard(files []string, env string) (*guard.Guard, error) {
 	return buildGuardFromFiles(files, env)
 }
 
-// countContracts counts rules by type from raw bundle data.
-func countContracts(data map[string]any) map[string]int {
+// countRules counts rules by type from raw bundle data.
+func countRules(data map[string]any) map[string]int {
 	counts := map[string]int{"pre": 0, "post": 0, "session": 0, "sandbox": 0}
 	raw, ok := data["rules"].([]any)
 	if !ok {

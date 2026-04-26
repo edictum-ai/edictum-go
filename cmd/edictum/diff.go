@@ -31,14 +31,14 @@ func newDiffCmd() *cobra.Command {
 }
 
 type diffResult struct {
-	Added     []contractRef `json:"added"`
-	Removed   []contractRef `json:"removed"`
-	Changed   []string      `json:"changed"`
-	Unchanged []string      `json:"unchanged"`
-	HasChange bool          `json:"has_changes"`
+	Added     []ruleRef `json:"added"`
+	Removed   []ruleRef `json:"removed"`
+	Changed   []string  `json:"changed"`
+	Unchanged []string  `json:"unchanged"`
+	HasChange bool      `json:"has_changes"`
 }
 
-type contractRef struct {
+type ruleRef struct {
 	ID   string `json:"id"`
 	Type string `json:"type"`
 }
@@ -62,12 +62,12 @@ func runDiffTwo(cmd *cobra.Command, path1, path2 string, jsonOut bool) error {
 		return fmt.Errorf("loading %s: %w", path2, err)
 	}
 
-	byID1 := indexContracts(data1)
-	byID2 := indexContracts(data2)
+	byID1 := indexRules(data1)
+	byID2 := indexRules(data2)
 
 	result := diffResult{
-		Added:     make([]contractRef, 0),
-		Removed:   make([]contractRef, 0),
+		Added:     make([]ruleRef, 0),
+		Removed:   make([]ruleRef, 0),
 		Changed:   make([]string, 0),
 		Unchanged: make([]string, 0),
 	}
@@ -76,7 +76,7 @@ func runDiffTwo(cmd *cobra.Command, path1, path2 string, jsonOut bool) error {
 		c2, exists := byID2[id]
 		if !exists {
 			ctype, _ := c1["type"].(string)
-			result.Removed = append(result.Removed, contractRef{ID: id, Type: ctype})
+			result.Removed = append(result.Removed, ruleRef{ID: id, Type: ctype})
 			continue
 		}
 		if reflect.DeepEqual(c1, c2) {
@@ -89,7 +89,7 @@ func runDiffTwo(cmd *cobra.Command, path1, path2 string, jsonOut bool) error {
 	for id, c2 := range byID2 {
 		if _, exists := byID1[id]; !exists {
 			ctype, _ := c2["type"].(string)
-			result.Added = append(result.Added, contractRef{ID: id, Type: ctype})
+			result.Added = append(result.Added, ruleRef{ID: id, Type: ctype})
 		}
 	}
 
@@ -189,8 +189,8 @@ func printComposeText(w io.Writer, r yamlpkg.CompositionReport) {
 	}
 }
 
-// indexContracts builds a map of rule ID to rule data.
-func indexContracts(data map[string]any) map[string]map[string]any {
+// indexRules builds a map of rule ID to rule data.
+func indexRules(data map[string]any) map[string]map[string]any {
 	idx := map[string]map[string]any{}
 	rules, _ := data["rules"].([]any)
 	for _, raw := range rules {

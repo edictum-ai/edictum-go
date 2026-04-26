@@ -1,4 +1,4 @@
-// Package workflow implements M1 workflow gate loading, state, and runtime evaluation.
+// Package workflow implements workflow gate loading, state, and runtime evaluation.
 package workflow
 
 import (

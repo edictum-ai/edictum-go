@@ -10,7 +10,7 @@ import (
 )
 
 // exitError signals a non-zero exit code without printing an error message.
-// Code 1 = violations/denied, Code 2 = usage/internal error.
+// Code 1 = violations/blocked, Code 2 = usage/internal error.
 type exitError struct {
 	code int
 }
@@ -22,8 +22,8 @@ func (e *exitError) Error() string {
 func main() {
 	rootCmd := &cobra.Command{
 		Use:           "edictum",
-		Short:         "Runtime rule enforcement for AI agent tool calls",
-		Long:          "Edictum CLI — validate, test, and enforce governance rules for AI agent tool calls.",
+		Short:         "Agency control for production AI agents",
+		Long:          "Edictum CLI — validate, test, and enforce agency boundaries for AI agent tool calls.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

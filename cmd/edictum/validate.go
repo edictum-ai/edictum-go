@@ -82,7 +82,7 @@ func runValidate(cmd *cobra.Command, files []string, jsonOut bool) error {
 			continue
 		}
 
-		counts := countContracts(data)
+		counts := countRules(data)
 		total := counts["pre"] + counts["post"] + counts["session"] + counts["sandbox"]
 
 		results = append(results, validateFileResult{

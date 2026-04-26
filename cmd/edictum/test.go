@@ -142,17 +142,17 @@ func runTestCases(cmd *cobra.Command, bundlePath, casesPath, env string, jsonOut
 		ok := result.Decision == tc.Expect
 
 		if tc.MatchContract != "" && ok {
-			ok = matchesDenyContract(result, tc.MatchContract)
+			ok = matchesBlockedRule(result, tc.MatchContract)
 		}
 
-		denyContract := extractRuleID(result)
+		blockingRule := extractRuleID(result)
 		cr := caseResult{
 			ID:       tc.ID,
 			Tool:     tc.Tool,
 			Decision: result.Decision,
 			Expected: tc.Expect,
 			Passed:   ok,
-			Rule:     denyContract,
+			Rule:     blockingRule,
 		}
 
 		if !ok {
@@ -226,7 +226,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 	}
 
 	ctx := context.Background()
-	hasDenials := false
+	hasBlocks := false
 
 	type callResult struct {
 		Decision       string   `json:"decision"`
@@ -242,7 +242,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 			guard.WithEvalEnvironment(env))
 
 		if result.Decision == "block" {
-			hasDenials = true
+			hasBlocks = true
 		}
 
 		results = append(results, callResult{
@@ -258,7 +258,7 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 		return writeJSONTo(w, results)
 	}
 
-	fmt.Fprintf(w, "%-3s %-12s %-8s %-10s %s\n", "#", "Tool", "Decision", "Contracts", "Details")
+	fmt.Fprintf(w, "%-3s %-12s %-8s %-10s %s\n", "#", "Tool", "Decision", "Rules", "Details")
 	for i, r := range results {
 		details := ""
 		if len(r.BlockReasons) > 0 {
@@ -268,13 +268,13 @@ func runTestCalls(cmd *cobra.Command, bundlePath, callsPath, env string, jsonOut
 			i+1, r.ToolName, strings.ToUpper(r.Decision), r.RulesEvaluated, details)
 	}
 
-	if hasDenials {
+	if hasBlocks {
 		return &exitError{code: 1}
 	}
 	return nil
 }
 
-func matchesDenyContract(result guard.EvaluationResult, ruleID string) bool {
+func matchesBlockedRule(result guard.EvaluationResult, ruleID string) bool {
 	for _, c := range result.Rules {
 		if !c.Passed && c.RuleID == ruleID {
 			return true

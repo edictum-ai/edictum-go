@@ -1,22 +1,34 @@
 # Edictum
 
-Go SDK for runtime rule enforcement on AI agent tool calls.
+Edictum is the agency control layer for production AI agents in Go.
+
+Agent frameworks build the agent. Edictum bounds the agency.
+
+Rulesets and Workflow Gates turn declared agent profiles into executable
+runtime boundaries: rules block unsafe tool calls, and Workflow Gates enforce
+ordered process with evidence and approvals.
+
+Edictum makes any agency level defensible. Medium Agency is the enterprise
+demand center right now, but the same runtime enforcement applies to lower- and
+higher-agency profiles.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/edictum-ai/edictum-go.svg)](https://pkg.go.dev/github.com/edictum-ai/edictum-go)
 [![CI](https://github.com/edictum-ai/edictum-go/actions/workflows/ci.yml/badge.svg)](https://github.com/edictum-ai/edictum-go/actions/workflows/ci.yml)
 [![Go 1.25+](https://img.shields.io/badge/go-1.25%2B-blue)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**Prompts are suggestions -- rules are enforcement.**
-The LLM cannot talk its way past a rule.
+**Prompts are suggestions -- agency boundaries are enforcement.**
+The LLM cannot talk its way past a rule or workflow gate.
 
 **Zero runtime deps** | **Fail-closed by default** | **660+ tests, -race clean**
 
 ## What it does
 
 - **Deterministic YAML rules** that execute outside the model -- no prompt-level bypass possible
+- **Workflow Gates** that enforce ordered process, required evidence, and approvals before execution
 - **Immune to prompt injection** -- rules are not part of the prompt, they run in a separate pipeline
 - **Fail-closed by default** -- if evaluation errors, the tool call is blocked
+- **Behavioral conformance measurement** to a declared profile; Edictum does not replace output-quality evals for accuracy, relevance, coherence, or answer quality
 
 ## Install
 
@@ -27,6 +39,9 @@ go get github.com/edictum-ai/edictum-go
 Requires Go 1.25+.
 
 ## Quick start
+
+Rulesets are one part of agency control. Use them to express deterministic
+tool-call boundaries for the declared agent profile.
 
 Define a ruleset in YAML:
 
@@ -84,10 +99,18 @@ func main() {
 }
 ```
 
-## Gate Workflow Runtime
+## Workflow Gates and CLI Gate
 
-`edictum gate check` remains a preflight hook path in M1. It evaluates rules only.
-Workflow Gates are enforced by the real execution path: `edictum gate run`.
+Gate bounds coding-assistant agency before tool execution. It enforces rules and
+optional workflow state before the runner executes the call.
+
+Rulesets answer whether a tool call fits the declared profile. Workflow Gates
+add ordered process: read context before writing, verify before push, require
+approval before protected operations, and emit audit events for each decision.
+
+For read/write agents, Edictum can require read-before-write evidence,
+verification before push, approval before protected operations, and audit events
+for every decision.
 
 Initialize Gate with separate rules and workflow documents:
 
@@ -106,6 +129,44 @@ edictum gate init \
   --workflow-exec
 ```
 
+Example workflow:
+
+```yaml
+apiVersion: edictum/v1
+kind: Workflow
+metadata:
+  name: read-write-agent
+stages:
+  - id: read-context
+    tools: [Read]
+    exit:
+      - condition: file_read("spec.md")
+        message: "Read the spec first"
+  - id: implement
+    entry:
+      - condition: stage_complete("read-context")
+    tools: [Edit]
+  - id: verify
+    entry:
+      - condition: stage_complete("implement")
+    tools: [Bash]
+    checks:
+      - command_matches: '^go test ./\.\.\.$'
+        message: "Run verification before pushing"
+  - id: approve-push
+    entry:
+      - condition: stage_complete("verify")
+    approval:
+      message: "Approval required before push"
+  - id: push
+    entry:
+      - condition: stage_complete("approve-push")
+    tools: [Bash]
+    checks:
+      - command_matches: '^git push\b'
+        message: "Only push after verification and approval"
+```
+
 Run actual tool execution through the full runtime with a stable session ID:
 
 ```bash
@@ -113,13 +174,13 @@ echo '{"tool_name":"Read","tool_input":{"path":"spec.md"}}' \
   | edictum gate run --format raw --session-id mimi-task-42 -- ./openclaw-tool-runner
 ```
 
-For M1 dogfood:
+For coding-assistant demos:
 
 - keep ruleset YAML and workflow YAML as separate files
 - reuse the same `--session-id` across one agent task so workflow state advances
-- route real tool execution through `gate run`; `gate check` will not enforce workflows
+- route real tool execution through `gate run`; `gate check` evaluates rules only
 
-For embedded consumers, the workflow runtime now exposes explicit stage-control and
+For embedded consumers, the workflow runtime exposes explicit stage-control and
 state APIs:
 
 ```go
@@ -170,9 +231,8 @@ func main() {
 }
 ```
 
-Audit events emitted from guarded runs now include `session_id`,
-`parent_session_id`, and workflow progress actions such as
-`workflow_state_updated`.
+Audit events emitted from runtime runs include `session_id`, `parent_session_id`,
+and workflow progress actions such as `workflow_state_updated`.
 
 ## Adapters
 

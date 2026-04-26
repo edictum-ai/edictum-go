@@ -27,8 +27,8 @@ func newGateRunCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:           "run [flags] -- <command> [args...]",
-		Short:         "Execute a tool call through the full Gate runtime",
-		Long:          "Run a real tool call through Guard.Run(), including session state, workflow gates, and approval handling.",
+		Short:         "Execute a tool call through Gate runtime enforcement",
+		Long:          "Gate bounds coding-assistant agency before tool execution. It enforces rules and optional workflow state before the runner executes the call.",
 		Args:          cobra.ArbitraryArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
