@@ -274,11 +274,19 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 	}
 	fmt.Fprintln(w, string(data))
 
-	// Host-specific JSON decisions are processed on a successful hook exit.
-	// Gemini's generated wrapper translates this signal to its host contract;
-	// raw preserves its generic Unix-style block exit for direct consumers.
-	if decision == "block" && (format == "gemini" || format == "raw") {
-		return &exitError{code: 1}
+	if decision == "block" {
+		switch format {
+		case "claude-code", "copilot":
+			return &exitError{code: 2}
+		case "gemini", "raw":
+			// Gemini's generated wrapper translates this signal to its host contract;
+			// raw preserves its generic Unix-style block exit for direct consumers.
+			return &exitError{code: 1}
+		case "cursor":
+			// Cursor documents that exit 2 blocks, but not that it preserves the
+			// JSON user_message and agent_message. Keep the JSON-processing exit
+			// until primary evidence confirms that both reason fields survive.
+		}
 	}
 	return nil
 }

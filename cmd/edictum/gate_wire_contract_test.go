@@ -12,20 +12,36 @@ func TestSecurityGatePolicyBlockWireContracts(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	rules := writeTestBundle(t)
 
-	for format, contract := range gateWireContracts {
-		t.Run(format, func(t *testing.T) {
+	tests := []struct {
+		format   string
+		wantExit int
+	}{
+		// Measured on Claude Code 2.1.226 on 2026-08-09: exit 2 blocks and preserves permissionDecisionReason.
+		{"claude-code", 2},
+		// https://cursor.com/docs/hooks (fetched 2026-08-09) only promises JSON processing on exit 0;
+		// evidence that exit 2 preserves user_message and agent_message is still required.
+		{"cursor", 0},
+		// https://docs.github.com/en/copilot/reference/hooks-reference (fetched 2026-08-09):
+		// PreToolUse exit 2 denies and merges stdout JSON with the deny decision.
+		{"copilot", 2},
+		// Gemini's generated wrapper converts this internal exit 1 to host exit 2 while preserving stdout JSON.
+		{"gemini", 1},
+		// https://opencode.ai/docs/plugins/ (fetched 2026-08-09): the generated plugin blocks by throwing on allow:false.
+		{"opencode", 0},
+		// Raw has no host protocol; preserve its generic Unix-style policy-deny exit.
+		{"raw", 1},
+	}
+
+	for _, test := range tests {
+		t.Run(test.format, func(t *testing.T) {
 			cmd := newGateCheckCmd()
 			var stdout bytes.Buffer
 			cmd.SetOut(&stdout)
-			cmd.SetIn(strings.NewReader(gateWireBlockInput(format)))
+			cmd.SetIn(strings.NewReader(gateWireBlockInput(test.format)))
 
-			err := runGateCheck(cmd, format, rules, false)
-			wantExit := 0
-			if format == "gemini" || format == "raw" {
-				wantExit = 1
-			}
-			assertProcessExitCode(t, err, wantExit)
-			assertAcceptedWirePayload(t, stdout.Bytes(), contract)
+			err := runGateCheck(cmd, test.format, rules, false)
+			assertProcessExitCode(t, err, test.wantExit)
+			assertAcceptedWirePayload(t, stdout.Bytes(), gateWireContracts[test.format])
 		})
 	}
 }
