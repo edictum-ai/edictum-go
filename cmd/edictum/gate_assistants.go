@@ -1,5 +1,4 @@
-// gate_assistants.go — Assistant registry, Claude Code, and Cursor
-// install/uninstall logic.
+// gate_assistants.go — Assistant registry and Claude Code install/uninstall logic.
 package main
 
 import (
@@ -22,14 +21,21 @@ type assistantOps struct {
 
 var assistantRegistry = map[string]assistantOps{
 	"claude-code": {install: installClaudeCode, uninstall: uninstallClaudeCode},
-	"cursor":      {install: installCursor, uninstall: uninstallCursor},
 	"copilot":     {install: installCopilot, uninstall: uninstallCopilot},
-	"gemini":      {install: installGemini, uninstall: uninstallGemini},
 	"opencode":    {install: installOpenCode, uninstall: uninstallOpenCode},
 }
 
+var legacyAssistantUninstallers = map[string]func() (string, error){
+	"cursor": uninstallLegacyCursor,
+	"gemini": uninstallLegacyGemini,
+}
+
 func supportedAssistants() []string {
-	return []string{"claude-code", "copilot", "cursor", "gemini", "opencode"}
+	return []string{"claude-code", "copilot", "opencode"}
+}
+
+func uninstallableAssistants() []string {
+	return []string{"claude-code", "copilot", "opencode", "cursor", "gemini"}
 }
 
 func installAssistant(name string) (string, error) {
@@ -41,11 +47,13 @@ func installAssistant(name string) (string, error) {
 }
 
 func uninstallAssistant(name string) (string, error) {
-	ops, ok := assistantRegistry[name]
-	if !ok {
-		return "", fmt.Errorf("unsupported assistant %q; supported: %s", name, strings.Join(supportedAssistants(), ", "))
+	if ops, ok := assistantRegistry[name]; ok {
+		return ops.uninstall()
 	}
-	return ops.uninstall()
+	if uninstall, ok := legacyAssistantUninstallers[name]; ok {
+		return uninstall()
+	}
+	return "", fmt.Errorf("unsupported assistant %q; uninstallable: %s", name, strings.Join(uninstallableAssistants(), ", "))
 }
 
 // --- Claude Code ---
@@ -109,65 +117,4 @@ func uninstallClaudeCode() (string, error) {
 		return "", wErr
 	}
 	return fmt.Sprintf("Removed edictum gate hook from %s", settingsPath), nil
-}
-
-// --- Cursor ---
-
-func installCursor() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	hooksPath := filepath.Join(home, ".cursor", "hooks.json")
-	config, err := readJSONFile(hooksPath)
-	if err != nil {
-		config = map[string]any{}
-	}
-
-	hookEntry := map[string]any{"command": "edictum gate check --format cursor", "timeout": float64(5)}
-	hooks := ensureMap(config, "hooks")
-	preToolUse := ensureSlice(hooks, "preToolUse")
-
-	if containsHookMarkerDirect(preToolUse, "command") {
-		return "Edictum gate hook already installed in Cursor hooks", nil
-	}
-
-	preToolUse = append(preToolUse, hookEntry)
-	hooks["preToolUse"] = preToolUse
-	config["hooks"] = hooks
-
-	if wErr := writeJSONFileAtomic(hooksPath, config); wErr != nil {
-		return "", wErr
-	}
-	return fmt.Sprintf("Installed edictum gate hook in %s", hooksPath), nil
-}
-
-func uninstallCursor() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	hooksPath := filepath.Join(home, ".cursor", "hooks.json")
-	config, err := readJSONFile(hooksPath)
-	if err != nil {
-		return "No Cursor hooks found", nil //nolint:nilerr // File not found is not an error for uninstall.
-	}
-
-	hooks, _ := config["hooks"].(map[string]any)
-	if hooks == nil {
-		return "Edictum gate hook not found in Cursor hooks", nil
-	}
-	preToolUse, _ := hooks["preToolUse"].([]any)
-
-	filtered, removed := filterDirectEntries(preToolUse, "command")
-	if !removed {
-		return "Edictum gate hook not found in Cursor hooks", nil
-	}
-
-	hooks["preToolUse"] = filtered
-	config["hooks"] = hooks
-	if wErr := writeJSONFileAtomic(hooksPath, config); wErr != nil {
-		return "", wErr
-	}
-	return fmt.Sprintf("Removed edictum gate hook from %s", hooksPath), nil
 }

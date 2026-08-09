@@ -2,13 +2,15 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// Minimal rule bundle for security tests. Denies rm -rf commands.
+// Minimal rule bundle for security tests. Tool input fields use the pipeline's
+// args.<field> selector form, so args.command matches the Bash command argument.
 const testRuleset = `apiVersion: edictum/v1
 kind: Ruleset
 metadata:
@@ -20,7 +22,7 @@ rules:
     type: pre
     tool: Bash
     when:
-      bash_command:
+      "args.command":
         contains: "rm -rf"
     then:
       action: block
@@ -157,5 +159,19 @@ func TestSecurityUnsupportedAssistantUninstall(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unsupported assistant") {
 		t.Fatalf("expected 'unsupported assistant' error, got: %v", err)
+	}
+}
+
+func TestSecurityRemovedAssistantInstallsRejected(t *testing.T) {
+	for _, assistant := range []string{"cursor", "gemini"} {
+		t.Run(assistant, func(t *testing.T) {
+			_, err := installAssistant(assistant)
+			if err == nil {
+				t.Fatal("removed assistant install must be rejected")
+			}
+			if !strings.Contains(err.Error(), fmt.Sprintf("unsupported assistant %q", assistant)) {
+				t.Fatalf("error = %q, want clear unsupported-assistant error", err)
+			}
+		})
 	}
 }

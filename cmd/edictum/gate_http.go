@@ -84,7 +84,7 @@ func containsHookMarker(entries []any, hooksKey, cmdKey string) bool {
 	return false
 }
 
-// containsHookMarkerDirect checks flat hook entries (Cursor/Copilot style: entries[].command).
+// containsHookMarkerDirect checks flat Copilot hook entries.
 func containsHookMarkerDirect(entries []any, cmdKey string) bool {
 	for _, entry := range entries {
 		m, _ := entry.(map[string]any)
@@ -132,7 +132,7 @@ func filterHookEntries(entries []any, hooksKey, cmdKey string) ([]any, bool) {
 	return filtered, removed
 }
 
-// filterDirectEntries removes flat edictum hooks (Cursor/Copilot style).
+// filterDirectEntries removes flat Edictum hooks.
 func filterDirectEntries(entries []any, cmdKey string) ([]any, bool) {
 	var filtered []any
 	removed := false

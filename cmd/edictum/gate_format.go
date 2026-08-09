@@ -22,23 +22,19 @@ func buildGuardFromPath(path string) (*guard.Guard, error) {
 // Format parsing and output
 // ---------------------------------------------------------------------------
 
-// Tool name maps for each assistant format.
-var cursorToolMap = map[string]string{
-	"Shell": "Bash", "Read": "Read", "Write": "Write",
-	"Edit": "Edit", "Task": "Task",
+const supportedGateFormatsText = "claude-code, copilot, opencode, raw"
+
+func isSupportedGateFormat(format string) bool {
+	switch format {
+	case "claude-code", "copilot", "opencode", "raw":
+		return true
+	default:
+		return false
+	}
 }
 
 var copilotToolMap = map[string]string{
 	"bash": "Bash", "edit": "Edit", "view": "Read", "create": "Write",
-}
-
-var geminiToolMap = map[string]string{
-	"shell": "Bash", "run_shell_command": "Bash",
-	"write_file": "Write", "read_file": "Read",
-	"edit_file": "Edit", "replace_in_file": "Edit",
-	"glob": "Glob", "list_files": "Glob",
-	"grep": "Grep", "search_files": "Grep",
-	"web_fetch": "WebFetch", "web_search": "WebSearch",
 }
 
 var opencodeToolMap = map[string]string{
@@ -63,33 +59,24 @@ func parseFormatStdin(format string, raw []byte) (string, map[string]any, error)
 
 	switch format {
 	case "claude-code", "raw":
-		// Auto-detect Cursor when stdin contains Cursor-specific fields.
 		if format == "claude-code" {
 			if _, ok := data["cursor_version"]; ok {
-				toolName, toolArgs, parseErr = parseCursorStdin(data)
-				break
+				return "", nil, fmt.Errorf("unsupported Cursor hook payload: cursor_version is not supported")
 			}
 			if _, ok := data["workspace_roots"]; ok {
-				toolName, toolArgs, parseErr = parseCursorStdin(data)
-				break
+				return "", nil, fmt.Errorf("unsupported Cursor hook payload: workspace_roots is not supported")
 			}
 		}
 		toolName, toolArgs, parseErr = parseStandardStdin(data, nil)
 
-	case "cursor":
-		toolName, toolArgs, parseErr = parseCursorStdin(data)
-
 	case "copilot":
 		toolName, toolArgs, parseErr = parseCopilotStdin(data)
-
-	case "gemini":
-		toolName, toolArgs, parseErr = parseStandardStdin(data, geminiToolMap)
 
 	case "opencode":
 		toolName, toolArgs, parseErr = parseOpenCodeStdin(data)
 
 	default:
-		return "", nil, fmt.Errorf("unsupported format %q; supported: claude-code, cursor, copilot, gemini, opencode, raw", format)
+		return "", nil, fmt.Errorf("unsupported format %q; supported: %s", format, supportedGateFormatsText)
 	}
 
 	if parseErr != nil {
@@ -121,18 +108,6 @@ func parseStandardStdin(data map[string]any, toolMap map[string]string) (string,
 		if mapped, ok := toolMap[toolName]; ok {
 			toolName = mapped
 		}
-	}
-	return toolName, toolInput, nil
-}
-
-func parseCursorStdin(data map[string]any) (string, map[string]any, error) {
-	toolName, _ := data["tool_name"].(string)
-	if mapped, ok := cursorToolMap[toolName]; ok {
-		toolName = mapped
-	}
-	toolInput, _ := data["tool_input"].(map[string]any)
-	if toolInput == nil {
-		toolInput = map[string]any{}
 	}
 	return toolName, toolInput, nil
 }
@@ -212,31 +187,11 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 			output = map[string]any{}
 		}
 
-	case "cursor":
-		if decision == "block" {
-			output = map[string]any{
-				"decision": "block",
-				"reason":   buildBlockReason(ruleID, reason),
-			}
-		} else {
-			output = map[string]any{"decision": "allow"}
-		}
-
 	case "copilot":
 		if decision == "block" {
 			output = map[string]any{
 				"permissionDecision":       "deny", // Claude Code/Copilot hook protocol value — do not rename,
 				"permissionDecisionReason": buildBlockReason(ruleID, reason),
-			}
-		} else {
-			output = map[string]any{}
-		}
-
-	case "gemini":
-		if decision == "block" {
-			output = map[string]any{
-				"decision": "block",
-				"reason":   buildBlockReason(ruleID, reason),
 			}
 		} else {
 			output = map[string]any{}
@@ -263,7 +218,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 		output = result
 
 	default:
-		output = map[string]any{"decision": decision}
+		return fmt.Errorf("unsupported format %q; supported: %s", format, supportedGateFormatsText)
 	}
 
 	data, err := json.Marshal(output)
@@ -272,10 +227,18 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 	}
 	fmt.Fprintln(w, string(data))
 
-	// Exit code 1 for block verdicts — consolidated here so callers don't
-	// need to return their own exitError after calling this function.
 	if decision == "block" {
-		return &exitError{code: 1}
+		switch format {
+		case "claude-code", "copilot":
+			return &exitError{code: 2}
+		case "opencode":
+			// The generated plugin reads allow:false from stdout and throws to block.
+			return nil
+		case "raw":
+			return &exitError{code: 1}
+		default:
+			return &exitError{code: 2}
+		}
 	}
 	return nil
 }

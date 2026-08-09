@@ -55,7 +55,7 @@ func newGateUninstallCmd() *cobra.Command {
 		Use:       "uninstall <assistant>",
 		Short:     "Remove the gate hook from a coding assistant",
 		Args:      cobra.ExactArgs(1),
-		ValidArgs: supportedAssistants(),
+		ValidArgs: uninstallableAssistants(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			msg, err := uninstallAssistant(args[0])
 			if err != nil {

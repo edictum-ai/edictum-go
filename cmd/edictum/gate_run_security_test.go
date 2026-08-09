@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -84,5 +85,24 @@ func TestSecurityGateRunMalformedSessionID(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "session create") && !strings.Contains(err.Error(), "invalid session ID") {
 		t.Fatalf("err = %v, want invalid session ID", err)
+	}
+}
+
+func TestSecurityGateRunRejectsRemovedFormatBeforeReadingStdin(t *testing.T) {
+	for _, format := range []string{"cursor", "gemini"} {
+		t.Run(format, func(t *testing.T) {
+			cmd := newGateRunCmd()
+			cmd.SetIn(gateErrorReader{})
+			cmd.SetArgs([]string{"--format", format, "--", "true"})
+
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("removed format must be rejected")
+			}
+			want := fmt.Sprintf("unsupported format %q; supported: %s", format, supportedGateFormatsText)
+			if err.Error() != want {
+				t.Fatalf("error = %q, want %q", err, want)
+			}
+		})
 	}
 }

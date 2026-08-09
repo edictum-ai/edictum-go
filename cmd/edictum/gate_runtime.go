@@ -38,7 +38,7 @@ func newGateRunCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&format, "format", "raw", "input format (claude-code, cursor, copilot, gemini, opencode, raw)")
+	cmd.Flags().StringVar(&format, "format", "raw", "input format ("+supportedGateFormatsText+")")
 	cmd.Flags().StringVar(&rulesPath, "rules", "", "override rule path")
 	cmd.Flags().StringVar(&workflowPath, "workflow", "", "override workflow path")
 	cmd.Flags().StringVar(&sessionID, "session-id", "", "stable session ID for persisted runtime state")
@@ -54,6 +54,9 @@ func runGateRun(
 ) error {
 	if len(runnerArgs) == 0 {
 		return fmt.Errorf("gate run requires a command after --")
+	}
+	if !isSupportedGateFormat(format) {
+		return fmt.Errorf("unsupported format %q; supported: %s", format, supportedGateFormatsText)
 	}
 
 	raw, err := io.ReadAll(io.LimitReader(cmd.InOrStdin(), maxStdinBytes+1))
