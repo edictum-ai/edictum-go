@@ -214,12 +214,14 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 
 	case "cursor":
 		if decision == "block" {
+			blockReason := buildBlockReason(ruleID, reason)
 			output = map[string]any{
-				"decision": "block",
-				"reason":   buildBlockReason(ruleID, reason),
+				"permission":    "deny",
+				"user_message":  blockReason,
+				"agent_message": blockReason,
 			}
 		} else {
-			output = map[string]any{"decision": "allow"}
+			output = map[string]any{"permission": "allow"}
 		}
 
 	case "copilot":
@@ -272,9 +274,10 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 	}
 	fmt.Fprintln(w, string(data))
 
-	// Exit code 1 for block verdicts — consolidated here so callers don't
-	// need to return their own exitError after calling this function.
-	if decision == "block" {
+	// Host-specific JSON decisions are processed on a successful hook exit.
+	// Gemini's generated wrapper translates this signal to its host contract;
+	// raw preserves its generic Unix-style block exit for direct consumers.
+	if decision == "block" && (format == "gemini" || format == "raw") {
 		return &exitError{code: 1}
 	}
 	return nil

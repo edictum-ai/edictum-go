@@ -20,7 +20,7 @@ rules:
     type: pre
     tool: Bash
     when:
-      bash_command:
+      "args.command":
         contains: "rm -rf"
     then:
       action: block

@@ -33,10 +33,18 @@ export const EdictumGate = async ({ directory }) => {
           throw new Error("Edictum gate check failed: " + proc.error.message);
         }
         const result = (proc.stdout || "").trim();
-        if (!result) return;
+        if (!result) {
+          if (proc.status !== 0) {
+            throw new Error("Edictum gate check failed with exit " + proc.status);
+          }
+          return;
+        }
         const parsed = JSON.parse(result);
         if (parsed.allow === false) {
           throw new Error(parsed.reason || "Blocked by edictum gate");
+        }
+        if (proc.status !== 0) {
+          throw new Error("Edictum gate check failed with exit " + proc.status);
         }
       } catch (e) {
         // Fail-closed: all errors block the tool call, preserving
