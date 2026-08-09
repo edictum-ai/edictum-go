@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+
+- removed the Cursor and Gemini CLI gate formats and installers because they
+  could not be verified against current live hosts; users should stay on the
+  previous release or migrate to Claude Code, Copilot, or OpenCode
+
 ## v0.5.0 - 2026-04-15
 
 ### Added

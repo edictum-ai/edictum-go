@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -157,5 +158,25 @@ func TestSecurityUnsupportedAssistantUninstall(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unsupported assistant") {
 		t.Fatalf("expected 'unsupported assistant' error, got: %v", err)
+	}
+}
+
+func TestSecurityRemovedAssistantsRejected(t *testing.T) {
+	operations := map[string]func(string) (string, error){
+		"install":   installAssistant,
+		"uninstall": uninstallAssistant,
+	}
+	for _, assistant := range []string{"cursor", "gemini"} {
+		for operation, run := range operations {
+			t.Run(operation+"/"+assistant, func(t *testing.T) {
+				_, err := run(assistant)
+				if err == nil {
+					t.Fatal("removed assistant must be rejected")
+				}
+				if !strings.Contains(err.Error(), fmt.Sprintf("unsupported assistant %q", assistant)) {
+					t.Fatalf("error = %q, want clear unsupported-assistant error", err)
+				}
+			})
+		}
 	}
 }

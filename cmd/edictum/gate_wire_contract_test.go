@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,14 +19,9 @@ func TestSecurityGatePolicyBlockWireContracts(t *testing.T) {
 	}{
 		// Measured on Claude Code 2.1.226 on 2026-08-09: exit 2 blocks and preserves permissionDecisionReason.
 		{"claude-code", 2},
-		// https://cursor.com/docs/hooks (fetched 2026-08-09) only promises JSON processing on exit 0;
-		// evidence that exit 2 preserves user_message and agent_message is still required.
-		{"cursor", 0},
 		// https://docs.github.com/en/copilot/reference/hooks-reference (fetched 2026-08-09):
 		// PreToolUse exit 2 denies and merges stdout JSON with the deny decision.
 		{"copilot", 2},
-		// Gemini's generated wrapper converts this internal exit 1 to host exit 2 while preserving stdout JSON.
-		{"gemini", 1},
 		// https://opencode.ai/docs/plugins/ (fetched 2026-08-09): the generated plugin blocks by throwing on allow:false.
 		{"opencode", 0},
 		// Raw has no host protocol; preserve its generic Unix-style policy-deny exit.
@@ -88,17 +84,59 @@ func TestSecurityGateFailureWireContracts(t *testing.T) {
 }
 
 func TestGateWireContractRejectsInternalBlock(t *testing.T) {
-	for _, format := range []string{"claude-code", "copilot", "cursor"} {
+	for _, format := range []string{"claude-code", "copilot"} {
 		t.Run(format, func(t *testing.T) {
 			payload := []byte(`{"permissionDecision":"block"}`)
-			switch format {
-			case "claude-code":
+			if format == "claude-code" {
 				payload = []byte(`{"hookSpecificOutput":{"permissionDecision":"block"}}`)
-			case "cursor":
-				payload = []byte(`{"permission":"block"}`)
 			}
 			if err := acceptedWirePayload(payload, gateWireContracts[format]); err == nil {
 				t.Fatal("internal decision value block must be rejected at this wire boundary")
+			}
+		})
+	}
+}
+
+func TestSecurityGateRemovedFormatsRejected(t *testing.T) {
+	for _, format := range []string{"cursor", "gemini"} {
+		t.Run(format, func(t *testing.T) {
+			cmd := newGateCheckCmd()
+			var stdout bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stdout)
+			cmd.SetIn(strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"echo ok"}}`))
+			cmd.SetArgs([]string{"--format", format})
+
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatal("removed format must return a non-zero exit")
+			}
+			if !strings.Contains(err.Error(), fmt.Sprintf("unsupported format %q", format)) {
+				t.Fatalf("error = %q, want clear unsupported-format error", err)
+			}
+			if strings.Contains(stdout.String(), `"allow"`) {
+				t.Fatalf("removed format emitted an allow payload: %s", stdout.String())
+			}
+		})
+	}
+}
+
+func TestSecurityGateCursorShapedClaudePayloadFailsClosed(t *testing.T) {
+	for _, field := range []string{"cursor_version", "workspace_roots"} {
+		t.Run(field, func(t *testing.T) {
+			cmd := newGateCheckCmd()
+			var stdout bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetIn(strings.NewReader(fmt.Sprintf(
+				`{"tool_name":"Shell","tool_input":{"command":"echo ok"},%q:"present"}`,
+				field,
+			)))
+
+			err := runGateCheck(cmd, "claude-code", "", false)
+			assertExitCode(t, err, 2)
+			assertAcceptedWirePayload(t, stdout.Bytes(), gateWireContracts["claude-code"])
+			if !strings.Contains(stdout.String(), "unsupported Cursor hook payload") {
+				t.Fatalf("stdout = %q, want unsupported Cursor reason", stdout.String())
 			}
 		})
 	}

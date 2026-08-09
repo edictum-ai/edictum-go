@@ -17,7 +17,7 @@ func newGateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gate",
 		Short: "Bound coding-assistant agency before tool execution",
-		Long:  "Manage Edictum Gate — runtime enforcement for coding assistants (Claude Code, Cursor, Copilot, Gemini, OpenCode).",
+		Long:  "Manage Edictum Gate — runtime enforcement for coding assistants (Claude Code, Copilot, OpenCode).",
 	}
 
 	cmd.AddCommand(
@@ -157,7 +157,7 @@ func newGateCheckCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&format, "format", "claude-code", "output format (claude-code, cursor, copilot, gemini, opencode, raw)")
+	cmd.Flags().StringVar(&format, "format", "claude-code", "output format ("+supportedGateFormatsText+")")
 	cmd.Flags().StringVar(&rulesPath, "rules", "", "override rule path")
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "force JSON output")
 	return cmd
@@ -168,6 +168,9 @@ func newGateCheckCmd() *cobra.Command {
 const maxStdinBytes = 10 * 1024 * 1024
 
 func runGateCheck(cmd *cobra.Command, format, rulesOverride string, jsonFlag bool) error {
+	if !isSupportedGateFormat(format) {
+		return fmt.Errorf("unsupported format %q; supported: %s", format, supportedGateFormatsText)
+	}
 	if jsonFlag {
 		format = "raw"
 	}

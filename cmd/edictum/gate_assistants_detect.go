@@ -117,17 +117,6 @@ func detectInstalledAssistants() []string {
 		}
 	}
 
-	// Cursor.
-	if config, rErr := readJSONFile(filepath.Join(home, ".cursor", "hooks.json")); rErr == nil {
-		hooks, _ := config["hooks"].(map[string]any)
-		if hooks != nil {
-			ptu, _ := hooks["preToolUse"].([]any)
-			if containsHookMarkerDirect(ptu, "command") {
-				installed = append(installed, "cursor")
-			}
-		}
-	}
-
 	// Copilot (cwd-relative).
 	if cwd, cwdErr := os.Getwd(); cwdErr == nil {
 		if config, rErr := readJSONFile(filepath.Join(cwd, ".github", "hooks", "hooks.json")); rErr == nil {
@@ -138,14 +127,6 @@ func detectInstalledAssistants() []string {
 					installed = append(installed, "copilot")
 				}
 			}
-		}
-	}
-
-	// Gemini (cwd-relative).
-	if cwd, cwdErr := os.Getwd(); cwdErr == nil {
-		scriptPath := filepath.Join(cwd, ".gemini", "hooks", "edictum-gate.sh")
-		if _, sErr := os.Stat(scriptPath); sErr == nil {
-			installed = append(installed, "gemini")
 		}
 	}
 
