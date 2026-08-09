@@ -55,6 +55,9 @@ func runGateRun(
 	if len(runnerArgs) == 0 {
 		return fmt.Errorf("gate run requires a command after --")
 	}
+	if !isSupportedGateFormat(format) {
+		return fmt.Errorf("unsupported format %q; supported: %s", format, supportedGateFormatsText)
+	}
 
 	raw, err := io.ReadAll(io.LimitReader(cmd.InOrStdin(), maxStdinBytes+1))
 	if err != nil {
