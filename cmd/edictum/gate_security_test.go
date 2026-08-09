@@ -161,22 +161,16 @@ func TestSecurityUnsupportedAssistantUninstall(t *testing.T) {
 	}
 }
 
-func TestSecurityRemovedAssistantsRejected(t *testing.T) {
-	operations := map[string]func(string) (string, error){
-		"install":   installAssistant,
-		"uninstall": uninstallAssistant,
-	}
+func TestSecurityRemovedAssistantInstallsRejected(t *testing.T) {
 	for _, assistant := range []string{"cursor", "gemini"} {
-		for operation, run := range operations {
-			t.Run(operation+"/"+assistant, func(t *testing.T) {
-				_, err := run(assistant)
-				if err == nil {
-					t.Fatal("removed assistant must be rejected")
-				}
-				if !strings.Contains(err.Error(), fmt.Sprintf("unsupported assistant %q", assistant)) {
-					t.Fatalf("error = %q, want clear unsupported-assistant error", err)
-				}
-			})
-		}
+		t.Run(assistant, func(t *testing.T) {
+			_, err := installAssistant(assistant)
+			if err == nil {
+				t.Fatal("removed assistant install must be rejected")
+			}
+			if !strings.Contains(err.Error(), fmt.Sprintf("unsupported assistant %q", assistant)) {
+				t.Fatalf("error = %q, want clear unsupported-assistant error", err)
+			}
+		})
 	}
 }

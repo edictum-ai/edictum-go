@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -83,7 +84,7 @@ func TestSecurityGateFailureWireContracts(t *testing.T) {
 	}
 }
 
-func TestGateWireContractRejectsInternalBlock(t *testing.T) {
+func TestSecurityGateWireContractRejectsInternalDecisionValue(t *testing.T) {
 	for _, format := range []string{"claude-code", "copilot"} {
 		t.Run(format, func(t *testing.T) {
 			payload := []byte(`{"permissionDecision":"block"}`)
@@ -94,6 +95,26 @@ func TestGateWireContractRejectsInternalBlock(t *testing.T) {
 				t.Fatal("internal decision value block must be rejected at this wire boundary")
 			}
 		})
+	}
+}
+
+func TestSecurityGateOpenCodeAllowWireContract(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cmd := newGateCheckCmd()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetIn(strings.NewReader(gateWireInput("opencode", "valid")))
+
+	err := runGateCheck(cmd, "opencode", writeTestBundle(t), false)
+	assertProcessExitCode(t, err, 0)
+	assertAcceptedWirePayload(t, stdout.Bytes(), gateWireContracts["opencode"])
+
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["allow"] != true {
+		t.Fatalf("emitted allow decision = %v, want true", payload["allow"])
 	}
 }
 

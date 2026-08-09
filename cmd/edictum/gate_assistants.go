@@ -25,8 +25,17 @@ var assistantRegistry = map[string]assistantOps{
 	"opencode":    {install: installOpenCode, uninstall: uninstallOpenCode},
 }
 
+var legacyAssistantUninstallers = map[string]func() (string, error){
+	"cursor": uninstallLegacyCursor,
+	"gemini": uninstallLegacyGemini,
+}
+
 func supportedAssistants() []string {
 	return []string{"claude-code", "copilot", "opencode"}
+}
+
+func uninstallableAssistants() []string {
+	return []string{"claude-code", "copilot", "opencode", "cursor", "gemini"}
 }
 
 func installAssistant(name string) (string, error) {
@@ -38,11 +47,13 @@ func installAssistant(name string) (string, error) {
 }
 
 func uninstallAssistant(name string) (string, error) {
-	ops, ok := assistantRegistry[name]
-	if !ok {
-		return "", fmt.Errorf("unsupported assistant %q; supported: %s", name, strings.Join(supportedAssistants(), ", "))
+	if ops, ok := assistantRegistry[name]; ok {
+		return ops.uninstall()
 	}
-	return ops.uninstall()
+	if uninstall, ok := legacyAssistantUninstallers[name]; ok {
+		return uninstall()
+	}
+	return "", fmt.Errorf("unsupported assistant %q; uninstallable: %s", name, strings.Join(uninstallableAssistants(), ", "))
 }
 
 // --- Claude Code ---

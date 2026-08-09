@@ -218,7 +218,7 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 		output = result
 
 	default:
-		output = map[string]any{"decision": decision}
+		return fmt.Errorf("unsupported format %q; supported: %s", format, supportedGateFormatsText)
 	}
 
 	data, err := json.Marshal(output)
@@ -231,8 +231,13 @@ func writeCheckOutput(cmd *cobra.Command, format, decision, ruleID, reason strin
 		switch format {
 		case "claude-code", "copilot":
 			return &exitError{code: 2}
+		case "opencode":
+			// The generated plugin reads allow:false from stdout and throws to block.
+			return nil
 		case "raw":
 			return &exitError{code: 1}
+		default:
+			return &exitError{code: 2}
 		}
 	}
 	return nil

@@ -9,9 +9,12 @@ import (
 	"testing"
 )
 
-func TestOpenCodePluginFailsClosedOnGateProcessFailure(t *testing.T) {
+func TestSecurityOpenCodePluginFailsClosed(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {
+		if os.Getenv("CI") != "" {
+			t.Fatal("node is required in CI to execute the generated OpenCode plugin")
+		}
 		t.Skip("node is required to execute the generated OpenCode plugin")
 	}
 

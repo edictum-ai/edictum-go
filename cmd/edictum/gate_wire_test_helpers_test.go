@@ -38,7 +38,7 @@ var gateWireContracts = map[string]gateWireContract{
 	"opencode": {
 		pinned:       true,
 		decisionPath: []string{"allow"},
-		accepted:     map[any]bool{false: true},
+		accepted:     map[any]bool{false: true, true: true},
 	},
 	// Raw has no target host protocol. Pin it when a named consumer and its
 	// primary-source accepted decision set are documented.
