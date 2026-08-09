@@ -96,8 +96,15 @@ func uninstallOpenCode() (string, error) {
 	}
 	pluginPath := filepath.Join(home, ".opencode", "plugins", "edictum-gate.ts")
 
-	if _, sErr := os.Stat(pluginPath); os.IsNotExist(sErr) {
+	data, readErr := os.ReadFile(pluginPath) //nolint:gosec // Known path under ~/.opencode.
+	if os.IsNotExist(readErr) {
 		return "Edictum gate plugin not found for OpenCode", nil
+	}
+	if readErr != nil {
+		return "", readErr
+	}
+	if !strings.HasPrefix(string(data), opencodeGeneratedPluginSignature+"\n") {
+		return "", fmt.Errorf("refusing to remove existing non-Edictum plugin at %s", pluginPath)
 	}
 	if rmErr := os.Remove(pluginPath); rmErr != nil {
 		return "", rmErr
