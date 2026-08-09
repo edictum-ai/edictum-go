@@ -36,10 +36,7 @@ export const EdictumGate = async ({ directory }) => {
         }
         const result = (proc.stdout || "").trim();
         if (!result) {
-          if (proc.status !== 0) {
-            throw new Error("Edictum gate check failed with exit " + proc.status);
-          }
-          return;
+          throw new Error("Edictum gate check produced no output (exit " + proc.status + ")");
         }
         const parsed = JSON.parse(result);
         if (parsed.allow === false) {

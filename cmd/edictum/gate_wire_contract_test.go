@@ -64,7 +64,8 @@ func TestSecurityGateFailureWireContracts(t *testing.T) {
 		{"internal_error", "valid", validRules, true},
 	}
 
-	for format, contract := range gateWireContracts {
+	for _, format := range []string{"claude-code", "copilot", "opencode", "raw"} {
+		contract := gateWireContracts[format]
 		for _, failure := range failures {
 			t.Run(format+"/"+failure.name, func(t *testing.T) {
 				cmd := newGateCheckCmd()

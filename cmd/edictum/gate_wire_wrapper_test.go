@@ -25,6 +25,7 @@ func TestSecurityOpenCodePluginFailsClosed(t *testing.T) {
 		want       string
 	}{
 		{"policy_block", `{"allow":false,"reason":"policy denied"}`, 0, "blocked\n"},
+		{"gate_failure_without_payload_exit_zero", "", 0, "blocked\n"},
 		{"gate_failure_without_payload", "", 3, "blocked\n"},
 		{"gate_failure_with_allow_payload", `{"allow":true}`, 3, "blocked\n"},
 		{"allow", `{"allow":true}`, 0, "allowed\n"},

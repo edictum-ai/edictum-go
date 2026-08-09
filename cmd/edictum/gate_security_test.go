@@ -9,7 +9,8 @@ import (
 	"testing"
 )
 
-// Minimal rule bundle for security tests. Denies rm -rf commands.
+// Minimal rule bundle for security tests. Tool input fields use the pipeline's
+// args.<field> selector form, so args.command matches the Bash command argument.
 const testRuleset = `apiVersion: edictum/v1
 kind: Ruleset
 metadata:
