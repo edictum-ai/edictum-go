@@ -4,7 +4,7 @@
 
 ### Security
 
-**The Cursor and Gemini gate formats did not reliably block a denied tool call.**
+**The Cursor and Gemini gate formats did not reliably enforce a block decision.**
 
 - **Cursor.** The emitter wrote `{"decision": "block"}`. Cursor's hook protocol reads
   `permission: "allow" | "deny"` — a field it was never sent. The decision was discarded. A normal
@@ -13,7 +13,7 @@
   Gemini treats exit 1 as a non-blocking warning, so the decision never reached the host. The
   wrapper carried a comment describing this path as fail-closed; it was not.
 
-In both cases the policy engine reached the correct decision and then failed to communicate it in a
+In both cases the pipeline reached the correct decision and then failed to communicate it in a
 form the host honours, so the tool ran. **Both formats are removed in this release** rather than
 shipped with a fix we cannot verify against a current live host — see *Removed*.
 
