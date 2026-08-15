@@ -8,17 +8,20 @@ name: realhost-harness
 # and real API quota, so nothing here may run on push or pull_request.
 # Publishing stays GitHub-hosted; this workflow never publishes anything.
 #
-# Runner host (label: edictum-realhost) is a Mac on the maintainer's user
-# account. The harness step sets the PATH entries the host needs:
-#   ~/.local/bin                             claude
-#   ~/.local/share/fnm/aliases/default/bin   node, npm, copilot (npm loader)
-#   /opt/homebrew/bin                        opencode
-# The fnm bin directory must precede /opt/homebrew/bin: the copilot CLI
-# loader must run under the fnm node toolchain. On 2026-08-15 the Homebrew
-# node (25.8.2) was itself unloadable (dyld: libsimdjson.31.dylib missing
-# against simdjson 4.6.4), which aborted copilot with Abort trap: 6.
-# Credentials are runner-local user accounts (Claude Code OAuth under
-# ~/.claude, Copilot CLI auth under ~/.copilot, OpenCode auth under
+# Runner host (label: edictum-realhost) is `edictum-realhost-mini`, a Mac
+# mini on the maintainer's user account, chosen by owner decision 2026-08-16.
+# The harness step puts ~/.local/bin first on PATH; every CLI the harness
+# drives lives there:
+#   ~/.local/bin/claude    Claude Code (official installer)
+#   ~/.local/bin/copilot   Copilot CLI (npm, prefix ~/.local; node 24 lives
+#                          in ~/.local/lib/node-v24.3.0-darwin-arm64 with
+#                          node/npm/npx symlinked into ~/.local/bin)
+#   ~/.local/bin/opencode  OpenCode (symlink to ~/.opencode/bin)
+# A single-directory layout is deliberate: the first proof host (laptop)
+# needed three PATH entries in a specific order and broke when node
+# resolved to a dyld-broken Homebrew node (Abort trap: 6 in copilot).
+# Credentials are runner-local user accounts (Claude Code OAuth in the
+# macOS keychain, Copilot CLI auth under ~/.copilot, OpenCode auth under
 # ~/.local/share/opencode/auth.json). No credentials live in this repo.
 
 on:
@@ -47,7 +50,7 @@ jobs:
           REALHOST_LOG_DIR: ${{ github.workspace }}/realhost-logs
           REALHOST_BREAK_HOOK: ${{ inputs.break-hook && '1' || '0' }}
         run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/fnm/aliases/default/bin:/opt/homebrew/bin:$PATH"
+          export PATH="$HOME/.local/bin:$PATH"
           bash ./scripts/realhost-harness.sh
       - name: Upload harness run log
         if: always()
