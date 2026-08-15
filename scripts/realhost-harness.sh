@@ -35,14 +35,16 @@
 #                          a fresh temp dir). The workflow points this at the
 #                          workspace and uploads it as an artifact.
 #
-# Runner host requirements:
-#   PATH must contain ~/.local/bin (claude), /opt/homebrew/bin (opencode)
-#   and ~/.local/share/fnm/aliases/default/bin (node; the copilot CLI is an
-#   npm loader and must run under the fnm node, not Homebrew node - on
-#   2026-08-15 Homebrew node 25.8.2 was dyld-broken and aborted copilot).
-#   The fnm bin directory must precede /opt/homebrew/bin.
-#   Credentials are runner-local user accounts (Claude Code
-#   OAuth under ~/.claude, Copilot CLI auth under ~/.copilot, OpenCode auth
+# Runner host requirements (host: edictum-realhost-mini, owner decision
+# 2026-08-16; the first proof host was the laptop, replaced by the mini):
+#   PATH must have ~/.local/bin first — claude (official installer),
+#   copilot (npm, prefix ~/.local), opencode (symlink to ~/.opencode/bin)
+#   and node/npm (symlinks to ~/.local/lib/node-v24.3.0-darwin-arm64)
+#   all live there. Single-directory layout on purpose: the laptop needed
+#   three PATH entries in order and broke when node resolved to a
+#   dyld-broken Homebrew node (Abort trap: 6 in copilot, 2026-08-15).
+#   Credentials are runner-local user accounts (Claude Code OAuth in the
+#   macOS keychain, Copilot CLI auth under ~/.copilot, OpenCode auth
 #   under ~/.local/share/opencode/auth.json). Nothing is stored in the repo.
 #
 # Every host runs in its own scratch directory. The copilot seam is the one
