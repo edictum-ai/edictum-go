@@ -11,8 +11,12 @@ name: realhost-harness
 # Runner host (label: edictum-realhost) is a Mac on the maintainer's user
 # account. The harness step sets the PATH entries the host needs:
 #   ~/.local/bin                             claude
+#   ~/.local/share/fnm/aliases/default/bin   node, npm, copilot (npm loader)
 #   /opt/homebrew/bin                        opencode
-#   ~/.local/share/fnm/aliases/default/bin   node (copilot CLI npm loader)
+# The fnm bin directory must precede /opt/homebrew/bin: the copilot CLI
+# loader must run under the fnm node toolchain. On 2026-08-15 the Homebrew
+# node (25.8.2) was itself unloadable (dyld: libsimdjson.31.dylib missing
+# against simdjson 4.6.4), which aborted copilot with Abort trap: 6.
 # Credentials are runner-local user accounts (Claude Code OAuth under
 # ~/.claude, Copilot CLI auth under ~/.copilot, OpenCode auth under
 # ~/.local/share/opencode/auth.json). No credentials live in this repo.
@@ -43,7 +47,7 @@ jobs:
           REALHOST_LOG_DIR: ${{ github.workspace }}/realhost-logs
           REALHOST_BREAK_HOOK: ${{ inputs.break-hook && '1' || '0' }}
         run: |
-          export PATH="$HOME/.local/bin:/opt/homebrew/bin:$HOME/.local/share/fnm/aliases/default/bin:$PATH"
+          export PATH="$HOME/.local/bin:$HOME/.local/share/fnm/aliases/default/bin:/opt/homebrew/bin:$PATH"
           bash ./scripts/realhost-harness.sh
       - name: Upload harness run log
         if: always()

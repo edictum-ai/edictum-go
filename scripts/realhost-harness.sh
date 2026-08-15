@@ -38,7 +38,10 @@
 # Runner host requirements:
 #   PATH must contain ~/.local/bin (claude), /opt/homebrew/bin (opencode)
 #   and ~/.local/share/fnm/aliases/default/bin (node; the copilot CLI is an
-#   npm loader). Credentials are runner-local user accounts (Claude Code
+#   npm loader and must run under the fnm node, not Homebrew node - on
+#   2026-08-15 Homebrew node 25.8.2 was dyld-broken and aborted copilot).
+#   The fnm bin directory must precede /opt/homebrew/bin.
+#   Credentials are runner-local user accounts (Claude Code
 #   OAuth under ~/.claude, Copilot CLI auth under ~/.copilot, OpenCode auth
 #   under ~/.local/share/opencode/auth.json). Nothing is stored in the repo.
 #
