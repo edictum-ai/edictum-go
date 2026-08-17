@@ -56,14 +56,23 @@
 set -u
 set -o pipefail
 
-LOG_DIR="${REALHOST_LOG_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/realhost-harness.XXXXXX")}"
+if [ -n "${REALHOST_LOG_DIR:-}" ]; then
+  mkdir -p "$REALHOST_LOG_DIR"
+  LOG_DIR="$(cd "$REALHOST_LOG_DIR" && pwd)"
+else
+  LOG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/realhost-harness.XXXXXX")"
+fi
 WORK_DIR="$LOG_DIR/work"
 mkdir -p "$WORK_DIR"
+rm -f "$LOG_DIR"/*.events.jsonl
 
 COPILOT_HOOK_FILE="$HOME/.copilot/hooks/edictum-realhost-probe.json"
 rm -f "$COPILOT_HOOK_FILE"
 cleanup() { rm -f "$COPILOT_HOOK_FILE"; }
-trap cleanup EXIT INT TERM HUP
+trap cleanup EXIT
+trap 'cleanup; exit 129' HUP
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
 
 FAILURES=""
 
@@ -124,6 +133,7 @@ run_cli_probe() { # $1 = host label; remaining args: CLI command
     log "$host: CLI exited 0"
   else
     fail "$host: CLI exited non-zero (see $host.err)"
+    return 1
   fi
 }
 
