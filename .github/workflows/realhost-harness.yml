@@ -1,0 +1,60 @@
+name: realhost-harness
+
+# Maintainer-dispatched real-host harness skeleton (L0.4). Drives the
+# installed Claude Code / Copilot CLI / OpenCode CLIs on a self-hosted
+# runner and proves the run is trustworthy: hooks that do not run fail the
+# run (scripts/realhost-harness.sh explains what this does and does not
+# prove). Dispatch-only by design: the host carries real user credentials
+# and real API quota, so nothing here may run on push or pull_request.
+# Publishing stays GitHub-hosted; this workflow never publishes anything.
+#
+# Runner host (label: edictum-realhost) is `edictum-realhost-mini`, a Mac
+# mini on the maintainer's user account, chosen by owner decision 2026-08-16.
+# The harness step puts ~/.local/bin first on PATH; every CLI the harness
+# drives lives there:
+#   ~/.local/bin/claude    Claude Code (official installer)
+#   ~/.local/bin/copilot   Copilot CLI (npm, prefix ~/.local; node 24 lives
+#                          in ~/.local/lib/node-v24.3.0-darwin-arm64 with
+#                          node/npm/npx symlinked into ~/.local/bin)
+#   ~/.local/bin/opencode  OpenCode (symlink to ~/.opencode/bin)
+# A single-directory layout is deliberate: the first proof host (laptop)
+# needed three PATH entries in a specific order and broke when node
+# resolved to a dyld-broken Homebrew node (Abort trap: 6 in copilot).
+# Credentials are runner-local user accounts (Claude Code OAuth in the
+# macOS keychain, Copilot CLI auth under ~/.copilot, OpenCode auth under
+# ~/.local/share/opencode/auth.json). No credentials live in this repo.
+
+on:
+  workflow_dispatch:
+    inputs:
+      break-hook:
+        description: "Deliberately break every probe hook (the run must go red)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: realhost-harness
+  cancel-in-progress: false
+
+jobs:
+  harness:
+    runs-on: [self-hosted, edictum-realhost]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run real-host harness skeleton
+        env:
+          REALHOST_LOG_DIR: ${{ github.workspace }}/realhost-logs
+          REALHOST_BREAK_HOOK: ${{ inputs.break-hook && '1' || '0' }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          bash ./scripts/realhost-harness.sh
+      - name: Upload harness run log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: realhost-harness-log${{ inputs.break-hook && '-broken-hook' || '' }}
+          path: realhost-logs/
