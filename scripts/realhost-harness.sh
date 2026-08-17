@@ -90,7 +90,7 @@ EOF
     cat > "$1" <<EOF
 #!/bin/sh
 # realhost harness probe — records the hook payload, allows everything.
-printf '{"probe_time":"%s"}' "\$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$2"
+printf '{"probe_time":"%s"}\n' "\$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$2"
 cat >> "$2"
 printf '\n' >> "$2"
 exit 0
