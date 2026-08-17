@@ -63,7 +63,7 @@ mkdir -p "$WORK_DIR"
 COPILOT_HOOK_FILE="$HOME/.copilot/hooks/edictum-realhost-probe.json"
 rm -f "$COPILOT_HOOK_FILE"
 cleanup() { rm -f "$COPILOT_HOOK_FILE"; }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT INT TERM HUP
 
 FAILURES=""
 
@@ -159,10 +159,12 @@ run_claude_code() {
 }
 EOF
 
-  (cd "$dir" && run_cli_probe "$host" \
+  pushd "$dir" >/dev/null
+  run_cli_probe "$host" \
     claude -p "Use the Bash tool to run exactly this command and reply with its output: echo edictum-probe-$host" \
       --settings "$dir/settings.json" \
-      --allowedTools "Bash")
+      --allowedTools "Bash"
+  popd >/dev/null
 
   check_hook_evidence "$host" "$events"
 }
@@ -200,9 +202,11 @@ run_copilot() {
 }
 EOF
 
-  (cd "$dir" && run_cli_probe "$host" \
+  pushd "$dir" >/dev/null
+  run_cli_probe "$host" \
     copilot -p "Run exactly this shell command and reply with its output: echo edictum-probe-$host" \
-      --allow-all-tools)
+      --allow-all-tools
+  popd >/dev/null
 
   check_hook_evidence "$host" "$events"
 }
@@ -258,8 +262,10 @@ export const EdictumProbe = async () => {
 EOF
   fi
 
-  (cd "$dir" && run_cli_probe "$host" \
-    opencode run "Run exactly this shell command and reply with its output: echo edictum-probe-$host")
+  pushd "$dir" >/dev/null
+  run_cli_probe "$host" \
+    opencode run "Run exactly this shell command and reply with its output: echo edictum-probe-$host"
+  popd >/dev/null
 
   check_hook_evidence "$host" "$events"
 }
