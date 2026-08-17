@@ -135,6 +135,7 @@ run_claude_code() {
   local host="claude-code"
   local dir="$WORK_DIR/$host"
   local events="$LOG_DIR/$host.events.jsonl"
+  rm -f "$events"
   mkdir -p "$dir"
 
   require_cli claude "$host" || return 0
@@ -180,6 +181,7 @@ run_copilot() {
   local host="copilot"
   local dir="$WORK_DIR/$host"
   local events="$LOG_DIR/$host.events.jsonl"
+  rm -f "$events"
   mkdir -p "$dir"
 
   require_cli copilot "$host" || return 0
@@ -220,6 +222,7 @@ run_opencode() {
   local host="opencode"
   local dir="$WORK_DIR/$host"
   local events="$LOG_DIR/$host.events.jsonl"
+  rm -f "$events"
   mkdir -p "$dir"
 
   require_cli opencode "$host" || return 0
